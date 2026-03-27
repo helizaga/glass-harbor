@@ -1,0 +1,29 @@
+{
+  "name": "glass-harbor-edm-lab",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && node scripts/copy-samples.mjs",
+    "preview": "vite preview",
+    "generate:samples": "node scripts/generate-samples.mjs",
+    "pack:json": "node scripts/build-pack-json.mjs --root samples/edm-core --base-url /samples/edm-core",
+    "prep": "npm run generate:samples && npm run pack:json",
+    "postinstall": "npm run prep",
+    "osc": "npx @strudel/osc",
+    "osc:debug": "npx @strudel/osc --debug",
+    "samples:serve": "node scripts/serve-samples.mjs",
+    "vendor:init": "node scripts/init-private-pack.mjs",
+    "vendor:import": "node scripts/import-private-pack.mjs",
+    "vendor:manifest": "node scripts/build-pack-json.mjs --root private-packs/runtime/edm-core --base-url /private-packs/runtime/edm-core"
+  },
+  "dependencies": {
+    "@strudel/repl": "1.3.0"
+  },
+  "devDependencies": {
+    "@strudel/osc": "1.3.2",
+    "@strudel/sampler": "0.2.4",
+    "vite": "8.0.3"
+  }
+}

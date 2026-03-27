@@ -1,0 +1,39 @@
+{
+  "air_texture": [
+    "/samples/edm-core/air_texture/0.wav"
+  ],
+  "clap_main": [
+    "/samples/edm-core/clap_main/0.wav",
+    "/samples/edm-core/clap_main/1.wav"
+  ],
+  "hat_closed": [
+    "/samples/edm-core/hat_closed/0.wav",
+    "/samples/edm-core/hat_closed/1.wav",
+    "/samples/edm-core/hat_closed/2.wav",
+    "/samples/edm-core/hat_closed/3.wav"
+  ],
+  "hat_open": [
+    "/samples/edm-core/hat_open/0.wav",
+    "/samples/edm-core/hat_open/1.wav"
+  ],
+  "impact_wide": [
+    "/samples/edm-core/impact_wide/0.wav"
+  ],
+  "kick_main": [
+    "/samples/edm-core/kick_main/0.wav",
+    "/samples/edm-core/kick_main/1.wav"
+  ],
+  "perc_top": [
+    "/samples/edm-core/perc_top/0.wav",
+    "/samples/edm-core/perc_top/1.wav"
+  ],
+  "riser_up": [
+    "/samples/edm-core/riser_up/0.wav"
+  ],
+  "shimmer_fx": [
+    "/samples/edm-core/shimmer_fx/0.wav"
+  ],
+  "vocal_chop": [
+    "/samples/edm-core/vocal_chop/0.wav"
+  ]
+}

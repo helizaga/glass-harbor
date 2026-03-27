@@ -1,0 +1,42 @@
+{
+  "vendor": "KSHMR Vol. 4",
+  "families": {
+    "kick_main": [
+      "Drums/Kicks/replace-with-your-kick-01.wav",
+      "Drums/Kicks/replace-with-your-kick-02.wav"
+    ],
+    "clap_main": [
+      "Drums/Claps/replace-with-your-clap-01.wav",
+      "Drums/Claps/replace-with-your-clap-02.wav"
+    ],
+    "hat_closed": [
+      "Drums/Hats/replace-with-your-closed-hat-01.wav",
+      "Drums/Hats/replace-with-your-closed-hat-02.wav",
+      "Drums/Hats/replace-with-your-closed-hat-03.wav",
+      "Drums/Hats/replace-with-your-closed-hat-04.wav"
+    ],
+    "hat_open": [
+      "Drums/Hats/replace-with-your-open-hat-01.wav",
+      "Drums/Hats/replace-with-your-open-hat-02.wav"
+    ],
+    "perc_top": [
+      "Percussion/replace-with-your-top-loop-or-hit-01.wav",
+      "Percussion/replace-with-your-top-loop-or-hit-02.wav"
+    ],
+    "impact_wide": [
+      "FX/Impacts/replace-with-your-impact-01.wav"
+    ],
+    "riser_up": [
+      "FX/Risers/replace-with-your-riser-01.wav"
+    ],
+    "shimmer_fx": [
+      "FX/Shimmers/replace-with-your-shimmer-01.wav"
+    ],
+    "air_texture": [
+      "Atmospheres/replace-with-your-air-texture-01.wav"
+    ],
+    "vocal_chop": [
+      "Vocals/replace-with-your-vocal-chop-01.wav"
+    ]
+  }
+}
