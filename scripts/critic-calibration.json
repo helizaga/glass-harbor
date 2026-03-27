@@ -1,0 +1,39 @@
+{
+  "version": "2026-03-27-v1",
+  "songs": {
+    "undertow-bloom": {
+      "style_lane": "melodic-house / long-build study",
+      "expected_top_weakness": "low_end_cleanliness"
+    },
+    "horizon-answer": {
+      "style_lane": "melodic-house / long-build study",
+      "expected_top_weakness": "section_contrast"
+    },
+    "open-water-signal": {
+      "style_lane": "melodic-house / long-build study",
+      "expected_top_weakness": "section_contrast"
+    },
+    "filter-memory-carousel": {
+      "style_lane": "french-house / loop-first study",
+      "expected_top_weakness": "groove_strength"
+    },
+    "filter-memory-carousel-v1": {
+      "style_lane": "french-house / loop-first study",
+      "expected_top_weakness": "groove_strength"
+    },
+    "filter-memory-carousel-v2": {
+      "style_lane": "french-house / loop-first study",
+      "expected_top_weakness": "groove_strength"
+    }
+  },
+  "comparisons": [
+    {
+      "source_song": "filter-memory-carousel",
+      "expected_order": [
+        "filter-memory-carousel-v2",
+        "filter-memory-carousel-v1",
+        "filter-memory-carousel"
+      ]
+    }
+  ]
+}

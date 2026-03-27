@@ -1,0 +1,53 @@
+{
+  "name": "glass-harbor",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "glass-harbor": "./bin/glass-harbor.mjs"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && node scripts/copy-samples.mjs",
+    "preview": "vite preview",
+    "generate:samples": "node scripts/generate-samples.mjs",
+    "pack:json": "node scripts/build-pack-json.mjs --root samples/edm-core --base-url /samples/edm-core",
+    "prep": "npm run generate:samples && npm run pack:json",
+    "postinstall": "npm run prep",
+    "osc": "npx @strudel/osc",
+    "osc:debug": "npx @strudel/osc --debug",
+    "song:new": "node ./bin/glass-harbor.mjs song new",
+    "song:variants": "node ./bin/glass-harbor.mjs song variants",
+    "song:validate": "node ./bin/glass-harbor.mjs song validate",
+    "song:serve": "node ./bin/glass-harbor.mjs song serve",
+    "song:render": "node ./bin/glass-harbor.mjs song render",
+    "song:analyze": "node ./bin/glass-harbor.mjs song analyze",
+    "song:critique": "node ./bin/glass-harbor.mjs song critique",
+    "song:revise": "node ./bin/glass-harbor.mjs song revise",
+    "song:status": "node ./bin/glass-harbor.mjs song status",
+    "song:next": "node ./bin/glass-harbor.mjs song next",
+    "song:approve": "node ./bin/glass-harbor.mjs song approve",
+    "song:reject": "node ./bin/glass-harbor.mjs song reject",
+    "song:loop": "node ./bin/glass-harbor.mjs song loop",
+    "song:compare": "node ./bin/glass-harbor.mjs song compare",
+    "song:explore": "node ./bin/glass-harbor.mjs song explore",
+    "debug:ui": "node ./bin/glass-harbor.mjs debug ui",
+    "debug:osc": "node ./bin/glass-harbor.mjs debug osc",
+    "samples:serve": "node scripts/serve-samples.mjs",
+    "vendor:init": "node scripts/init-private-pack.mjs",
+    "vendor:import": "node scripts/import-private-pack.mjs",
+    "vendor:manifest": "node scripts/build-pack-json.mjs --root private-packs/runtime/edm-core --base-url /private-packs/runtime/edm-core"
+  },
+  "dependencies": {
+    "@strudel/core": "1.2.6",
+    "@strudel/repl": "1.3.0",
+    "@strudel/transpiler": "1.2.6",
+    "@strudel/webaudio": "1.3.0"
+  },
+  "devDependencies": {
+    "@strudel/osc": "1.3.2",
+    "@strudel/sampler": "0.2.4",
+    "playwright": "1.58.2",
+    "vite": "8.0.3"
+  }
+}

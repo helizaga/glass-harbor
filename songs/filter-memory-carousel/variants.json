@@ -1,0 +1,28 @@
+{
+  "source_slug": "filter-memory-carousel",
+  "source_brief_path": "/Users/tommy/Documents/GitHub/song/songs/filter-memory-carousel/filter-memory-carousel.brief.md",
+  "source_song_path": "/Users/tommy/Documents/GitHub/song/songs/filter-memory-carousel/filter-memory-carousel.strudel.js",
+  "generated_at": "2026-03-27T19:05:05.111Z",
+  "variants": [
+    {
+      "slug": "filter-memory-carousel-v1",
+      "label": "v1",
+      "variant_index": 1,
+      "source_slug": "filter-memory-carousel",
+      "title": "Filter Memory Carousel Variant 1",
+      "brief_path": "/Users/tommy/Documents/GitHub/song/songs/filter-memory-carousel-v1/filter-memory-carousel-v1.brief.md",
+      "song_path": "/Users/tommy/Documents/GitHub/song/songs/filter-memory-carousel-v1/filter-memory-carousel-v1.strudel.js",
+      "source_song_path": "/Users/tommy/Documents/GitHub/song/songs/filter-memory-carousel/filter-memory-carousel.strudel.js"
+    },
+    {
+      "slug": "filter-memory-carousel-v2",
+      "label": "v2",
+      "variant_index": 2,
+      "source_slug": "filter-memory-carousel",
+      "title": "Filter Memory Carousel Variant 2",
+      "brief_path": "/Users/tommy/Documents/GitHub/song/songs/filter-memory-carousel-v2/filter-memory-carousel-v2.brief.md",
+      "song_path": "/Users/tommy/Documents/GitHub/song/songs/filter-memory-carousel-v2/filter-memory-carousel-v2.strudel.js",
+      "source_song_path": "/Users/tommy/Documents/GitHub/song/songs/filter-memory-carousel/filter-memory-carousel.strudel.js"
+    }
+  ]
+}

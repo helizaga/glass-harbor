@@ -1,0 +1,30 @@
+{
+  "genre_tags": ["french house study", "disco strut"],
+  "mood_tags": ["playful", "elastic", "clean-sweet", "celebratory"],
+  "bpm_range": [121, 125],
+  "section_map": ["intro:8", "groove:16", "lift:8", "breakdown:8", "drop:16", "outro:8"],
+  "energy_curve": ["medium", "high", "high", "medium-low", "high", "low"],
+  "roles_by_section": {
+    "intro": ["kick_main", "hat_closed"],
+    "groove": ["kick_main", "clap_main", "hat_closed", "perc_top"],
+    "lift": ["hat_open", "perc_top"],
+    "breakdown": ["vocal_chop", "air_texture"],
+    "drop": ["kick_main", "clap_main", "hat_closed", "hat_open", "perc_top"],
+    "outro": ["hat_closed", "air_texture"]
+  },
+  "groove_notes": [
+    "keep the drum pulse steady while the loop phrasing changes around it",
+    "subtraction should feel like a breath with memory, not a genre switch",
+    "the brightest layer should be withheld until the return"
+  ],
+  "harmonic_summary": "lock to one central vamp and let rhythm edits create most of the contrast",
+  "transition_recipes": [
+    "narrow-band filter before the break",
+    "clap and bass return together on the first bar of the comeback"
+  ],
+  "anti_goals": [
+    "avoid overcomplicated harmony",
+    "avoid giant white-noise lifts",
+    "avoid a flat return section"
+  ]
+}
