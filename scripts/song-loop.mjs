@@ -1,5 +1,8 @@
+import { readFileSync } from 'node:fs';
+
 import { findLatestRunDir, resolveSongSlug } from '../lib/song-contract.mjs';
 import { CommandError, EXIT_CODES, isMainModule, runCliCommand } from '../lib/command-runtime.mjs';
+import { appendMemoryHistory, chooseBaselineRun, ensureSongMemory, updateSongMemory } from '../lib/review-gates.mjs';
 import { handleSongAnalyze } from './song-analyze.mjs';
 import { handleSongCritique } from './song-critique.mjs';
 import { handleSongRender } from './song-render.mjs';
@@ -21,6 +24,12 @@ export async function handleSongLoop({ argv }) {
   let finalExitCode = EXIT_CODES.OK;
   let reviseResult = null;
   let activeRunDir = null;
+  let baselineRunDir = null;
+  let recommendedNextAction = null;
+  let approvalRequired = false;
+  let changeSummary = null;
+  let regressionFlags = [];
+  ensureSongMemory(slug);
   while (iteration < maxIters) {
     iteration += 1;
 
@@ -47,6 +56,9 @@ export async function handleSongLoop({ argv }) {
 
     reviseResult = await handleSongRevise({ argv: ['--song', slug] });
     activeRunDir = reviseResult.run_dir ?? activeRunDir;
+    baselineRunDir = reviseResult.baseline_run_dir ?? baselineRunDir;
+    recommendedNextAction = reviseResult.recommended_next_action ?? recommendedNextAction;
+    approvalRequired = reviseResult.approval_required ?? approvalRequired;
     finalExitCode = reviseResult.exitCode ?? EXIT_CODES.OK;
     if (finalExitCode !== EXIT_CODES.OK) {
       break;
@@ -57,6 +69,35 @@ export async function handleSongLoop({ argv }) {
   }
 
   const runDir = activeRunDir ?? findLatestRunDir(slug);
+  let verdict = null;
+  if (runDir && reviseResult?.verdict_path) {
+    verdict = JSON.parse(readFileSync(reviseResult.verdict_path, 'utf8'));
+    baselineRunDir = verdict.baseline_run_dir ?? baselineRunDir;
+    recommendedNextAction = verdict.recommended_next_action ?? recommendedNextAction;
+    approvalRequired = verdict.approval_required ?? approvalRequired;
+    changeSummary = verdict.change_summary ?? null;
+    regressionFlags = verdict.regression_flags ?? [];
+
+    updateSongMemory(slug, (memory) =>
+      appendMemoryHistory(
+        {
+          ...memory,
+          last_attempted_run_dir: runDir,
+          pending_review_run_dir: verdict.recommended_next_action === 'review_gate' ? runDir : null,
+          current_open_issue: verdict.summary ?? memory.current_open_issue ?? null,
+        },
+        {
+          at: new Date().toISOString(),
+          run_dir: runDir,
+          baseline_run_dir: verdict.baseline_run_dir ?? chooseBaselineRun(slug, { memory, excludeRunDir: runDir }),
+          decision: verdict.verdict,
+          summary: verdict.summary,
+          recommended_next_action: verdict.recommended_next_action,
+        },
+      ),
+    );
+  }
+
   return {
     phase: 'song:loop',
     status:
@@ -71,8 +112,16 @@ export async function handleSongLoop({ argv }) {
     song: slug,
     iterations: iteration,
     run_dir: runDir,
+    baseline_run_dir: baselineRunDir,
     revision_request_path: reviseResult?.request_path ?? null,
     revision_prompt_path: reviseResult?.prompt_path ?? null,
+    verdict_path: reviseResult?.verdict_path ?? null,
+    verdict_markdown_path: reviseResult?.verdict_markdown_path ?? null,
+    summary_path: reviseResult?.summary_path ?? null,
+    change_summary: changeSummary,
+    regression_flags: regressionFlags,
+    recommended_next_action: recommendedNextAction,
+    approval_required: approvalRequired,
     message:
       finalExitCode === EXIT_CODES.OK
         ? `Completed ${iteration} review pass${iteration === 1 ? '' : 'es'} for ${slug}.`

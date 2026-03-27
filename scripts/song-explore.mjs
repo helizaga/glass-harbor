@@ -3,6 +3,7 @@ import { join } from 'node:path';
 
 import { formatRunId, resolveSongSlug, runsRoot } from '../lib/song-contract.mjs';
 import { CommandError, EXIT_CODES, isMainModule, runCliCommand } from '../lib/command-runtime.mjs';
+import { writeVerdictArtifacts } from '../lib/review-gates.mjs';
 import { handleSongCompare } from './song-compare.mjs';
 import { handleSongLoop } from './song-loop.mjs';
 import { handleSongVariants } from './song-variants.mjs';
@@ -20,6 +21,30 @@ function parseIntegerFlag(argv, flag, fallback) {
 function chooseNextAction(compareResult, loopBySlug) {
   const winner = compareResult.winner;
   const winnerLoop = loopBySlug.get(winner.song) ?? null;
+
+  if (compareResult.recommended_next_action === 'review_gate') {
+    return {
+      type: 'review_gate',
+      target_slug: winner.song,
+      reason: compareResult.winner_reason,
+    };
+  }
+
+  if (compareResult.recommended_next_action === 'abandon') {
+    return {
+      type: 'abandon_branch',
+      target_slug: winner.song,
+      reason: compareResult.winner_reason,
+    };
+  }
+
+  if (compareResult.recommended_next_action === 'revise') {
+    return {
+      type: 'revise_winner',
+      target_slug: winner.song,
+      reason: compareResult.winner_reason,
+    };
+  }
 
   if (compareResult.readiness === 'blocked') {
     return {
@@ -74,17 +99,21 @@ function buildExploreMarkdown(payload) {
     '',
     `Generated at: ${payload.generated_at}`,
     `Readiness: ${payload.readiness}`,
+    `Baseline run: ${payload.baseline_run_dir ?? 'none'}`,
+    `Recommended next action: ${payload.recommended_next_action}`,
+    `Approval required: ${payload.approval_required ? 'yes' : 'no'}`,
     '',
     '## Variants',
     ...payload.variants.map(
       (variant) =>
-        `- ${variant.slug}: loop_status=${variant.loop_status}, gate=${variant.gate}, weighted_score=${variant.weighted_score ?? 'n/a'}, run_dir=${variant.run_dir ?? 'none'}`,
+        `- ${variant.slug}: loop_status=${variant.loop_status}, gate=${variant.gate}, weighted_score=${variant.weighted_score ?? 'n/a'}, regression=${variant.regression_vs_baseline?.verdict ?? 'n/a'}, run_dir=${variant.run_dir ?? 'none'}`,
     ),
     '',
     '## Compare',
     `- winner: ${payload.compare.winner_slug}`,
     `- winner run: ${payload.compare.winner_run_dir ?? 'none'}`,
     `- decision basis: ${payload.compare.decision_basis}`,
+    `- winner reason: ${payload.compare.winner_reason}`,
     '',
     '## Next Action',
     `- ${payload.next_action.type}: ${payload.next_action.target_slug ?? 'global'}`,
@@ -141,10 +170,13 @@ export async function handleSongExplore({ argv }) {
         slug: candidate.song,
         loop_status: loopResult?.status ?? 'missing',
         run_dir: candidate.run_dir ?? loopResult?.run_dir ?? null,
+        baseline_run_dir: candidate.baseline_run_dir ?? compareResult.baseline_run_dir ?? null,
         gate: candidate.gate,
         provisional: candidate.provisional,
         weighted_score: candidate.gate === 'missing' ? null : candidate.weighted_score,
         blocker_class: candidate.blocker_class,
+        regression_vs_baseline: candidate.regression_vs_baseline ?? null,
+        recommended_next_action: candidate.recommended_next_action ?? null,
       };
     });
 
@@ -156,19 +188,49 @@ export async function handleSongExplore({ argv }) {
     generated_at: new Date().toISOString(),
     readiness: compareResult.readiness,
     formula_version: compareResult.formula_version,
+    run_dir: explorationDir,
+    baseline_run_dir: compareResult.baseline_run_dir ?? null,
     variants,
     compare: {
       winner_slug: compareResult.winner.song,
       winner_run_dir: compareResult.winner.run_dir,
       comparison_json_path: compareResult.comparison_json_path,
       comparison_markdown_path: compareResult.comparison_markdown_path,
+      winner_reason: compareResult.winner_reason,
+      loser_reasons: compareResult.loser_reasons,
+      regression_vs_baseline: compareResult.regression_vs_baseline,
       decision_basis: 'tier_then_weighted_score',
     },
     next_action: chooseNextAction(compareResult, loopBySlug),
+    recommended_next_action: compareResult.recommended_next_action,
+    approval_required: compareResult.approval_required,
+    regression_vs_baseline: compareResult.regression_vs_baseline,
   };
 
   const exploreJsonPath = join(explorationDir, 'explore.json');
   const exploreMarkdownPath = join(explorationDir, 'explore.md');
+  const verdictArtifacts = writeVerdictArtifacts(explorationDir, {
+    ...compareResult.winner.regression_vs_baseline,
+    phase: 'explore_verdict',
+    version: compareResult.formula_version,
+    song: slug,
+    run_dir: compareResult.winner.run_dir,
+    baseline_run_dir: compareResult.baseline_run_dir,
+    verdict: compareResult.winner.regression_vs_baseline.verdict,
+    approval_required: compareResult.approval_required,
+    recommended_next_action: compareResult.recommended_next_action,
+    baseline_scores: {},
+    current_scores: compareResult.winner.scores ?? {},
+    preserve_axes: [],
+    target_axes: [],
+    change_summary: {
+      weighted_baseline: 0,
+      weighted_current: compareResult.winner.weighted_score ?? 0,
+      weighted_delta: compareResult.regression_vs_baseline?.weighted_delta ?? 0,
+      top_metric_changes: [],
+    },
+    summary: compareResult.winner_reason,
+  });
   writeFileSync(exploreJsonPath, `${JSON.stringify(payload, null, 2)}\n`);
   writeFileSync(exploreMarkdownPath, `${buildExploreMarkdown(payload)}\n`);
 
@@ -177,6 +239,9 @@ export async function handleSongExplore({ argv }) {
     exploration_dir: explorationDir,
     explore_json_path: exploreJsonPath,
     explore_markdown_path: exploreMarkdownPath,
+    verdict_path: verdictArtifacts.verdict_path,
+    verdict_markdown_path: verdictArtifacts.verdict_markdown_path,
+    summary_path: verdictArtifacts.summary_path,
     messages: [
       `Exploration completed for ${slug}; winner: ${compareResult.winner.song}`,
       exploreJsonPath,

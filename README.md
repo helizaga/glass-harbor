@@ -72,11 +72,24 @@ This produces a gitignored run under `runs/<slug>/<timestamp>/` with:
 - `sections/*.wav`
 - `analysis.json`
 - `critique.json`
+- `verdict.json`
+- `verdict.md`
+- `summary.md`
 - `revision.md`
 - `revision-request.json`
 - `revision-prompt.md`
 
 The render path uses a local browser runtime driven by Playwright. You do not need to use a browser UI by hand, but Strudel still needs a browser engine for reliable playback and offline rendering.
+
+Each song also keeps local agent memory in `songs/<slug>/memory.json`:
+
+- current approved baseline run
+- last attempted run
+- pending review run
+- current open issue
+- short decision history
+
+This file is local state and is gitignored.
 
 ## Variant Comparison
 
@@ -111,11 +124,17 @@ npm exec -- glass-harbor song explore glass-harbor --count 3 --max-iters 1
 
 - `comparison.json`
 - `comparison.md`
+- `verdict.json`
+- `verdict.md`
+- `summary.md`
 
 `song explore` writes a gitignored exploration bundle under `runs/<source-slug>/explorations/<timestamp>/` with:
 
 - `explore.json`
 - `explore.md`
+- `verdict.json`
+- `verdict.md`
+- `summary.md`
 
 When you compare from a source slug with `variants.json`, the base song is included automatically as the baseline unless you pass explicit slugs instead.
 
@@ -238,5 +257,6 @@ Compatibility and support scripts:
 
 - The included audio is generated placeholder material so the repo works immediately and stays license-safe.
 - The local app is intentionally no longer the center of the workflow.
+- The recommended human-in-the-loop pattern is: agent runs the CLI, you read `summary.md` or `verdict.md`, then you approve or redirect.
 - The project is most valuable as workflow infrastructure on top of Strudel, not as a replacement for Strudel itself.
 - The review loop is deterministic first: MIR-style analysis runs every pass, while future audio-model critique can layer on top through a provider hook.

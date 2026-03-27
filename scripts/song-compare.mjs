@@ -10,21 +10,19 @@ import {
   songPaths,
 } from '../lib/song-contract.mjs';
 import { CommandError, EXIT_CODES, isMainModule, runCliCommand } from '../lib/command-runtime.mjs';
+import {
+  baselineComparisonForCandidate,
+  chooseBaselineRun,
+  critiqueForRun,
+  ensureSongMemory,
+  strongestAxis,
+  weakestAxis,
+  weightedScore,
+  writeVerdictArtifacts,
+  REVIEW_GATE_VERSION,
+} from '../lib/review-gates.mjs';
 
-const SCORE_WEIGHTS = {
-  groove_strength: 0.22,
-  section_contrast: 0.18,
-  low_end_cleanliness: 0.16,
-  style_fit: 0.14,
-  transition_impact: 0.12,
-  melodic_memorability: 0.1,
-  top_end_harshness: 0.05,
-  structure_clarity: 0.03,
-};
-
-function round(value) {
-  return Number(value.toFixed(3));
-}
+const FORMULA_VERSION = REVIEW_GATE_VERSION;
 
 function parseCompareSlugs(argv) {
   const normalized = [];
@@ -66,32 +64,6 @@ function loadVariantsFromManifest(sourceSlug) {
   return [...new Set([sanitizeSlug(sourceSlug), ...variantSlugs].filter(Boolean))];
 }
 
-function weightedScore(scores = {}) {
-  return round(
-    Object.entries(SCORE_WEIGHTS).reduce((sum, [key, weight]) => sum + (Number(scores[key] ?? 0) * weight), 0),
-  );
-}
-
-function strongestAxis(scores = {}) {
-  const entries = Object.entries(scores);
-  if (entries.length === 0) {
-    return null;
-  }
-
-  const [key, value] = entries.sort((left, right) => Number(right[1]) - Number(left[1]))[0];
-  return { key, value: round(Number(value)) };
-}
-
-function lowestAxis(scores = {}) {
-  const entries = Object.entries(scores);
-  if (entries.length === 0) {
-    return null;
-  }
-
-  const [key, value] = entries.sort((left, right) => Number(left[1]) - Number(right[1]))[0];
-  return { key, value: round(Number(value)) };
-}
-
 function candidateSummary(candidate) {
   if (candidate.gate === 'blocked' || candidate.gate === 'missing') {
     return `${candidate.song} is blocked by ${candidate.primary_liability ?? 'runtime issues'}.`;
@@ -102,19 +74,25 @@ function candidateSummary(candidate) {
   return `${candidate.song} is currently the strongest revise candidate with better ${candidate.strongest_axis?.key?.replaceAll('_', ' ') ?? 'overall balance'}.`;
 }
 
-function buildComparisonMarkdown({ sourceSong, winner, candidates, comparisonPath }) {
+function buildComparisonMarkdown({ sourceSong, winner, candidates, comparisonPath, baselineRunDir, verdict }) {
   return [
     `# Song Comparison: ${sourceSong}`,
     '',
     `Winner: ${winner.song}`,
+    `Baseline run: ${baselineRunDir ?? 'none'}`,
+    `Recommended next action: ${verdict.recommended_next_action}`,
+    `Approval required: ${verdict.approval_required ? 'yes' : 'no'}`,
     '',
     winner.summary,
     '',
     '## Ranked Candidates',
-    ...candidates.map((candidate, index) => `- #${index + 1} ${candidate.song} | ${candidate.rank_bucket_label} | score ${candidate.weighted_score}\n  summary: ${candidate.summary}\n  top: groove ${candidate.scores?.groove_strength ?? 0}, contrast ${candidate.scores?.section_contrast ?? 0}, low-end ${candidate.scores?.low_end_cleanliness ?? 0}\n  watch: ${candidate.primary_liability ?? 'none'}`),
+    ...candidates.map(
+      (candidate, index) =>
+        `- #${index + 1} ${candidate.song} | ${candidate.rank_bucket_label} | score ${candidate.weighted_score}\n  summary: ${candidate.summary}\n  regression: ${candidate.regression_vs_baseline.verdict}\n  watch: ${candidate.primary_liability ?? 'none'}`,
+    ),
     '',
-    '## Winner Actions',
-    ...(winner.revision_actions.length > 0 ? winner.revision_actions.map((action) => `- ${action}`) : ['- none']),
+    '## Next Step',
+    `- ${verdict.recommended_next_action}`,
     '',
     `JSON artifact: ${join(comparisonPath, 'comparison.json')}`,
   ].join('\n');
@@ -152,13 +130,14 @@ function compareCandidates(left, right) {
   return (
     rightBucket.rank - leftBucket.rank ||
     right.weighted_score - left.weighted_score ||
+    right.regression_vs_baseline.weighted_delta - left.regression_vs_baseline.weighted_delta ||
     (left.music_findings?.length ?? 0) - (right.music_findings?.length ?? 0) ||
     (left.revision_actions?.length ?? 0) - (right.revision_actions?.length ?? 0) ||
     left.song.localeCompare(right.song)
   );
 }
 
-function loadCandidate(slug) {
+function loadCandidate(slug, baselineRunDir, baselineCritique) {
   const runDir = findLatestRunDir(slug, { requiredFiles: ['critique.json', 'run.json'] });
   const critiquePath = runDir ? join(runDir, 'critique.json') : '';
   const runPath = runDir ? join(runDir, 'run.json') : '';
@@ -180,6 +159,7 @@ function loadCandidate(slug) {
           message: `No critique artifact found for ${slug}. Run glass-harbor song loop ${slug} --max-iters 1 --json first.`,
         },
       ],
+      music_findings: [],
       strongest_axis: null,
       weakest_axis: null,
       primary_liability: 'critique_missing',
@@ -187,6 +167,15 @@ function loadCandidate(slug) {
       revision_actions: [`Run glass-harbor song loop ${slug} --max-iters 1 --json before comparing variants.`],
       critique_path: critiquePath || null,
       run_path: runPath || null,
+      regression_vs_baseline: {
+        verdict: 'missing',
+        weighted_delta: 0,
+        deltas: {},
+        regression_flags: [],
+        summary: `No critique artifact found for ${slug}.`,
+        recommended_next_action: 'revise',
+        approval_required: false,
+      },
       ranking: {
         bucket_label: 'missing',
         weighted_score: 0,
@@ -200,12 +189,24 @@ function loadCandidate(slug) {
   const critique = readJson(critiquePath);
   const score = weightedScore(critique.scores);
   const strongest = strongestAxis(critique.scores);
-  const weakest = lowestAxis(critique.scores);
+  const weakest = weakestAxis(critique.scores);
   const primaryLiability =
     critique.runtime_blockers?.[0]?.code ??
     critique.music_findings?.[0]?.title ??
     weakest?.key ??
     null;
+
+  const regressionVsBaseline = baselineComparisonForCandidate({
+    baselineRunDir,
+    baselineCritique,
+    candidate: {
+      song: slug,
+      run_dir: runDir,
+      gate: critique.gate ?? 'missing',
+      summary: critique.summary ?? null,
+      scores: critique.scores ?? {},
+    },
+  });
 
   const ranking = {
     bucket_label: rankBucket({
@@ -223,6 +224,7 @@ function loadCandidate(slug) {
         provisional: Boolean(critique.provisional),
       }).rank,
       score,
+      regressionVsBaseline.weighted_delta,
       -((critique.music_findings ?? []).length),
       -((critique.revision_actions ?? []).length),
       slug,
@@ -243,11 +245,100 @@ function loadCandidate(slug) {
     strongest_axis: strongest,
     weakest_axis: weakest,
     primary_liability: primaryLiability,
-    summary: critique.summary ?? candidateSummary({ song: slug, gate: critique.gate ?? 'missing', strongest_axis: strongest, primary_liability: primaryLiability }),
+    summary:
+      critique.summary ??
+      candidateSummary({
+        song: slug,
+        gate: critique.gate ?? 'missing',
+        strongest_axis: strongest,
+        primary_liability: primaryLiability,
+      }),
     revision_actions: (critique.revision_actions ?? []).map((action) => action.action ?? action).filter(Boolean),
     critique_path: critiquePath,
     run_path: runPath,
+    regression_vs_baseline: regressionVsBaseline,
     ranking,
+  };
+}
+
+function buildComparisonDecision({ sourceSong, baselineRunDir, baselineCritique, rankedCandidates }) {
+  const winner = rankedCandidates[0];
+  const loserReasons = Object.fromEntries(
+    rankedCandidates
+      .filter((candidate) => candidate.song !== winner.song)
+      .map((candidate) => [
+        candidate.song,
+        candidate.gate === 'missing' || candidate.gate === 'blocked'
+          ? candidate.primary_liability ?? 'not review-ready'
+          : candidate.regression_vs_baseline.verdict === 'improved'
+            ? 'still scored lower than the winner after weighting'
+            : candidate.regression_vs_baseline.summary,
+      ]),
+  );
+
+  let recommendedNextAction = 'revise';
+  let approvalRequired = false;
+  let winnerReason = `${winner.song} leads on weighted score within the strongest critique bucket.`;
+
+  if (winner.gate === 'missing' || winner.gate === 'blocked') {
+    recommendedNextAction = 'revise';
+    winnerReason = `${winner.song} only leads because the other candidates are even less review-ready.`;
+  } else if (winner.regression_vs_baseline.verdict === 'improved') {
+    recommendedNextAction = 'review_gate';
+    approvalRequired = true;
+    winnerReason = `${winner.song} beats the approved baseline and is ready for human review.`;
+  } else if (winner.song === sourceSong) {
+    recommendedNextAction = 'revise';
+    winnerReason = `${winner.song} remains the best direction, but no candidate beat the approved baseline.`;
+  } else {
+    recommendedNextAction = 'abandon';
+    winnerReason = `${winner.song} wins among the candidates, but it does not beat the approved baseline.`;
+  }
+
+  const verdict = {
+    phase: 'comparison_verdict',
+    version: REVIEW_GATE_VERSION,
+    song: sourceSong,
+    run_dir: winner.run_dir,
+    baseline_run_dir: baselineRunDir,
+    verdict:
+      winner.regression_vs_baseline.verdict === 'improved'
+        ? 'improved'
+        : winner.gate === 'missing' || winner.gate === 'blocked'
+          ? 'blocked'
+          : recommendedNextAction === 'abandon'
+            ? 'regressed'
+            : 'flat',
+    approval_required: approvalRequired,
+    recommended_next_action: recommendedNextAction,
+    baseline_scores: baselineCritique?.scores ?? {},
+    current_scores: winner.scores ?? {},
+    preserve_axes: [],
+    target_axes: [],
+    regression_flags: winner.regression_vs_baseline.regression_flags ?? [],
+    change_summary: {
+      weighted_baseline: weightedScore(baselineCritique?.scores ?? {}),
+      weighted_current: winner.weighted_score ?? 0,
+      weighted_delta: winner.regression_vs_baseline.weighted_delta ?? 0,
+      top_metric_changes: [],
+    },
+    regression_vs_baseline: {
+      baseline_run_dir: baselineRunDir,
+      winner_song: winner.song,
+      verdict: winner.regression_vs_baseline.verdict,
+      weighted_delta: winner.regression_vs_baseline.weighted_delta ?? 0,
+      deltas: winner.regression_vs_baseline.deltas ?? {},
+      regression_flags: winner.regression_vs_baseline.regression_flags ?? [],
+    },
+    summary: winnerReason,
+  };
+
+  return {
+    winnerReason,
+    loserReasons,
+    verdict,
+    recommendedNextAction,
+    approvalRequired,
   };
 }
 
@@ -262,8 +353,7 @@ export async function handleSongCompare({ argv, positionals }) {
   }
 
   const explicitSlugs = parseCompareSlugs(argv);
-  const candidateSlugs =
-    explicitSlugs.length > 1 ? explicitSlugs : loadVariantsFromManifest(sourceSong);
+  const candidateSlugs = explicitSlugs.length > 1 ? explicitSlugs : loadVariantsFromManifest(sourceSong);
 
   if (candidateSlugs.length === 0) {
     throw new CommandError(
@@ -275,8 +365,12 @@ export async function handleSongCompare({ argv, positionals }) {
     );
   }
 
-  const candidates = [...new Set(candidateSlugs)].map(loadCandidate).sort(compareCandidates);
-  const winner = candidates[0];
+  const memory = ensureSongMemory(sourceSong);
+  const baselineRunDir = chooseBaselineRun(sourceSong, { memory });
+  const baselineCritique = critiqueForRun(baselineRunDir);
+  const candidates = [...new Set(candidateSlugs)]
+    .map((slug) => loadCandidate(slug, baselineRunDir, baselineCritique))
+    .sort(compareCandidates);
   const rankedCandidates = candidates.map((candidate) => {
     const bucket = rankBucket(candidate);
     return {
@@ -297,13 +391,22 @@ export async function handleSongCompare({ argv, positionals }) {
         : 'partial'
       : 'ready';
 
+  const decision = buildComparisonDecision({
+    sourceSong,
+    baselineRunDir,
+    baselineCritique,
+    rankedCandidates,
+  });
+
   const payload = {
     phase: 'song:compare',
     status: 'ok',
     exitCode: EXIT_CODES.OK,
     readiness,
-    formula_version: '2026-03-27-v1',
+    formula_version: FORMULA_VERSION,
     source_song: sourceSong,
+    run_dir: comparisonDir,
+    baseline_run_dir: baselineRunDir,
     compared_songs: rankedCandidates.map((candidate) => candidate.song),
     candidate_count: rankedCandidates.length,
     missing_candidates: missingCandidates,
@@ -317,21 +420,25 @@ export async function handleSongCompare({ argv, positionals }) {
       rank_bucket_label: rankedWinner.rank_bucket_label,
       comparison_score: rankedWinner.comparison_score,
       weighted_score: rankedWinner.weighted_score,
-      summary:
-        rankedWinner.gate === 'blocked' || rankedWinner.gate === 'missing'
-          ? `${rankedWinner.song} only leads because the other candidates are even less review-ready.`
-          : `${rankedWinner.song} is the current best direction because it wins the strongest review bucket and has the highest weighted musical score in that bucket.`,
+      summary: decision.winnerReason,
       strongest_axis: rankedWinner.strongest_axis,
       primary_liability: rankedWinner.primary_liability,
       revision_actions: rankedWinner.revision_actions,
+      regression_vs_baseline: rankedWinner.regression_vs_baseline,
     },
+    winner_reason: decision.winnerReason,
+    loser_reasons: decision.loserReasons,
     candidates: rankedCandidates,
+    regression_vs_baseline: rankedWinner.regression_vs_baseline,
+    recommended_next_action: decision.recommendedNextAction,
+    approval_required: decision.approvalRequired,
     message:
       rankedWinner.gate === 'blocked' || rankedWinner.gate === 'missing'
         ? `Comparison completed for ${sourceSong}, but the leading candidate is still blocked.`
         : `Comparison completed for ${sourceSong}; ${rankedWinner.song} is the current best direction.`,
   };
 
+  const verdictArtifacts = writeVerdictArtifacts(comparisonDir, decision.verdict);
   const comparisonJsonPath = join(comparisonDir, 'comparison.json');
   const comparisonMarkdownPath = join(comparisonDir, 'comparison.md');
   writeFileSync(comparisonJsonPath, `${JSON.stringify(payload, null, 2)}\n`);
@@ -339,9 +446,11 @@ export async function handleSongCompare({ argv, positionals }) {
     comparisonMarkdownPath,
     `${buildComparisonMarkdown({
       sourceSong,
-      winner: { ...payload.winner, summary: payload.winner.summary, revision_actions: rankedWinner.revision_actions },
+      winner: { ...payload.winner, summary: payload.winner.summary },
       candidates: rankedCandidates,
       comparisonPath: comparisonDir,
+      baselineRunDir,
+      verdict: decision.verdict,
     })}\n`,
   );
 
@@ -349,11 +458,10 @@ export async function handleSongCompare({ argv, positionals }) {
     ...payload,
     comparison_json_path: comparisonJsonPath,
     comparison_markdown_path: comparisonMarkdownPath,
-    messages: [
-      payload.message,
-      comparisonJsonPath,
-      comparisonMarkdownPath,
-    ],
+    verdict_path: verdictArtifacts.verdict_path,
+    verdict_markdown_path: verdictArtifacts.verdict_markdown_path,
+    summary_path: verdictArtifacts.summary_path,
+    messages: [payload.message, comparisonJsonPath, comparisonMarkdownPath],
   };
 }
 

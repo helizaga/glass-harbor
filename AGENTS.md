@@ -15,6 +15,7 @@
 4. Use `glass-harbor song render`, `glass-harbor song analyze`, `glass-harbor song critique`, and `glass-harbor song revise` for review passes.
 5. When exploring multiple directions from one brief, prefer `glass-harbor song explore <slug>` for the full scaffold -> loop -> compare pass. If you need finer control, use `glass-harbor song variants <slug>` and `glass-harbor song compare <slug>` directly. The compare command includes the base song by default when reading `variants.json`.
 6. Use the local app only for debugging, preload checks, pack switching, or SuperDirt verification.
+7. Treat `songs/<slug>/memory.json` as the local baseline-memory source of truth for approved runs and pending review candidates.
 
 ## Song Contract
 - Song files must start with:
@@ -48,7 +49,12 @@
 - `render -> analyze -> critique -> revise`
 - Deterministic analysis comes first.
 - Audio-model critique is optional and should be treated as advisory, not the sole judge.
-- `runs/` is gitignored and holds generated artifacts like `mix.wav`, `sections/*.wav`, `analysis.json`, `critique.json`, `revision.md`, `revision-request.json`, and `revision-prompt.md`.
+- `runs/` is gitignored and holds generated artifacts like `mix.wav`, `sections/*.wav`, `analysis.json`, `critique.json`, `verdict.json`, `verdict.md`, `summary.md`, `revision.md`, `revision-request.json`, and `revision-prompt.md`.
+- Review-gate behavior is:
+  - `review_gate`: the run improved and should be shown to the user before promotion
+  - `revise`: keep iterating without user interruption
+  - `abandon`: candidate is not good enough to beat baseline
+  - `escalate_to_human`: the revision regressed or damaged protected strengths
 
 ## Reference Cards
 - `references/` contains abstract retrieval cards for prompting and critique.
@@ -87,3 +93,4 @@
 - Prefer modifying repo scripts and docs over embedding workflow rules in prompts.
 - If a check can be deterministic, encode it in code or scripts instead of prose.
 - Keep generated music code readable enough for a human to paste, inspect, and tweak quickly.
+- When you finish a long-running command, surface `summary.md` or `verdict.md` to the user instead of raw artifact spelunking.

@@ -59,9 +59,12 @@ export async function handleSongAnalyze({ argv }) {
       exitCode: EXIT_CODES.ANALYSIS_BLOCKED,
       song: slug,
       run_dir: runDir,
+      baseline_run_dir: null,
       readiness: 'blocked',
       anomalies: blockedPayload.anomalies,
       runtime_blockers: blockedPayload.runtime_blockers,
+      recommended_next_action: 'revise',
+      approval_required: false,
       message: `Analysis skipped for ${slug} because the render phase is blocked.`,
     };
   }
@@ -130,9 +133,12 @@ export async function handleSongAnalyze({ argv }) {
     exitCode: payload.status === 'blocked' ? EXIT_CODES.ANALYSIS_BLOCKED : EXIT_CODES.OK,
     song: slug,
     run_dir: runDir,
+    baseline_run_dir: null,
     readiness,
     anomalies,
     runtime_blockers: runtimeBlockers,
+    recommended_next_action: payload.status === 'blocked' ? 'revise' : null,
+    approval_required: false,
     message:
       payload.status === 'blocked'
         ? `Analysis completed for ${slug}, but the run is blocked by render/runtime issues.`

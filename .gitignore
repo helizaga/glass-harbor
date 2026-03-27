@@ -2,6 +2,7 @@ node_modules/
 dist/
 private-packs/
 runs/
+songs/**/memory.json
 .playwright-cli/
 __pycache__/
 .DS_Store

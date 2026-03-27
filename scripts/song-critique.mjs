@@ -267,12 +267,15 @@ export async function handleSongCritique({ argv }) {
     exitCode: EXIT_CODES.OK,
     song: slug,
     run_dir: runDir,
+    baseline_run_dir: null,
     gate,
     blocker_class: blockerClass,
     provisional,
     summary: payload.summary,
     runtime_blockers: runtimeBlockers,
     revision_actions: payload.revision_actions,
+    recommended_next_action: gate === 'blocked' ? 'revise' : gate === 'pass' ? 'review_gate' : 'revise',
+    approval_required: gate === 'pass',
     message: `Wrote critique to ${join(runDir, 'critique.json')}`,
   };
 }

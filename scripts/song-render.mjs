@@ -196,9 +196,12 @@ export async function handleSongRender({ argv }) {
       exitCode: status === 'blocked' ? EXIT_CODES.RENDER_BLOCKED : EXIT_CODES.OK,
       song: slug,
       run_dir: runDir,
+      baseline_run_dir: null,
       preflight: payload.preflight,
       runtime_blockers: runtimeBlockers,
       outputs: payload.outputs ?? null,
+      recommended_next_action: status === 'blocked' ? 'revise' : null,
+      approval_required: false,
       message:
         status === 'blocked'
           ? `Rendered ${slug} to ${runDir}, but the run is blocked by runtime issues.`
