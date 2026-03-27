@@ -6,6 +6,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
 const targets = [
   ['samples', 'samples'],
+  ['songs', 'songs'],
   ['tracks', 'tracks'],
 ];
 if (existsSync(join(root, 'private-packs', 'runtime'))) {

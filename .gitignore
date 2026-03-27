@@ -1,5 +1,7 @@
 node_modules/
 dist/
 private-packs/
+runs/
 .playwright-cli/
+__pycache__/
 .DS_Store

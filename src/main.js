@@ -3,7 +3,7 @@ import './style.css';
 
 const PUBLIC_PACK_URL = '/samples/edm-core/strudel.json';
 const PRIVATE_PACK_URL = '/private-packs/runtime/edm-core/strudel.json';
-const PACK_TOKEN = '__SAMPLE_PACK_URL__';
+const AUTHORED_PACK_URL = 'http://localhost:5432';
 const REQUIRED_PACK_FAMILIES = [
   'kick_main',
   'clap_main',
@@ -19,16 +19,16 @@ const REQUIRED_PACK_FAMILIES = [
 
 const tracks = [
   {
-    id: 'local',
-    label: 'Local Preview',
-    path: '/tracks/glass-harbor.local.strudel.js',
-    description: 'Custom sample pack plus browser-native placeholder synths for fast arranging.',
+    id: 'song',
+    label: 'Glass Harbor Song',
+    path: '/songs/glass-harbor/glass-harbor.strudel.js',
+    description: 'Primary pasteable song artifact for Strudel web and local debugging.',
   },
   {
     id: 'superdirt',
-    label: 'SuperDirt Performance',
+    label: 'SuperDirt Debug',
     path: '/tracks/glass-harbor.superdirt.strudel.js',
-    description: 'Local drums and FX with bass, pads, plucks, and leads routed over OSC.',
+    description: 'Optional local debug surface for OSC and SuperDirt verification.',
   },
   {
     id: 'preload',
@@ -66,10 +66,9 @@ app.innerHTML = `
   <main class="shell">
     <section class="hero">
       <p class="eyebrow">Strudel + SuperDirt</p>
-      <h1>Glass Harbor EDM Lab</h1>
+      <h1>Glass Harbor</h1>
       <p class="lede">
-        Local-first live-coding workspace for modern EDM sketches with a custom pack,
-        pinned Strudel REPL, and a SuperDirt-ready performance lane.
+        Paste-first songwriting scaffold for agent-generated Strudel songs. This browser app is a debug runner, not the primary workflow.
       </p>
     </section>
 
@@ -114,15 +113,19 @@ app.innerHTML = `
     <section class="notes">
       <div>
         <h2>Session Flow</h2>
-        <p>Start in Local Preview, run Pack Preload once, then switch to SuperDirt Performance when your OSC bridge and SuperDirt are live.</p>
+        <p>Primary workflow: run <code>glass-harbor song serve</code>, paste a file from <code>songs/</code> into Strudel web, then use this app only when you want local debugging.</p>
+      </div>
+      <div>
+        <h2>Review Loop</h2>
+        <p>For agent review, use <code>glass-harbor song render</code>, <code>glass-harbor song analyze</code>, and <code>glass-harbor song critique</code>. They produce gitignored run artifacts under <code>runs/</code>.</p>
       </div>
       <div>
         <h2>Samples</h2>
-        <p>The committed pack is generated scaffold audio under <code>samples/edm-core</code>. Your future commercial import lives separately under <code>private-packs/runtime/edm-core</code>.</p>
+        <p>Authored song files target <code>http://localhost:5432</code> for paste mode. This debug runner rewrites that to the active scaffold or private overlay manifest automatically.</p>
       </div>
       <div>
-        <h2>OSC</h2>
-        <p>Use <code>npm run osc</code> to start the Strudel bridge, then launch SuperDirt locally. The SuperDirt track routes only the tonal parts over OSC.</p>
+        <h2>Debug</h2>
+        <p>Use <code>npm run osc</code> plus the <code>SuperDirt Debug</code> tab when you want to verify the external sound engine path for a generated song.</p>
       </div>
     </section>
 
@@ -203,7 +206,10 @@ async function loadTrack(track, packMode, requestId) {
   }
 
   const packSelection = await resolvePackUrl(packMode.id);
-  const code = (await response.text()).replaceAll(PACK_TOKEN, packSelection.url);
+  const code = (await response.text())
+    .replaceAll('__SAMPLE_PACK_URL__', packSelection.url)
+    .replaceAll("'http://localhost:5432'", `'${packSelection.url}'`)
+    .replaceAll('"http://localhost:5432"', `"${packSelection.url}"`);
   if (requestId !== activeLoadRequest) {
     return;
   }

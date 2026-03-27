@@ -1,0 +1,28 @@
+{
+  "genre_tags": ["melodic house", "progressive house"],
+  "mood_tags": ["cinematic", "restrained", "polished", "reflective"],
+  "bpm_range": [122, 126],
+  "section_map": ["intro:8", "groove:16", "lift:8", "breakdown:16", "drop:16", "outro:8"],
+  "energy_curve": ["low", "medium", "medium-high", "low", "high", "low"],
+  "roles_by_section": {
+    "intro": ["air_texture", "shimmer_fx"],
+    "groove": ["kick_main", "clap_main", "hat_closed"],
+    "lift": ["hat_open", "perc_top", "riser_up"],
+    "breakdown": ["air_texture", "vocal_chop"],
+    "drop": ["kick_main", "clap_main", "hat_closed", "hat_open", "perc_top", "impact_wide"]
+  },
+  "groove_notes": [
+    "hats stay controlled in the groove and widen in the drop",
+    "kick remains simple while bass density changes energy"
+  ],
+  "harmonic_summary": "minor tonic center with suspended color",
+  "transition_recipes": [
+    "8-bar riser into 1-bar impact",
+    "hat pullback before the drop",
+    "filtered air bed under the breakdown"
+  ],
+  "anti_goals": [
+    "avoid overly bright hats",
+    "avoid aggressive festival-style layering"
+  ]
+}

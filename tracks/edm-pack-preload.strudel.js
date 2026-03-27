@@ -1,7 +1,7 @@
 // @title EDM Pack Preload
 // @details Quiet warm-up pass for the custom pack before a serious take.
 
-samples('__SAMPLE_PACK_URL__')
+samples('http://localhost:5432')
 setcpm(120 / 4)
 
 stack(

@@ -21,6 +21,8 @@ This repo ships a compact sound pack with stable names so tracks survive sample 
 - Prefer a small number of high-confidence sounds over large undifferentiated folders.
 - Upgrade one family at a time and regenerate `strudel.json` after changes.
 - Keep `kick_main`, `clap_main`, and `hat_closed` especially disciplined because they define the whole groove identity.
+- Song code must reference these stable families only, not vendor filenames or raw private paths.
+- Review and generation tooling assume these family names stay stable across pack upgrades.
 
 ## Quality Bar
 

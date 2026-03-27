@@ -1,0 +1,27 @@
+{
+  "genre_tags": ["deep house", "chill crossover"],
+  "mood_tags": ["late-night", "smooth", "warm", "understated"],
+  "bpm_range": [120, 124],
+  "section_map": ["intro:8", "groove:16", "breath:8", "groove-2:16", "breakdown:16", "drop:16", "outro:8"],
+  "energy_curve": ["low", "medium", "medium", "medium-low", "low", "medium-high", "low"],
+  "roles_by_section": {
+    "intro": ["air_texture"],
+    "groove": ["kick_main", "clap_main", "hat_closed"],
+    "breath": ["shimmer_fx"],
+    "breakdown": ["riser_up", "vocal_chop"],
+    "drop": ["kick_main", "clap_main", "hat_open", "perc_top", "impact_wide"]
+  },
+  "groove_notes": [
+    "onset density rises gradually instead of all at once",
+    "open hats feel like lift, not aggression"
+  ],
+  "harmonic_summary": "stable minor center with slower harmonic rhythm",
+  "transition_recipes": [
+    "shimmer swell into a quieter breakdown",
+    "impact reserved for the biggest section only"
+  ],
+  "anti_goals": [
+    "avoid oversized low end",
+    "avoid cluttered tops"
+  ]
+}
