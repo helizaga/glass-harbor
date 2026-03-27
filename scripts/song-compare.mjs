@@ -74,6 +74,9 @@ function candidateSummary(candidate) {
   if (candidate.gate === 'pass') {
     return `${candidate.song} is the cleanest current option and already clears the critique gate.`;
   }
+  if (candidate.gate === 'review_gate') {
+    return `${candidate.song} is promising and ready for human review, but the evidence is still mixed.`;
+  }
   return `${candidate.song} is currently the strongest revise candidate with better ${candidate.strongest_axis?.key?.replaceAll('_', ' ') ?? 'overall balance'}.`;
 }
 
@@ -104,6 +107,12 @@ function buildComparisonMarkdown({ sourceSong, winner, candidates, comparisonPat
 function rankBucket(candidate) {
   if (candidate.gate === 'pass' && !candidate.provisional) {
     return { rank: 7, label: 'pass' };
+  }
+  if (candidate.gate === 'review_gate' && !candidate.provisional) {
+    return { rank: 6, label: 'review_gate' };
+  }
+  if (candidate.gate === 'review_gate' && candidate.provisional) {
+    return { rank: 6, label: 'review_gate*' };
   }
   if (candidate.gate === 'pass' && candidate.provisional) {
     return { rank: 6, label: 'pass*' };

@@ -2,12 +2,23 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 
-import { normalizeRuntimeErrors, readText, resolveRunDir, resolveSongSlug, songPaths, validateSongCode } from '../lib/song-contract.mjs';
+import {
+  normalizeRuntimeErrors,
+  parseBrief,
+  readText,
+  resolveRunDir,
+  resolveSongSlug,
+  selectReferenceCards,
+  songPaths,
+  validateSongCode,
+} from '../lib/song-contract.mjs';
 import { CommandError, EXIT_CODES, isMainModule, runCliCommand } from '../lib/command-runtime.mjs';
+import { resolvePythonExecutable } from '../lib/python-runtime.mjs';
+import { computeEmbeddingAlignment } from './song-embedding-provider.mjs';
 
 function runPython(args) {
   return new Promise((resolve, reject) => {
-    const child = spawn('python3', args, { stdio: 'inherit' });
+    const child = spawn(resolvePythonExecutable(), args, { stdio: 'inherit' });
     child.on('exit', (code) => {
       if (code === 0) {
         resolve();
@@ -28,6 +39,49 @@ function parseJsonFile(filePath, { exitCode, code, label }) {
       code,
     });
   }
+}
+
+function round(value) {
+  return Number((Number(value) || 0).toFixed(3));
+}
+
+function clamp(value, min = 0, max = 1) {
+  return Math.max(min, Math.min(max, Number(value) || 0));
+}
+
+function computeSectionTransitions(sectionNames, sections = {}) {
+  const transitions = [];
+  for (let index = 0; index < sectionNames.length - 1; index += 1) {
+    const from = sectionNames[index];
+    const to = sectionNames[index + 1];
+    const left = sections[from];
+    const right = sections[to];
+    if (!left || !right) {
+      continue;
+    }
+
+    transitions.push({
+      from,
+      to,
+      loudness_delta: round((right.rms ?? 0) - (left.rms ?? 0)),
+      onset_delta: round((right.onset_density ?? 0) - (left.onset_density ?? 0)),
+      brightness_delta: round(
+        ((right.timbre?.spectral_centroid ?? 0) - (left.timbre?.spectral_centroid ?? 0)) / 4000,
+      ),
+      low_end_delta: round(
+        ((right.timbre?.sub_energy_ratio ?? 0) + (right.timbre?.bass_energy_ratio ?? 0)) -
+          ((left.timbre?.sub_energy_ratio ?? 0) + (left.timbre?.bass_energy_ratio ?? 0)),
+      ),
+      boundary_strength: round(
+        clamp(
+          Math.abs((right.rms ?? 0) - (left.rms ?? 0)) * 5 +
+            Math.abs((right.onset_density ?? 0) - (left.onset_density ?? 0)) / 3 +
+            Math.abs((right.timbre?.spectral_centroid ?? 0) - (left.timbre?.spectral_centroid ?? 0)) / 6000,
+        ),
+      ),
+    });
+  }
+  return transitions;
 }
 
 export async function handleSongAnalyze({ argv }) {
@@ -92,7 +146,9 @@ export async function handleSongAnalyze({ argv }) {
   }
 
   const song = songPaths(slug);
-  const validation = validateSongCode(readText(song.songPath));
+  const code = readText(song.songPath);
+  const brief = parseBrief(readText(song.briefPath));
+  const validation = validateSongCode(code);
   const outputPath = join(runDir, 'analysis.json');
 
   try {
@@ -151,6 +207,15 @@ export async function handleSongAnalyze({ argv }) {
 
   const readiness =
     runtimeBlockers.length > 0 ? 'blocked' : anomalies.length > 0 ? 'provisional' : 'ready_for_critique';
+  const referenceCards = selectReferenceCards(brief, 3);
+  const embeddingAlignment = await computeEmbeddingAlignment({
+    analysis: raw,
+    brief,
+    references: referenceCards,
+    runDir,
+  });
+  const sectionNames = validation.sections.map((section) => section.name).filter((name) => raw.sections?.[name]);
+  const confidenceNotes = [...new Set([...(raw.confidence_notes ?? []), ...(embeddingAlignment.confidence_notes ?? [])])];
   const payload = {
     phase: 'analyze',
     status: readiness === 'ready_for_critique' ? 'ok' : readiness === 'blocked' ? 'blocked' : 'partial',
@@ -158,7 +223,14 @@ export async function handleSongAnalyze({ argv }) {
     run_dir: runDir,
     readiness,
     metrics: raw.mix,
+    rhythm: raw.rhythm ?? raw.mix?.rhythm ?? {},
+    structure: raw.structure ?? raw.mix?.structure ?? {},
+    tonal: raw.tonal ?? raw.mix?.tonal ?? {},
+    timbre: raw.timbre ?? raw.mix?.timbre ?? {},
     sections: raw.sections,
+    section_transitions: computeSectionTransitions(sectionNames, raw.sections ?? {}),
+    embedding_alignment: embeddingAlignment,
+    confidence_notes: confidenceNotes,
     anomalies,
     runtime_blockers: runtimeBlockers,
   };

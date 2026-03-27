@@ -1,0 +1,30 @@
+{
+  "genre_tags": ["french house study", "loop-first house"],
+  "mood_tags": ["glossy", "buoyant", "nostalgic", "chrome-lit"],
+  "bpm_range": [120, 124],
+  "section_map": ["intro:8", "groove:16", "lift:8", "breakdown:8", "drop:16", "outro:8"],
+  "energy_curve": ["medium", "medium-high", "high", "medium-low", "high", "low"],
+  "roles_by_section": {
+    "intro": ["kick_main", "hat_closed", "air_texture"],
+    "groove": ["kick_main", "clap_main", "hat_closed", "perc_top"],
+    "lift": ["hat_open", "riser_up"],
+    "breakdown": ["air_texture", "vocal_chop"],
+    "drop": ["kick_main", "clap_main", "hat_closed", "hat_open", "impact_wide"],
+    "outro": ["air_texture"]
+  },
+  "groove_notes": [
+    "the loop should feel already alive before the arrangement widens",
+    "movement comes from filter opening and mute choreography more than from new chords",
+    "robotic punctuation should feel clipped and playful, not sentimental"
+  ],
+  "harmonic_summary": "one strong harmonic loop with small color shifts is better than multiple unrelated sections",
+  "transition_recipes": [
+    "filtered groove squeeze before the return",
+    "one-bar dropout before the impact downbeat"
+  ],
+  "anti_goals": [
+    "avoid cinematic breakdown sprawl",
+    "avoid festival-style riser dependence",
+    "avoid melodic-house wash"
+  ]
+}

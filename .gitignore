@@ -5,4 +5,5 @@ runs/
 songs/**/memory.json
 .playwright-cli/
 __pycache__/
+.glass-harbor-venv/
 .DS_Store

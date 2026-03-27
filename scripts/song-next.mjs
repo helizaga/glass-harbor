@@ -53,7 +53,7 @@ function buildNextAction(statusPayload) {
   }
 
   if (
-    (statusPayload.recommended_next_action === 'keep' || baseline.gate === 'pass') &&
+    (statusPayload.recommended_next_action === 'keep' || baseline.gate === 'pass' || baseline.gate === 'review_gate') &&
     !statusPayload.current_open_issue
   ) {
     return {

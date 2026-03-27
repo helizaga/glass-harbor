@@ -4,6 +4,7 @@ import {
   chooseBaselineRun,
   critiqueForRun,
   ensureSongMemory,
+  isReviewReadyGate,
   loadRunVerdict,
   loadSongMemory,
   songMemoryPath,
@@ -46,7 +47,7 @@ export async function handleSongStatus({ argv }) {
       pendingVerdict?.recommended_next_action ??
       (pendingRunDir
         ? 'review_gate'
-        : memory.current_open_issue || !baselineRunDir || baselineCritique?.gate !== 'pass'
+        : memory.current_open_issue || !baselineRunDir || !isReviewReadyGate(baselineCritique?.gate)
           ? 'revise'
           : 'keep'),
     approval_required: Boolean(pendingRunDir),

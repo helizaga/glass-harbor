@@ -91,6 +91,21 @@ Each song also keeps local agent memory in `songs/<slug>/memory.json`:
 
 This file is local state and is gitignored.
 
+The analyzer now prefers a repo-local Python environment at `.glass-harbor-venv/bin/python` when present, then falls back to `GLASS_HARBOR_PYTHON`, then `python3`. For the richer MIR stack, install:
+
+```sh
+python3 -m venv .glass-harbor-venv
+. .glass-harbor-venv/bin/activate
+python -m pip install -r scripts/requirements-analysis.txt
+```
+
+Optional style-alignment env:
+
+- `GLASS_HARBOR_EMBEDDING_PROVIDER=none|mulan`
+- `GLASS_HARBOR_MULAN_MODEL_PATH=/path/to/local/model`
+
+If the MuLan backend is unavailable, critique falls back to deterministic MIR and retrieval-based style scoring with lower confidence.
+
 ## Variant Comparison
 
 When one brief needs multiple candidate directions, scaffold sibling song folders first:

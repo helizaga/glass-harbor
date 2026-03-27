@@ -51,6 +51,8 @@
 - Default review flow is:
 - `render -> analyze -> critique -> revise`
 - Deterministic analysis comes first.
+- The richer MIR path expects a local Python environment such as `.glass-harbor-venv` with `scripts/requirements-analysis.txt` installed.
+- If `GLASS_HARBOR_EMBEDDING_PROVIDER=mulan` is set but the backend is unavailable, keep going with deterministic MIR style scoring and treat confidence as lower.
 - Audio-model critique is optional and should be treated as advisory, not the sole judge.
 - `runs/` is gitignored and holds generated artifacts like `mix.wav`, `sections/*.wav`, `analysis.json`, `critique.json`, `verdict.json`, `verdict.md`, `summary.md`, `revision.md`, `revision-request.json`, and `revision-prompt.md`.
 - Review-gate behavior is:
