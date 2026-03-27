@@ -144,6 +144,21 @@ You can also compare arbitrary slugs directly:
 npm exec -- glass-harbor song compare open-water-signal horizon-answer
 ```
 
+## Thread Workflow
+
+If you want Codex threads to be the interface, use these commands as the control surface:
+
+- `glass-harbor song status <slug>`
+- `glass-harbor song approve <slug> [--run <path>] [--reason <text>]`
+- `glass-harbor song reject <slug> [--run <path>] [--reason <text>]`
+
+The intended loop is:
+
+1. agent runs `song loop`, `song compare`, or `song explore`
+2. agent summarizes `summary.md` or `verdict.md` in the thread
+3. you reply with approval or rejection
+4. agent calls `song approve` or `song reject` and continues
+
 ## Stable Sound Vocabulary
 
 Generated songs should only target these sampled roles unless you explicitly expand the contract:
@@ -227,6 +242,9 @@ Primary CLI:
 - `glass-harbor song analyze <slug>`
 - `glass-harbor song critique <slug>`
 - `glass-harbor song revise <slug>`
+- `glass-harbor song status <slug>`
+- `glass-harbor song approve <slug> [--run <path>] [--reason <text>]`
+- `glass-harbor song reject <slug> [--run <path>] [--reason <text>]`
 - `glass-harbor song loop <slug>`
 - `glass-harbor song compare <slug> [<other-slug> ...]`
 - `glass-harbor song explore <slug> [--count <n>] [--max-iters <n>]`

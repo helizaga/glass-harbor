@@ -13,9 +13,11 @@
 2. Generate or revise the canonical song file at `songs/<slug>/<slug>.strudel.js`.
 3. Keep the song directly pasteable into `https://strudel.cc/` after `glass-harbor song serve`.
 4. Use `glass-harbor song render`, `glass-harbor song analyze`, `glass-harbor song critique`, and `glass-harbor song revise` for review passes.
-5. When exploring multiple directions from one brief, prefer `glass-harbor song explore <slug>` for the full scaffold -> loop -> compare pass. If you need finer control, use `glass-harbor song variants <slug>` and `glass-harbor song compare <slug>` directly. The compare command includes the base song by default when reading `variants.json`.
-6. Use the local app only for debugging, preload checks, pack switching, or SuperDirt verification.
-7. Treat `songs/<slug>/memory.json` as the local baseline-memory source of truth for approved runs and pending review candidates.
+5. Use `glass-harbor song status <slug>` to inspect approved baseline, pending review, and current open issue before taking action in the thread.
+6. When exploring multiple directions from one brief, prefer `glass-harbor song explore <slug>` for the full scaffold -> loop -> compare pass. If you need finer control, use `glass-harbor song variants <slug>` and `glass-harbor song compare <slug>` directly. The compare command includes the base song by default when reading `variants.json`.
+7. Use `glass-harbor song approve` and `glass-harbor song reject` to resolve review gates after the user answers in the thread.
+8. Use the local app only for debugging, preload checks, pack switching, or SuperDirt verification.
+9. Treat `songs/<slug>/memory.json` as the local baseline-memory source of truth for approved runs and pending review candidates.
 
 ## Song Contract
 - Song files must start with:
@@ -81,6 +83,9 @@
 - `glass-harbor song analyze <slug>`
 - `glass-harbor song critique <slug>`
 - `glass-harbor song revise <slug>`
+- `glass-harbor song status <slug>`
+- `glass-harbor song approve <slug> [--run <path>] [--reason <text>]`
+- `glass-harbor song reject <slug> [--run <path>] [--reason <text>]`
 - `glass-harbor song loop <slug>`
 - `glass-harbor song compare <slug> [<other-slug> ...]`
 - `glass-harbor song explore <slug> [--count <n>] [--max-iters <n>]`
