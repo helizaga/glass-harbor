@@ -9,7 +9,8 @@
     "groove": ["kick_main", "clap_main", "hat_closed"],
     "lift": ["hat_open", "perc_top", "riser_up"],
     "breakdown": ["air_texture", "vocal_chop"],
-    "drop": ["kick_main", "clap_main", "hat_closed", "hat_open", "perc_top", "impact_wide"]
+    "drop": ["kick_main", "clap_main", "hat_closed", "hat_open", "perc_top", "impact_wide"],
+    "outro": ["air_texture", "shimmer_fx"]
   },
   "groove_notes": [
     "hats stay controlled in the groove and widen in the drop",

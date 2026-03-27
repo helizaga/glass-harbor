@@ -37,10 +37,7 @@ const compareNatural = (left, right) => left.localeCompare(right, undefined, { n
 function assertInsideRoot(rootPath, candidatePath, label) {
   const rel = relative(rootPath, candidatePath);
   const escapesRoot = rel.startsWith('..') || rel.includes(`${sep}..${sep}`) || rel === '..';
-  if (escapesRoot || rel === '') {
-    if (rel === '') {
-      return;
-    }
+  if (escapesRoot) {
     throw new Error(`${label} must stay inside ${rootPath}`);
   }
 }

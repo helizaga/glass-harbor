@@ -10,12 +10,12 @@
 
 ## Structure
 
-- intro
-- groove
-- lift
-- breakdown
-- drop
-- outro
+- intro: 8
+- groove: 16
+- lift: 8
+- breakdown: 16
+- drop: 16
+- outro: 8
 
 ## Sonic Goals
 

@@ -59,15 +59,22 @@ function scriptPath(name) {
 }
 
 function parseSongArgs(args, { requireSlug = false } = {}) {
-  const rest = [...args];
-  const hasSongFlag = rest.includes('--song') || rest.includes('-s');
+  const hasSongFlag = args.includes('--song') || args.includes('-s');
+  const flagsWithValues = new Set(['--song', '-s', '--run', '--count', '--max-iters', '--reason']);
+  const rest = [];
   let slug = null;
 
-  if (!hasSongFlag) {
-    const slugIndex = rest.findIndex((value) => !value.startsWith('-'));
-    if (slugIndex !== -1) {
-      slug = rest[slugIndex];
-      rest.splice(slugIndex, 1);
+  for (let index = 0; index < args.length; index += 1) {
+    const value = args[index];
+    if (!hasSongFlag && !slug && !value.startsWith('-')) {
+      slug = value;
+      continue;
+    }
+
+    rest.push(value);
+    if (flagsWithValues.has(value) && args[index + 1] !== undefined) {
+      rest.push(args[index + 1]);
+      index += 1;
     }
   }
 

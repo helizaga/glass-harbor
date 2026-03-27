@@ -9,7 +9,8 @@ const targets = [
   ['songs', 'songs'],
   ['tracks', 'tracks'],
 ];
-if (existsSync(join(root, 'private-packs', 'runtime'))) {
+const includePrivateRuntime = process.env.GLASS_HARBOR_INCLUDE_PRIVATE_RUNTIME === '1';
+if (includePrivateRuntime && existsSync(join(root, 'private-packs', 'runtime'))) {
   targets.push(['private-packs/runtime', 'private-packs/runtime']);
 }
 

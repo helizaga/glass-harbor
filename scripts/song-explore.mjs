@@ -144,7 +144,11 @@ export async function handleSongExplore({ argv }) {
     argv: ['--song', slug, '--count', `${count}`, ...(force ? ['--force'] : [])],
   });
 
-  const loopResults = [];
+  const loopResults = [
+    await handleSongLoop({
+      argv: ['--song', slug, '--max-iters', `${maxIters}`],
+    }),
+  ];
   for (const variant of variantsResult.variants) {
     const loopResult = await handleSongLoop({
       argv: ['--song', variant.slug, '--max-iters', `${maxIters}`],
@@ -209,14 +213,15 @@ export async function handleSongExplore({ argv }) {
 
   const exploreJsonPath = join(explorationDir, 'explore.json');
   const exploreMarkdownPath = join(explorationDir, 'explore.md');
+  const winnerRegression = compareResult.winner.regression_vs_baseline ?? {};
   const verdictArtifacts = writeVerdictArtifacts(explorationDir, {
-    ...compareResult.winner.regression_vs_baseline,
+    ...winnerRegression,
     phase: 'explore_verdict',
     version: compareResult.formula_version,
     song: slug,
     run_dir: compareResult.winner.run_dir,
     baseline_run_dir: compareResult.baseline_run_dir,
-    verdict: compareResult.winner.regression_vs_baseline.verdict,
+    verdict: winnerRegression.verdict ?? 'flat',
     approval_required: compareResult.approval_required,
     recommended_next_action: compareResult.recommended_next_action,
     baseline_scores: {},
@@ -226,7 +231,7 @@ export async function handleSongExplore({ argv }) {
     change_summary: {
       weighted_baseline: 0,
       weighted_current: compareResult.winner.weighted_score ?? 0,
-      weighted_delta: compareResult.regression_vs_baseline?.weighted_delta ?? 0,
+      weighted_delta: winnerRegression.weighted_delta ?? 0,
       top_metric_changes: [],
     },
     summary: compareResult.winner_reason,

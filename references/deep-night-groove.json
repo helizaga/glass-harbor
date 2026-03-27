@@ -8,8 +8,10 @@
     "intro": ["air_texture"],
     "groove": ["kick_main", "clap_main", "hat_closed"],
     "breath": ["shimmer_fx"],
+    "groove-2": ["kick_main", "clap_main", "hat_closed", "hat_open"],
     "breakdown": ["riser_up", "vocal_chop"],
-    "drop": ["kick_main", "clap_main", "hat_open", "perc_top", "impact_wide"]
+    "drop": ["kick_main", "clap_main", "hat_open", "perc_top", "impact_wide"],
+    "outro": ["air_texture"]
   },
   "groove_notes": [
     "groove should feel smooth before it feels heavy",

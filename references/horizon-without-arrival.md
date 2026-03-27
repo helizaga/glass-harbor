@@ -52,7 +52,7 @@
 
 ## Harmony Summary
 
-- minor center with delayed resolution and long held chord weight
+- minor center with delayed resolution and long-held chord weight
 
 ## Transition Recipes
 

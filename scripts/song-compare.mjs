@@ -26,16 +26,19 @@ const FORMULA_VERSION = REVIEW_GATE_VERSION;
 
 function parseCompareSlugs(argv) {
   const normalized = [];
-  let skipNext = false;
 
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
-    if (skipNext) {
-      skipNext = false;
+    if (value === '--song' || value === '-s') {
+      const slug = sanitizeSlug(argv[index + 1]);
+      if (slug) {
+        normalized.push(slug);
+      }
+      index += 1;
       continue;
     }
-    if (value === '--song' || value === '-s' || value === '--run') {
-      skipNext = true;
+    if (value === '--run') {
+      index += 1;
       continue;
     }
     if (value.startsWith('-')) {
@@ -343,8 +346,11 @@ function buildComparisonDecision({ sourceSong, baselineRunDir, baselineCritique,
 }
 
 export async function handleSongCompare({ argv, positionals }) {
-  const positionalSlugs = positionals.map((value) => sanitizeSlug(value)).filter(Boolean);
-  const sourceSong = positionalSlugs[0] || resolveSongSlug(argv);
+  const positionalSlugs = positionals
+    .filter((value, index) => value !== '--song' && value !== '-s' && !(index > 0 && (positionals[index - 1] === '--song' || positionals[index - 1] === '-s')))
+    .map((value) => sanitizeSlug(value))
+    .filter(Boolean);
+  const sourceSong = resolveSongSlug(argv) || positionalSlugs[0];
   if (!sourceSong) {
     throw new CommandError('Usage: glass-harbor song compare <slug> [<other-slug> ...]', {
       exitCode: EXIT_CODES.USAGE,
@@ -353,7 +359,9 @@ export async function handleSongCompare({ argv, positionals }) {
   }
 
   const explicitSlugs = parseCompareSlugs(argv);
-  const candidateSlugs = explicitSlugs.length > 1 ? explicitSlugs : loadVariantsFromManifest(sourceSong);
+  const explicitCandidates = explicitSlugs.filter((slug) => slug !== sourceSong);
+  const candidateSlugs =
+    explicitCandidates.length > 0 ? [sourceSong, ...explicitCandidates] : loadVariantsFromManifest(sourceSong);
 
   if (candidateSlugs.length === 0) {
     throw new CommandError(

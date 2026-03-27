@@ -12,6 +12,7 @@ They should capture:
 - groove notes
 - harmonic movement summary
 - transition recipes
+- anti goals
 
 They should not contain:
 

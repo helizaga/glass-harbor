@@ -27,6 +27,21 @@ function average(values) {
   return values.length === 0 ? 0 : values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
+function parseJsonFile(filePath, fallback = null) {
+  try {
+    return JSON.parse(readFileSync(filePath, 'utf8'));
+  } catch (error) {
+    if (fallback !== null) {
+      console.warn(`Failed to parse ${filePath}: ${error.message}`);
+      return fallback;
+    }
+    throw new CommandError(`Failed to parse required JSON artifact at ${filePath}: ${error.message}`, {
+      exitCode: EXIT_CODES.ANALYSIS_BLOCKED,
+      code: 'analysis_parse_error',
+    });
+  }
+}
+
 export async function handleSongCritique({ argv }) {
   const slug = resolveSongSlug(argv);
   if (!slug) {
@@ -50,9 +65,9 @@ export async function handleSongCritique({ argv }) {
   const brief = parseBrief(readText(song.briefPath));
   const code = readText(song.songPath);
   const validation = validateSongCode(code);
-  const analysis = JSON.parse(readFileSync(analysisPath, 'utf8'));
+  const analysis = parseJsonFile(analysisPath);
   const runInfo = existsSync(join(runDir, 'run.json'))
-    ? JSON.parse(readFileSync(join(runDir, 'run.json'), 'utf8'))
+    ? parseJsonFile(join(runDir, 'run.json'), { runtime_blockers: [], console_errors: [] })
     : { runtime_blockers: [], console_errors: [] };
   const providerReview = await reviewAudioWithProvider({
     song: slug,
@@ -80,7 +95,7 @@ export async function handleSongCritique({ argv }) {
   const layerNames = extractNamedLayers(code);
   const melodicLayers = layerNames.filter((name) => /(lead|pluck|arp|pad|hook)/i.test(name));
   const transitionLayers = layerNames.filter((name) => /(riser|impact|shimmer|air|vocal)/i.test(name));
-  const referenceOverlap = average(referenceCards.map((card) => clamp(card.score / 40) || 0));
+  const referenceOverlap = average(referenceCards.map((card) => clamp(Number(card.score ?? 0) / 40) || 0));
   const silentRender = (analysis.metrics?.rms ?? 0) === 0 && (analysis.metrics?.peak ?? 0) === 0;
   const runtimeErrors =
     runInfo.runtime_blockers?.length > 0
@@ -192,12 +207,13 @@ export async function handleSongCritique({ argv }) {
     revisionActions.push(...finding.revision_actions);
   }
 
-  const gate =
-    runtimeBlockers.length > 0 ? 'blocked' : musicFindings.length > 0 ? 'revise' : 'pass';
+  const hasRuntimeBlockers = runtimeBlockers.length > 0;
+  const hasContractErrors = validation.errors.length > 0;
+  const gate = hasRuntimeBlockers || hasContractErrors ? 'blocked' : musicFindings.length > 0 ? 'revise' : 'pass';
   const blockerClass =
-    runtimeBlockers.length > 0
+    hasRuntimeBlockers
       ? 'runtime'
-      : validation.errors.length > 0
+      : hasContractErrors
         ? 'contract'
         : analysis.status === 'blocked'
           ? 'analysis'
@@ -233,7 +249,9 @@ export async function handleSongCritique({ argv }) {
       gate === 'pass'
         ? 'The song clears the current rubric with no major structural issues.'
         : gate === 'blocked'
-          ? runtimeBlockers[0]?.title ?? 'Review blocked by runtime issues.'
+          ? blockerClass === 'contract'
+            ? validation.errors[0] ?? 'Review blocked by song contract validation errors.'
+            : runtimeBlockers[0]?.title ?? 'Review blocked by runtime issues.'
           : musicFindings[0]?.title ?? 'Song needs revision.',
   };
 

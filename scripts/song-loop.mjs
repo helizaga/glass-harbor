@@ -19,6 +19,12 @@ export async function handleSongLoop({ argv }) {
 
   const maxIndex = argv.indexOf('--max-iters');
   const maxIters = maxIndex !== -1 && argv[maxIndex + 1] ? Number.parseInt(argv[maxIndex + 1], 10) : 1;
+  if (!Number.isFinite(maxIters) || maxIters <= 0) {
+    throw new CommandError('Usage: --max-iters must be a positive integer.', {
+      exitCode: EXIT_CODES.USAGE,
+      code: 'invalid_max_iters',
+    });
+  }
 
   let iteration = 0;
   let finalExitCode = EXIT_CODES.OK;
@@ -64,14 +70,26 @@ export async function handleSongLoop({ argv }) {
       break;
     }
 
-    // There is no automatic model rewrite step yet, so one prepared revision pass is enough.
-    break;
+    if (
+      iteration >= maxIters ||
+      reviseResult.status === 'noop' ||
+      reviseResult.recommended_next_action !== 'revise'
+    ) {
+      break;
+    }
   }
 
   const runDir = activeRunDir ?? findLatestRunDir(slug);
   let verdict = null;
   if (runDir && reviseResult?.verdict_path) {
-    verdict = JSON.parse(readFileSync(reviseResult.verdict_path, 'utf8'));
+    try {
+      verdict = JSON.parse(readFileSync(reviseResult.verdict_path, 'utf8'));
+    } catch (error) {
+      console.warn(`Failed to parse ${reviseResult.verdict_path}: ${error.message}`);
+      verdict = null;
+    }
+  }
+  if (verdict) {
     baselineRunDir = verdict.baseline_run_dir ?? baselineRunDir;
     recommendedNextAction = verdict.recommended_next_action ?? recommendedNextAction;
     approvalRequired = verdict.approval_required ?? approvalRequired;

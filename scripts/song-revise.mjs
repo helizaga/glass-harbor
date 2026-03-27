@@ -145,7 +145,15 @@ export async function handleSongRevise({ argv }) {
   }
 
   const brief = parseBrief(readText(song.briefPath));
-  const critique = JSON.parse(readFileSync(critiquePath, 'utf8'));
+  let critique;
+  try {
+    critique = JSON.parse(readFileSync(critiquePath, 'utf8'));
+  } catch (error) {
+    throw new CommandError(`Failed to parse critique.json at ${critiquePath}: ${error.message}`, {
+      exitCode: EXIT_CODES.ANALYSIS_BLOCKED,
+      code: 'critique_parse_error',
+    });
+  }
   const references = referenceCardSummaries(critique, brief);
   const memory = ensureSongMemory(slug, { excludeRunDir: runDir });
   const baselineRunDir = chooseBaselineRun(slug, { memory, excludeRunDir: runDir });

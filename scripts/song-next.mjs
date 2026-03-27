@@ -52,7 +52,10 @@ function buildNextAction(statusPayload) {
     };
   }
 
-  if (statusPayload.recommended_next_action === 'keep' || baseline.gate === 'pass') {
+  if (
+    (statusPayload.recommended_next_action === 'keep' || baseline.gate === 'pass') &&
+    !statusPayload.current_open_issue
+  ) {
     return {
       type: 'stop',
       reason: baseline.summary ?? 'The approved baseline already clears the current review gate.',

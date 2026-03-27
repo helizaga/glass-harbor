@@ -33,8 +33,8 @@ Reference cards live under `references/` and capture reusable arrangement patter
 
 Start with:
 
-- [songs/glass-harbor/glass-harbor.brief.md](/Users/tommy/Documents/GitHub/song/songs/glass-harbor/glass-harbor.brief.md)
-- [songs/glass-harbor/glass-harbor.strudel.js](/Users/tommy/Documents/GitHub/song/songs/glass-harbor/glass-harbor.strudel.js)
+- [songs/glass-harbor/glass-harbor.brief.md](songs/glass-harbor/glass-harbor.brief.md)
+- [songs/glass-harbor/glass-harbor.strudel.js](songs/glass-harbor/glass-harbor.strudel.js)
 
 ## Fastest Workflow
 

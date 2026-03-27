@@ -44,7 +44,11 @@ export async function handleSongStatus({ argv }) {
     current_best_comparison_score: memory.current_best_comparison_score ?? null,
     recommended_next_action:
       pendingVerdict?.recommended_next_action ??
-      (pendingRunDir ? 'review_gate' : baselineCritique?.gate === 'pass' ? 'keep' : 'revise'),
+      (pendingRunDir
+        ? 'review_gate'
+        : memory.current_open_issue || !baselineRunDir || baselineCritique?.gate !== 'pass'
+          ? 'revise'
+          : 'keep'),
     approval_required: Boolean(pendingRunDir),
     baseline: {
       run_dir: baselineRunDir,
@@ -67,7 +71,11 @@ export async function handleSongStatus({ argv }) {
     history: latestHistory(memory.history),
     message: pendingRunDir
       ? `Song ${slug} has a pending review run waiting for approval.`
-      : `Song ${slug} is currently anchored to its approved baseline run.`,
+      : !baselineRunDir
+        ? `Song ${slug} does not have an approved baseline yet.`
+        : memory.current_open_issue
+          ? `Song ${slug} still has feedback to address.`
+          : `Song ${slug} is currently anchored to its approved baseline run.`,
   };
 
   return payload;

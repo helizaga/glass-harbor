@@ -19,6 +19,17 @@ function runPython(args) {
   });
 }
 
+function parseJsonFile(filePath, { exitCode, code, label }) {
+  try {
+    return JSON.parse(readFileSync(filePath, 'utf8'));
+  } catch (error) {
+    throw new CommandError(`Failed to parse ${label} at ${filePath}: ${error.message}`, {
+      exitCode,
+      code,
+    });
+  }
+}
+
 export async function handleSongAnalyze({ argv }) {
   const slug = resolveSongSlug(argv);
   if (!slug) {
@@ -38,7 +49,11 @@ export async function handleSongAnalyze({ argv }) {
     });
   }
 
-  const runInfo = JSON.parse(readFileSync(runPath, 'utf8'));
+  const runInfo = parseJsonFile(runPath, {
+    exitCode: EXIT_CODES.ANALYSIS_BLOCKED,
+    code: 'run_parse_error',
+    label: 'run.json',
+  });
   if (runInfo.status === 'blocked') {
     const outputPath = join(runDir, 'analysis.json');
     const blockedPayload = {
@@ -80,19 +95,42 @@ export async function handleSongAnalyze({ argv }) {
   const validation = validateSongCode(readText(song.songPath));
   const outputPath = join(runDir, 'analysis.json');
 
-  await runPython([
-    'scripts/song-analyze.py',
-    '--run-dir',
-    runDir,
-    '--song',
-    slug,
-    '--bpm',
-    validation.metadata.bpm ?? '0',
-    '--output',
-    outputPath,
-  ]);
+  try {
+    await runPython([
+      'scripts/song-analyze.py',
+      '--run-dir',
+      runDir,
+      '--song',
+      slug,
+      '--bpm',
+      validation.metadata.bpm ?? '0',
+      '--output',
+      outputPath,
+    ]);
+  } catch (error) {
+    const blockedPayload = {
+      phase: 'analyze',
+      status: 'blocked',
+      song: slug,
+      run_dir: runDir,
+      readiness: 'blocked',
+      metrics: null,
+      sections: {},
+      anomalies: [`Audio analysis failed for ${slug}.`],
+      runtime_blockers: [{ code: 'analysis_failed', message: error.message }],
+    };
+    writeFileSync(outputPath, `${JSON.stringify(blockedPayload, null, 2)}\n`);
+    throw new CommandError(`Analysis failed for ${slug}: ${error.message}`, {
+      exitCode: EXIT_CODES.ANALYSIS_BLOCKED,
+      code: 'analysis_failed',
+    });
+  }
 
-  const raw = JSON.parse(readFileSync(outputPath, 'utf8'));
+  const raw = parseJsonFile(outputPath, {
+    exitCode: EXIT_CODES.ANALYSIS_BLOCKED,
+    code: 'analysis_parse_error',
+    label: 'analysis output',
+  });
   const anomalies = [];
   if ((raw.mix?.rms ?? 0) === 0 && (raw.mix?.peak ?? 0) === 0) {
     anomalies.push('Rendered mix is silent.');

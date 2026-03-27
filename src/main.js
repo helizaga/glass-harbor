@@ -144,7 +144,10 @@ const packButtons = [...document.querySelectorAll('.pack-button')];
 let activeLoadRequest = 0;
 
 function renderError(error) {
-  replRoot.innerHTML = `<pre class="error">${error.message}</pre>`;
+  const pre = document.createElement('pre');
+  pre.className = 'error';
+  pre.textContent = error.message;
+  replRoot.replaceChildren(pre);
 }
 
 function updateControls(track, packMode, packLabelText) {

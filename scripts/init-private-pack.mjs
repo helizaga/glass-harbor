@@ -13,8 +13,11 @@ const mapTemplate = join(root, 'packs', 'kshmr-vol-4.import-map.template.json');
 mkdirSync(rawRoot, { recursive: true });
 mkdirSync(runtimeRoot, { recursive: true });
 
+if (!existsSync(mapTemplate)) {
+  throw new Error(`Missing import map template at ${mapTemplate}`);
+}
+
 if (!existsSync(mapTarget)) {
-  mkdirSync(dirname(mapTarget), { recursive: true });
   cpSync(mapTemplate, mapTarget);
 }
 

@@ -38,7 +38,7 @@ A minor center with open suspended color and long melodic release.
 
 - keep the long-form build compelling instead of static
 - make sure the bloom section lands clearly after the breakdown
-- avoid brittle hats or overly aggressive top end
+- avoid brittle hats or overly aggressive top-end lift
 - preserve warmth and space even when the full groove opens up
 
 ## Stable Sound Roles
