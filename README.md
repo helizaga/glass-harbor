@@ -13,12 +13,10 @@ The primary workflow is:
 
 ## What This Repo Is
 
-- an agent-first songwriting workspace
+- an agent-first songwriting workspace built around pasteable Strudel files
 - a stable sound-role contract for generated songs
-- a public scaffold pack that always runs
-- a private licensed-sample overlay that stays local
-- an optional local debug UI built on `@strudel/repl`
-- a headless browser render path for agent review
+- a public scaffold pack plus a private local overlay for licensed samples
+- a debug-only local app and a headless render path for review
 - a retrieval-style reference library for prompting and critique
 
 ## What The Primary Artifacts Are
@@ -52,12 +50,7 @@ Then open `https://strudel.cc/`, paste the contents of a song file from `songs/`
 npm run dev
 ```
 
-The local app is secondary now. Use it to:
-
-- audition a song locally
-- verify the public scaffold vs private overlay
-- run the preload track
-- verify the SuperDirt debug path
+The local app is secondary now. Use it to audition a song locally, verify pack selection, run the preload track, or check the SuperDirt debug path.
 
 ## Headless Review Loop
 
@@ -150,30 +143,27 @@ Then:
 
 The imported runtime pack keeps the same stable sound-role names, so existing songs do not need rewrites.
 
-## Scripts
+## Commands
 
-- `glass-harbor song serve`: serve the active runtime pack for Strudel web paste mode
-- `glass-harbor song new <slug>`: scaffold a brief and pasteable song file
-- `glass-harbor song validate <slug>`: validate the brief and canonical song contract
-- `glass-harbor song render <slug>`: render the canonical song into a full mix plus section clips
-- `glass-harbor song analyze <slug>`: analyze the latest rendered run with deterministic audio metrics
-- `glass-harbor song critique <slug>`: score the latest run and write revision guidance
-- `glass-harbor song loop <slug>`: orchestrate render -> analyze -> critique for one review pass
-- `glass-harbor debug ui`: run the optional local debug app
-- `glass-harbor debug osc`: run the Strudel OSC bridge
+Primary CLI:
+
+- `glass-harbor song serve`
+- `glass-harbor song new <slug>`
+- `glass-harbor song validate <slug>`
+- `glass-harbor song render <slug>`
+- `glass-harbor song analyze <slug>`
+- `glass-harbor song critique <slug>`
+- `glass-harbor song loop <slug>`
+- `glass-harbor debug ui`
+- `glass-harbor debug osc`
+
+Compatibility and support scripts:
+
 - `npm run song:*`: compatibility shims that forward to the CLI
-- `npm run dev`: run the optional local debug app
-- `npm run build`: build the local debug app and copy runtime assets into `dist/`
-- `npm run preview`: preview the built app
-- `npm run generate:samples`: regenerate the committed placeholder pack
-- `npm run pack:json`: regenerate `samples/edm-core/strudel.json`
-- `npm run prep`: regenerate scaffold audio plus manifest
-- `npm run osc`: run the Strudel OSC bridge
-- `npm run osc:debug`: run the OSC bridge with verbose logging
-- `npm run samples:serve`: serve the committed scaffold pack only
-- `npm run vendor:init`: create the local gitignored import workspace
-- `npm run vendor:import`: import a private library into the runtime pack
-- `npm run vendor:manifest`: regenerate only the private runtime manifest
+- `npm run dev`, `npm run build`, `npm run preview`
+- `npm run generate:samples`, `npm run pack:json`, `npm run prep`
+- `npm run samples:serve`
+- `npm run vendor:init`, `npm run vendor:import`, `npm run vendor:manifest`
 
 ## Repo Layout
 

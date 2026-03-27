@@ -1,6 +1,4 @@
-import { statSync } from 'node:fs';
-
-import { findLatestRunDir, resolveSongSlug, songPaths } from '../lib/song-contract.mjs';
+import { findLatestRunDir, resolveSongSlug } from '../lib/song-contract.mjs';
 import { CommandError, EXIT_CODES, isMainModule, runCliCommand } from '../lib/command-runtime.mjs';
 import { handleSongAnalyze } from './song-analyze.mjs';
 import { handleSongCritique } from './song-critique.mjs';
@@ -17,13 +15,11 @@ export async function handleSongLoop({ argv }) {
 
   const maxIndex = argv.indexOf('--max-iters');
   const maxIters = maxIndex !== -1 && argv[maxIndex + 1] ? Number.parseInt(argv[maxIndex + 1], 10) : 1;
-  const songPath = songPaths(slug).songPath;
 
   let iteration = 0;
   let finalExitCode = EXIT_CODES.OK;
   while (iteration < maxIters) {
     iteration += 1;
-    const beforeStat = statSync(songPath).mtimeMs;
 
     const renderResult = await handleSongRender({ argv: ['--song', slug] });
     finalExitCode = renderResult.exitCode ?? EXIT_CODES.OK;
@@ -43,10 +39,8 @@ export async function handleSongLoop({ argv }) {
       break;
     }
 
-    const afterStat = statSync(songPath).mtimeMs;
-    if (afterStat === beforeStat) {
-      break;
-    }
+    // There is no automatic revise step yet, so one clean pass is enough.
+    break;
   }
 
   const runDir = findLatestRunDir(slug);

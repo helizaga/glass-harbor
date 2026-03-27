@@ -60,4 +60,4 @@ D minor center with lush suspended harmonic color.
 - keep the song as one pasteable `.strudel.js` file
 - use stable sound roles only for sampled material
 - keep tonal parts readable and modular
-- the same file should work in Strudel web after `npm run song:serve`
+- the same file should work in Strudel web after `glass-harbor song serve`
