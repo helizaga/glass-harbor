@@ -18,3 +18,8 @@ const child = spawn(
 child.on('exit', (code) => {
   process.exit(code ?? 0);
 });
+
+child.on('error', (error) => {
+  console.error(`Failed to start sample server: ${error.message}`);
+  process.exit(1);
+});

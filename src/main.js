@@ -4,6 +4,18 @@ import './style.css';
 const PUBLIC_PACK_URL = '/samples/edm-core/strudel.json';
 const PRIVATE_PACK_URL = '/private-packs/runtime/edm-core/strudel.json';
 const PACK_TOKEN = '__SAMPLE_PACK_URL__';
+const REQUIRED_PACK_FAMILIES = [
+  'kick_main',
+  'clap_main',
+  'hat_closed',
+  'hat_open',
+  'perc_top',
+  'impact_wide',
+  'riser_up',
+  'shimmer_fx',
+  'air_texture',
+  'vocal_chop',
+];
 
 const tracks = [
   {
@@ -126,41 +138,16 @@ const trackDescription = document.querySelector('#track-description');
 const packLabel = document.querySelector('#pack-label');
 const trackButtons = [...document.querySelectorAll('.track-button')];
 const packButtons = [...document.querySelectorAll('.pack-button')];
+let activeLoadRequest = 0;
 
-async function privatePackAvailable() {
-  const response = await fetch(PRIVATE_PACK_URL, { method: 'HEAD' });
-  return response.ok;
+function renderError(error) {
+  replRoot.innerHTML = `<pre class="error">${error.message}</pre>`;
 }
 
-async function resolvePackUrl(modeId) {
-  if (modeId === 'public') {
-    return { url: PUBLIC_PACK_URL, label: 'Public scaffold pack' };
-  }
-  if (modeId === 'private') {
-    return { url: PRIVATE_PACK_URL, label: 'Private commercial overlay' };
-  }
-
-  const hasPrivatePack = await privatePackAvailable();
-  return hasPrivatePack
-    ? { url: PRIVATE_PACK_URL, label: 'Auto: private commercial overlay' }
-    : { url: PUBLIC_PACK_URL, label: 'Auto: public scaffold pack' };
-}
-
-async function loadTrack(track, packMode = defaultPackMode) {
-  const response = await fetch(track.path);
-  if (!response.ok) {
-    throw new Error(`Unable to load ${track.path}`);
-  }
-
-  const packSelection = await resolvePackUrl(packMode.id);
-  const code = (await response.text()).replaceAll(PACK_TOKEN, packSelection.url);
-  const repl = document.createElement('strudel-editor');
-  repl.setAttribute('code', code);
-  replRoot.replaceChildren(repl);
-
+function updateControls(track, packMode, packLabelText) {
   trackLabel.textContent = track.label;
   trackDescription.textContent = `${track.description} Source: ${track.path}`;
-  packLabel.textContent = `Pack: ${packSelection.label}`;
+  packLabel.textContent = `Pack: ${packLabelText}`;
 
   trackButtons.forEach((button) => {
     const isActive = button.dataset.track === track.id;
@@ -173,9 +160,73 @@ async function loadTrack(track, packMode = defaultPackMode) {
     button.dataset.active = isActive ? 'true' : 'false';
     button.setAttribute('aria-selected', isActive ? 'true' : 'false');
   });
+}
+
+async function packManifestAvailable(url) {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      return false;
+    }
+
+    const manifest = await response.json();
+    return REQUIRED_PACK_FAMILIES.every(
+      (family) => Array.isArray(manifest[family]) && manifest[family].length > 0,
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function resolvePackUrl(modeId) {
+  if (modeId === 'public') {
+    return { url: PUBLIC_PACK_URL, label: 'Public scaffold pack' };
+  }
+  if (modeId === 'private') {
+    const hasPrivatePack = await packManifestAvailable(PRIVATE_PACK_URL);
+    if (!hasPrivatePack) {
+      throw new Error('Private overlay is unavailable or incomplete. Run npm run vendor:import or switch back to the public scaffold.');
+    }
+    return { url: PRIVATE_PACK_URL, label: 'Private commercial overlay' };
+  }
+
+  const hasPrivatePack = await packManifestAvailable(PRIVATE_PACK_URL);
+  return hasPrivatePack
+    ? { url: PRIVATE_PACK_URL, label: 'Auto: private commercial overlay' }
+    : { url: PUBLIC_PACK_URL, label: 'Auto: public scaffold pack' };
+}
+
+async function loadTrack(track, packMode, requestId) {
+  const response = await fetch(track.path);
+  if (!response.ok) {
+    throw new Error(`Unable to load ${track.path}`);
+  }
+
+  const packSelection = await resolvePackUrl(packMode.id);
+  const code = (await response.text()).replaceAll(PACK_TOKEN, packSelection.url);
+  if (requestId !== activeLoadRequest) {
+    return;
+  }
+
+  const repl = document.createElement('strudel-editor');
+  repl.setAttribute('code', code);
+  replRoot.replaceChildren(repl);
+  updateControls(track, packMode, packSelection.label);
 
   window.localStorage.setItem('glass-harbor-track', track.id);
   window.localStorage.setItem('glass-harbor-pack-mode', packMode.id);
+}
+
+async function applySelection(track, packMode) {
+  const requestId = ++activeLoadRequest;
+  try {
+    await loadTrack(track, packMode, requestId);
+  } catch (error) {
+    if (requestId !== activeLoadRequest || error.name === 'AbortError') {
+      return;
+    }
+    renderError(error);
+  }
 }
 
 trackButtons.forEach((button) => {
@@ -187,7 +238,7 @@ trackButtons.forEach((button) => {
     const activePackMode =
       packModes.find((mode) => mode.id === window.localStorage.getItem('glass-harbor-pack-mode')) ??
       defaultPackMode;
-    await loadTrack(track, activePackMode);
+    await applySelection(track, activePackMode);
   });
 });
 
@@ -199,10 +250,8 @@ packButtons.forEach((button) => {
     if (!packMode) {
       return;
     }
-    await loadTrack(activeTrack, packMode);
+    await applySelection(activeTrack, packMode);
   });
 });
 
-loadTrack(defaultTrack, defaultPackMode).catch((error) => {
-  replRoot.innerHTML = `<pre class="error">${error.message}</pre>`;
-});
+applySelection(defaultTrack, defaultPackMode);

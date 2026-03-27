@@ -6,9 +6,10 @@ Local-first Strudel setup for modern EDM sketching with:
 - a curated custom sample pack under `samples/edm-core`
 - a gitignored private commercial-pack overlay under `private-packs/`
 - a preload ritual to warm critical one-shots
-- two track targets:
+- three track targets:
   - `tracks/glass-harbor.local.strudel.js` for browser-only preview
   - `tracks/glass-harbor.superdirt.strudel.js` for hybrid local samples + OSC to SuperDirt
+  - `tracks/edm-pack-preload.strudel.js` for sample warm-up before a real take
 
 ## Quick Start
 
