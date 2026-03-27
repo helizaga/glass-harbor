@@ -48,6 +48,7 @@
 - the first bloom should release tension without peaking completely
 - the second return is the real summit
 - hats are withheld to preserve long-form shape
+- save the brightest upper layer for the final return, not the first bloom
 
 ## Harmony Summary
 
@@ -62,4 +63,4 @@
 
 - treat anticipation as part of the hook
 - let the second payoff justify the full arrangement
-
+- keep darkness and polish in balance so the delayed payoff still feels nocturnal

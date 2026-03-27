@@ -15,7 +15,8 @@
   "groove_notes": [
     "the first bloom should release tension without peaking completely",
     "the second return is the real summit",
-    "hats are withheld to preserve long-form shape"
+    "hats are withheld to preserve long-form shape",
+    "save the brightest upper layer for the final return, not the first bloom"
   ],
   "harmonic_summary": "minor center with delayed resolution and long held chord weight",
   "transition_recipes": [
@@ -24,6 +25,7 @@
   ],
   "anti_goals": [
     "avoid giving away the strongest drop too early",
-    "avoid flattening section contrast"
+    "avoid flattening section contrast",
+    "avoid making the whole arrangement equally shiny"
   ]
 }

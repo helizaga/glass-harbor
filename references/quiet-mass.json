@@ -13,7 +13,8 @@
   "groove_notes": [
     "size should come from width and harmonic stacking",
     "percussion stays disciplined",
-    "the low end should feel solid without dominating the image"
+    "the low end should feel solid without dominating the image",
+    "chord glow and stereo spread should create lift before extra percussion does"
   ],
   "harmonic_summary": "broad voicings and suspended color create scale",
   "transition_recipes": [
@@ -22,6 +23,7 @@
   ],
   "anti_goals": [
     "avoid mistaking density for size",
-    "avoid cluttered percussion during the bloom"
+    "avoid cluttered percussion during the bloom",
+    "avoid trying to make every large moment louder instead of wider"
   ]
 }

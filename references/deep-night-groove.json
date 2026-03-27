@@ -12,8 +12,10 @@
     "drop": ["kick_main", "clap_main", "hat_open", "perc_top", "impact_wide"]
   },
   "groove_notes": [
+    "groove should feel smooth before it feels heavy",
     "onset density rises gradually instead of all at once",
-    "open hats feel like lift, not aggression"
+    "open hats feel like lift, not aggression",
+    "percussion moves around the clap, not against it"
   ],
   "harmonic_summary": "stable minor center with slower harmonic rhythm",
   "transition_recipes": [
@@ -22,6 +24,7 @@
   ],
   "anti_goals": [
     "avoid oversized low end",
-    "avoid cluttered tops"
+    "avoid cluttered tops",
+    "avoid turning the groove aggressive too early"
   ]
 }

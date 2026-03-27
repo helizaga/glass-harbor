@@ -43,9 +43,11 @@
 
 ## Groove Notes
 
+- groove should feel smooth before it feels heavy
 - onset density rises gradually instead of all at once
 - open hats feel like lift, not aggression
 - claps stay dry enough to anchor the groove
+- percussion moves around the clap, not against it
 
 ## Harmony Summary
 
@@ -62,3 +64,4 @@
 - keep low end warm, not oversized
 - use texture and spacing to create sophistication
 - save the widest FX moments for the final drop
+- let bass support atmosphere before it starts driving aggression

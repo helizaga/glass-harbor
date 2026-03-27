@@ -45,6 +45,7 @@
 - hats stay controlled in the groove and widen in the drop
 - clap is stable; tops and open hats drive motion
 - kick remains simple while bass density changes energy
+- let one recurring motif evolve gradually instead of adding too many new lead ideas
 
 ## Harmony Summary
 
@@ -63,3 +64,4 @@
 - let density, not complexity, drive drop contrast
 - keep tops polished instead of aggressively bright
 - use atmospheric beds to keep breakdowns cinematic
+- build memory with motif recursion and small cumulative changes

@@ -45,6 +45,7 @@
 - size should come from width and harmonic stacking
 - percussion stays disciplined
 - the low end should feel solid without dominating the image
+- chord glow and stereo spread should create lift before extra percussion does
 
 ## Harmony Summary
 
@@ -59,4 +60,4 @@
 
 - loud is not the only way to feel big
 - careful spacing can sound more expensive than dense layering
-
+- use width and harmonic light to create scale before reaching for more density
