@@ -8,8 +8,11 @@ The primary workflow is:
 2. generate one pasteable `.strudel.js` song file against stable sound-role names
 3. run `glass-harbor song serve`
 4. paste the song file into `https://strudel.cc/`
-5. optionally use the local app for debugging or SuperDirt verification
-6. optionally run the local render -> analyze -> critique loop for revision guidance
+5. optionally scaffold multiple sibling variants from one base song with `glass-harbor song variants <slug>`
+6. optionally run the local render -> analyze -> critique -> revise loop for each candidate
+7. rank competing candidates with `glass-harbor song compare <slug>`
+8. or let the CLI orchestrate the whole branch-and-rank pass with `glass-harbor song explore <slug>`
+9. optionally use the local app for debugging or SuperDirt verification
 
 ## What This Repo Is
 
@@ -60,6 +63,7 @@ The repo now supports a browser-minimal review workflow:
 npm exec -- glass-harbor song render glass-harbor
 npm exec -- glass-harbor song analyze glass-harbor
 npm exec -- glass-harbor song critique glass-harbor
+npm exec -- glass-harbor song revise glass-harbor
 ```
 
 This produces a gitignored run under `runs/<slug>/<timestamp>/` with:
@@ -69,8 +73,57 @@ This produces a gitignored run under `runs/<slug>/<timestamp>/` with:
 - `analysis.json`
 - `critique.json`
 - `revision.md`
+- `revision-request.json`
+- `revision-prompt.md`
 
 The render path uses a local browser runtime driven by Playwright. You do not need to use a browser UI by hand, but Strudel still needs a browser engine for reliable playback and offline rendering.
+
+## Variant Comparison
+
+When one brief needs multiple candidate directions, scaffold sibling song folders first:
+
+```sh
+npm exec -- glass-harbor song variants glass-harbor
+```
+
+That writes normal song folders like:
+
+- `songs/glass-harbor-v1/`
+- `songs/glass-harbor-v2/`
+- `songs/glass-harbor-v3/`
+
+Then run the normal loop on each candidate and compare them:
+
+```sh
+npm exec -- glass-harbor song loop glass-harbor-v1 --max-iters 1 --json
+npm exec -- glass-harbor song loop glass-harbor-v2 --max-iters 1 --json
+npm exec -- glass-harbor song loop glass-harbor-v3 --max-iters 1 --json
+npm exec -- glass-harbor song compare glass-harbor
+```
+
+Or let the CLI do the scaffold -> loop -> compare pass in one go:
+
+```sh
+npm exec -- glass-harbor song explore glass-harbor --count 3 --max-iters 1
+```
+
+`song compare` writes a gitignored comparison bundle under `runs/<source-slug>/comparisons/<timestamp>/` with:
+
+- `comparison.json`
+- `comparison.md`
+
+`song explore` writes a gitignored exploration bundle under `runs/<source-slug>/explorations/<timestamp>/` with:
+
+- `explore.json`
+- `explore.md`
+
+When you compare from a source slug with `variants.json`, the base song is included automatically as the baseline unless you pass explicit slugs instead.
+
+You can also compare arbitrary slugs directly:
+
+```sh
+npm exec -- glass-harbor song compare open-water-signal horizon-answer
+```
 
 ## Stable Sound Vocabulary
 
@@ -149,11 +202,15 @@ Primary CLI:
 
 - `glass-harbor song serve`
 - `glass-harbor song new <slug>`
+- `glass-harbor song variants <slug>`
 - `glass-harbor song validate <slug>`
 - `glass-harbor song render <slug>`
 - `glass-harbor song analyze <slug>`
 - `glass-harbor song critique <slug>`
+- `glass-harbor song revise <slug>`
 - `glass-harbor song loop <slug>`
+- `glass-harbor song compare <slug> [<other-slug> ...]`
+- `glass-harbor song explore <slug> [--count <n>] [--max-iters <n>]`
 - `glass-harbor debug ui`
 - `glass-harbor debug osc`
 

@@ -7,6 +7,9 @@ This repository is designed around a code-first songwriting loop:
 3. run `glass-harbor song serve`
 4. paste the song file into `https://strudel.cc/`
 5. optionally use the local app for debugging or SuperDirt verification
+6. optionally run `render -> analyze -> critique -> revise` to prepare the next agent edit pass
+7. when you want multiple directions from one brief, scaffold sibling variants and compare them instead of endlessly revising one draft
+8. if you want the whole branch-and-rank pass in one command, use `glass-harbor song explore <slug>`
 
 ## Folder Contract
 
@@ -68,4 +71,22 @@ The agent review loop is:
 1. render the canonical song file
 2. analyze the audio with deterministic metrics
 3. score the run and generate bounded revision actions
-4. hand the revision brief back to the songwriter skill or a human editor
+4. run `glass-harbor song revise <slug>` to write an agent-ready revision package
+5. hand that revision package back to the songwriter skill or a human editor
+
+## Variants And Comparison
+
+When one idea needs several candidates:
+
+1. run `glass-harbor song variants <slug>`
+2. edit or regenerate the sibling variant songs
+3. run the normal loop on each variant slug
+4. run `glass-harbor song compare <slug>` to rank the latest reviewed candidates
+
+`song compare` can also compare explicit slugs, for example:
+
+- `glass-harbor song compare open-water-signal horizon-answer`
+
+If you want one command to scaffold, loop, and compare:
+
+- `glass-harbor song explore glass-harbor --count 3 --max-iters 1`

@@ -1,0 +1,26 @@
+{
+  "genre_tags": ["breath section", "second-drop setup"],
+  "mood_tags": ["suspended", "poised", "expectant", "narrow"],
+  "bpm_range": [120, 126],
+  "section_map": ["drop:16", "breath:8", "second-drop:16"],
+  "energy_curve": ["high", "medium-low", "high"],
+  "roles_by_section": {
+    "drop": ["kick_main", "clap_main", "hat_open", "perc_top", "impact_wide"],
+    "breath": ["air_texture", "vocal_chop"],
+    "second-drop": ["kick_main", "clap_main", "hat_open", "perc_top", "impact_wide"]
+  },
+  "groove_notes": [
+    "the breath should feel intentional, not empty",
+    "preserve pulse with fragments, not full grooves",
+    "return strongest material after the listener exhales"
+  ],
+  "harmonic_summary": "hold tonic gravity while reducing rhythmic information",
+  "transition_recipes": [
+    "filtered tail plus one breath of air",
+    "reintroduce clap or bass on the first downbeat of the return"
+  ],
+  "anti_goals": [
+    "avoid dead air",
+    "avoid a second drop that feels identical to the first"
+  ]
+}

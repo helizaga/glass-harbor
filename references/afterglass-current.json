@@ -1,0 +1,28 @@
+{
+  "genre_tags": ["deep house", "chill crossover"],
+  "mood_tags": ["soft", "close", "calm", "reflective"],
+  "bpm_range": [118, 122],
+  "section_map": ["intro:8", "groove:16", "breath:8", "groove-2:16", "breakdown:16", "drop:16", "outro:8"],
+  "energy_curve": ["low", "medium", "medium-low", "medium", "low", "medium-high", "low"],
+  "roles_by_section": {
+    "intro": ["air_texture"],
+    "groove": ["kick_main", "clap_main", "hat_closed"],
+    "breath": ["shimmer_fx"],
+    "breakdown": ["vocal_chop", "riser_up"],
+    "drop": ["kick_main", "clap_main", "hat_open", "perc_top"]
+  },
+  "groove_notes": [
+    "groove should feel smooth before it feels heavy",
+    "percussion moves around the clap, not against it",
+    "bass supports atmosphere more than aggression"
+  ],
+  "harmonic_summary": "slow minor-center movement with soft modal color",
+  "transition_recipes": [
+    "filtered shimmer into quieter breath section",
+    "vocal punctuation before groove return"
+  ],
+  "anti_goals": [
+    "avoid oversized bass",
+    "avoid busy tops in the groove"
+  ]
+}

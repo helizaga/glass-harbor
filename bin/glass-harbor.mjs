@@ -12,12 +12,16 @@ function usage() {
 
 Usage:
   glass-harbor song new <slug> [--json] [--quiet] [--verbose]
+  glass-harbor song variants <slug> [--count <n>] [--json] [--quiet] [--verbose]
   glass-harbor song validate <slug> [--json] [--quiet] [--verbose]
   glass-harbor song serve [--json] [--quiet]
   glass-harbor song render <slug> [--run <path>] [--json] [--quiet] [--verbose]
   glass-harbor song analyze <slug> [--run <path>] [--json] [--quiet] [--verbose]
   glass-harbor song critique <slug> [--run <path>] [--json] [--quiet] [--verbose]
+  glass-harbor song revise <slug> [--run <path>] [--json] [--quiet] [--verbose]
   glass-harbor song loop <slug> [--max-iters <n>] [--json] [--quiet] [--verbose]
+  glass-harbor song compare <slug> [<other-slug> ...] [--json] [--quiet] [--verbose]
+  glass-harbor song explore <slug> [--count <n>] [--max-iters <n>] [--json] [--quiet] [--verbose]
   glass-harbor debug ui
   glass-harbor debug osc [--debug]
 
@@ -81,6 +85,8 @@ const [namespace, command, ...rest] = argv;
 if (namespace === 'song') {
   if (command === 'new') {
     spawnCommand(process.execPath, [scriptPath('song-new.mjs'), ...parseSongArgs(rest, { requireSlug: true })]);
+  } else if (command === 'variants') {
+    spawnCommand(process.execPath, [scriptPath('song-variants.mjs'), ...parseSongArgs(rest, { requireSlug: true })]);
   } else if (command === 'validate') {
     spawnCommand(process.execPath, [scriptPath('song-validate.mjs'), ...parseSongArgs(rest, { requireSlug: true })]);
   } else if (command === 'serve') {
@@ -91,8 +97,14 @@ if (namespace === 'song') {
     spawnCommand(process.execPath, [scriptPath('song-analyze.mjs'), ...parseSongArgs(rest, { requireSlug: true })]);
   } else if (command === 'critique') {
     spawnCommand(process.execPath, [scriptPath('song-critique.mjs'), ...parseSongArgs(rest, { requireSlug: true })]);
+  } else if (command === 'revise') {
+    spawnCommand(process.execPath, [scriptPath('song-revise.mjs'), ...parseSongArgs(rest, { requireSlug: true })]);
   } else if (command === 'loop') {
     spawnCommand(process.execPath, [scriptPath('song-loop.mjs'), ...parseSongArgs(rest, { requireSlug: true })]);
+  } else if (command === 'compare') {
+    spawnCommand(process.execPath, [scriptPath('song-compare.mjs'), ...rest]);
+  } else if (command === 'explore') {
+    spawnCommand(process.execPath, [scriptPath('song-explore.mjs'), ...parseSongArgs(rest, { requireSlug: true })]);
   } else {
     fail(usage());
   }

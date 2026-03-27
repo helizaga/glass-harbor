@@ -1,0 +1,29 @@
+{
+  "genre_tags": ["emotional electronic", "long-build"],
+  "mood_tags": ["yearning", "unresolved", "patient", "aching"],
+  "bpm_range": [118, 123],
+  "section_map": ["intro:16", "pulse:16", "lift:8", "breakdown:16", "first-bloom:16", "breath:8", "second-bloom:16", "outro:8"],
+  "energy_curve": ["low", "medium", "medium-high", "low", "medium-high", "medium-low", "high", "low"],
+  "roles_by_section": {
+    "intro": ["air_texture"],
+    "pulse": ["kick_main", "clap_main", "hat_closed"],
+    "lift": ["riser_up", "hat_open"],
+    "breakdown": ["air_texture"],
+    "first-bloom": ["kick_main", "clap_main", "hat_closed"],
+    "second-bloom": ["kick_main", "clap_main", "hat_closed", "hat_open", "perc_top", "impact_wide"]
+  },
+  "groove_notes": [
+    "the first bloom should release tension without peaking completely",
+    "the second return is the real summit",
+    "hats are withheld to preserve long-form shape"
+  ],
+  "harmonic_summary": "minor center with delayed resolution and long held chord weight",
+  "transition_recipes": [
+    "one-bar pre-bloom vacuum",
+    "post-bloom breath before final return"
+  ],
+  "anti_goals": [
+    "avoid giving away the strongest drop too early",
+    "avoid flattening section contrast"
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "genre_tags": ["restrained progressive house"],
+  "mood_tags": ["muted", "reflective", "persistent", "soft-focus"],
+  "bpm_range": [120, 124],
+  "section_map": ["intro:8", "groove:16", "groove-2:16", "breakdown:16", "drop:16", "outro:8"],
+  "energy_curve": ["low", "medium", "medium", "low", "medium-high", "low"],
+  "roles_by_section": {
+    "intro": ["air_texture"],
+    "groove": ["kick_main", "clap_main", "hat_closed"],
+    "groove-2": ["kick_main", "clap_main", "hat_closed"],
+    "drop": ["kick_main", "clap_main", "hat_open", "perc_top"]
+  },
+  "groove_notes": [
+    "reuse one motif instead of adding many new parts",
+    "changes should be small but cumulative",
+    "bass and hats do more structural work than lead overload"
+  ],
+  "harmonic_summary": "narrow harmonic movement with repeated voicing memory",
+  "transition_recipes": [
+    "motif echo into breakdown",
+    "quiet re-entry before full drop groove"
+  ],
+  "anti_goals": [
+    "avoid constant new layers",
+    "avoid over-arranging the lead"
+  ]
+}

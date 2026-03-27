@@ -41,6 +41,7 @@ export async function handleSongValidate({ argv }) {
     paths,
     metadata: songValidation.metadata,
     sections: songValidation.sections,
+    dependencies: songValidation.dependencies,
     errors,
     warnings: songValidation.warnings,
     message:

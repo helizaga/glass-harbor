@@ -4,13 +4,17 @@
 - This repo is a paste-first Strudel songwriting scaffold for human + agent collaboration.
 - The primary artifact is a single pasteable `songs/<slug>/<slug>.strudel.js` file generated from a short Markdown brief.
 - Do not turn this into a GUI-first product. The local app is a debug surface, not the main workflow.
+- For brief-to-song generation or revision, use the repo-local skill at `skills/strudel-songwriter/SKILL.md`.
+- For interpreting critique/revision artifacts, use `skills/strudel-song-critic/SKILL.md`.
+- For building retrieval memory, use `skills/reference-card-author/SKILL.md`.
 
 ## Canonical Workflow
 1. Read the brief at `songs/<slug>/<slug>.brief.md`.
 2. Generate or revise the canonical song file at `songs/<slug>/<slug>.strudel.js`.
 3. Keep the song directly pasteable into `https://strudel.cc/` after `glass-harbor song serve`.
-4. Use `glass-harbor song render`, `glass-harbor song analyze`, and `glass-harbor song critique` for review passes.
-5. Use the local app only for debugging, preload checks, pack switching, or SuperDirt verification.
+4. Use `glass-harbor song render`, `glass-harbor song analyze`, `glass-harbor song critique`, and `glass-harbor song revise` for review passes.
+5. When exploring multiple directions from one brief, prefer `glass-harbor song explore <slug>` for the full scaffold -> loop -> compare pass. If you need finer control, use `glass-harbor song variants <slug>` and `glass-harbor song compare <slug>` directly. The compare command includes the base song by default when reading `variants.json`.
+6. Use the local app only for debugging, preload checks, pack switching, or SuperDirt verification.
 
 ## Song Contract
 - Song files must start with:
@@ -41,10 +45,10 @@
 
 ## Review Loop
 - Default review flow is:
-  - `render -> analyze -> critique -> revise`
+- `render -> analyze -> critique -> revise`
 - Deterministic analysis comes first.
 - Audio-model critique is optional and should be treated as advisory, not the sole judge.
-- `runs/` is gitignored and holds generated artifacts like `mix.wav`, `sections/*.wav`, `analysis.json`, `critique.json`, and `revision.md`.
+- `runs/` is gitignored and holds generated artifacts like `mix.wav`, `sections/*.wav`, `analysis.json`, `critique.json`, `revision.md`, `revision-request.json`, and `revision-prompt.md`.
 
 ## Reference Cards
 - `references/` contains abstract retrieval cards for prompting and critique.
@@ -64,12 +68,16 @@
 
 ## Commands
 - `glass-harbor song new <slug>`
+- `glass-harbor song variants <slug>`
 - `glass-harbor song validate <slug>`
 - `glass-harbor song serve`
 - `glass-harbor song render <slug>`
 - `glass-harbor song analyze <slug>`
 - `glass-harbor song critique <slug>`
+- `glass-harbor song revise <slug>`
 - `glass-harbor song loop <slug>`
+- `glass-harbor song compare <slug> [<other-slug> ...]`
+- `glass-harbor song explore <slug> [--count <n>] [--max-iters <n>]`
 - `glass-harbor debug ui`
 - `glass-harbor debug osc`
 - `npm run song:*` remains available as compatibility shims

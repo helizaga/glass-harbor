@@ -1,0 +1,27 @@
+{
+  "genre_tags": ["restrained tension", "elegant drama"],
+  "mood_tags": ["silky", "uneasy", "dramatic", "measured"],
+  "bpm_range": [121, 126],
+  "section_map": ["intro:8", "groove:16", "lift:8", "breakdown:16", "drop:16", "outro:8"],
+  "energy_curve": ["low", "medium", "medium-high", "low", "high", "low"],
+  "roles_by_section": {
+    "intro": ["air_texture"],
+    "groove": ["kick_main", "clap_main", "hat_closed"],
+    "lift": ["riser_up"],
+    "drop": ["kick_main", "clap_main", "hat_closed", "perc_top", "impact_wide"]
+  },
+  "groove_notes": [
+    "keep most of the surface smooth",
+    "use one or two narrow disruptions for drama",
+    "instability should feel intentional, not messy"
+  ],
+  "harmonic_summary": "stable center with brief altered color for tension spikes",
+  "transition_recipes": [
+    "short unstable accent before a controlled return",
+    "disruption resolves into a clean downbeat"
+  ],
+  "anti_goals": [
+    "avoid constant tension with no release",
+    "avoid random glitch behavior that breaks elegance"
+  ]
+}

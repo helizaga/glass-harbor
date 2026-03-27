@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { chromium } from 'playwright';
@@ -53,63 +53,113 @@ export async function handleSongRender({ argv }) {
   });
 
   const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({ acceptDownloads: true });
-  const page = await context.newPage();
-  page.setDefaultTimeout(300000);
-  const downloads = [];
   const pageErrors = [];
+  const savedOutputs = [];
+  let preflight = null;
+  let runtimeBlockers = [];
 
-  page.on('download', (download) => {
-    downloads.push(download);
-  });
-  page.on('console', (message) => {
-    if (message.type() === 'error') {
-      pageErrors.push(message.text());
+  const targets = [
+    {
+      output: 'mix',
+      begin: 0,
+      end: validation.sections.at(-1)?.end ?? 32,
+      targetPath: join(runDir, 'mix.wav'),
+    },
+    ...validation.sections.map((section) => ({
+      output: `section-${section.name}`,
+      begin: section.begin,
+      end: section.end,
+      targetPath: join(runDir, 'sections', `${section.name}.wav`),
+    })),
+  ];
+
+  async function renderTarget(target) {
+    const context = await browser.newContext({ acceptDownloads: true });
+    const page = await context.newPage();
+    page.setDefaultTimeout(300000);
+    const downloads = [];
+    const targetErrors = [];
+
+    page.on('download', (download) => {
+      downloads.push(download);
+    });
+    page.on('console', (message) => {
+      if (message.type() === 'error') {
+        targetErrors.push(message.text());
+      }
+    });
+    page.on('pageerror', (error) => {
+      targetErrors.push(error.message);
+    });
+
+    try {
+      await page.goto(
+        `http://127.0.0.1:5173/render.html?song=${encodeURIComponent(`/songs/${slug}/${slug}.strudel.js`)}&slug=${encodeURIComponent(slug)}&begin=${encodeURIComponent(target.begin)}&end=${encodeURIComponent(target.end)}&output=${encodeURIComponent(target.output)}`,
+        { waitUntil: 'networkidle' },
+      );
+
+      await page.waitForFunction(() => {
+        const state = window.__renderState;
+        return state && (state.status === 'done' || state.status === 'error' || state.status === 'blocked');
+      }, { timeout: 300000 });
+
+      const renderState = await page.evaluate(() => window.__renderState);
+      const expectedDownloads = renderState.status === 'done' ? renderState.expected ?? 0 : 0;
+      if (expectedDownloads > 0) {
+        const startedAt = Date.now();
+        while (downloads.length < expectedDownloads && Date.now() - startedAt < 300000) {
+          await new Promise((resolve) => setTimeout(resolve, 200));
+        }
+      }
+
+      if (renderState.status === 'error') {
+        targetErrors.push(renderState.error);
+      }
+
+      if (expectedDownloads > 0 && downloads.length < expectedDownloads) {
+        targetErrors.push(`Expected ${expectedDownloads} downloads for ${target.output}, received ${downloads.length}.`);
+      }
+
+      if (renderState.status === 'done' && downloads[0]) {
+        await downloads[0].saveAs(target.targetPath);
+      }
+
+      return {
+        renderState,
+        targetErrors,
+      };
+    } finally {
+      await context.close();
     }
-  });
-  page.on('pageerror', (error) => {
-    pageErrors.push(error.message);
-  });
+  }
 
-  let renderState = null;
   try {
-    await page.goto(
-      `http://127.0.0.1:5173/render.html?song=${encodeURIComponent(`/songs/${slug}/${slug}.strudel.js`)}&slug=${encodeURIComponent(slug)}`,
-      { waitUntil: 'networkidle' },
-    );
+    for (const target of targets) {
+      const result = await renderTarget(target);
+      pageErrors.push(...result.targetErrors);
+      preflight = preflight ?? result.renderState.preflight ?? null;
 
-    await page.waitForFunction(() => {
-      const state = window.__renderState;
-      return state && (state.status === 'done' || state.status === 'error');
-    }, { timeout: 300000 });
+      if (result.renderState.status === 'done') {
+        savedOutputs.push(target.targetPath);
+        continue;
+      }
 
-    renderState = await page.evaluate(() => window.__renderState);
-    const expectedDownloads = renderState.expected ?? 0;
-    const startedAt = Date.now();
-    while (downloads.length < expectedDownloads && Date.now() - startedAt < 300000) {
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      runtimeBlockers =
+        result.renderState.runtime_blockers?.length > 0
+          ? result.renderState.runtime_blockers
+          : normalizeRuntimeErrors(pageErrors, validation.dependencies);
+      break;
     }
 
-    if (renderState.status === 'error') {
-      pageErrors.push(renderState.error);
+    if (runtimeBlockers.length === 0 && pageErrors.length > 0) {
+      runtimeBlockers = normalizeRuntimeErrors(pageErrors, validation.dependencies);
     }
 
-    if (downloads.length < expectedDownloads) {
-      pageErrors.push(`Expected ${expectedDownloads} downloads, received ${downloads.length}.`);
-    }
-
-    for (const download of downloads) {
-      const suggestedName = download.suggestedFilename();
-      const baseName = suggestedName.replace(/\.wav$/i, '');
-      const targetPath =
-        baseName === 'mix'
-          ? join(runDir, 'mix.wav')
-          : join(runDir, 'sections', `${baseName.replace(/^section-/, '')}.wav`);
-      await download.saveAs(targetPath);
-    }
-
-    const runtimeBlockers = normalizeRuntimeErrors(pageErrors);
     const status = runtimeBlockers.length > 0 ? 'blocked' : 'ok';
+    if (status === 'blocked') {
+      savedOutputs.forEach((filePath) => rmSync(filePath, { force: true }));
+    }
+
     const payload = {
       phase: 'render',
       status,
@@ -117,6 +167,8 @@ export async function handleSongRender({ argv }) {
       generated_at: new Date().toISOString(),
       metadata: validation.metadata,
       sections: validation.sections,
+      dependencies: validation.dependencies,
+      preflight,
       runtime_blockers: runtimeBlockers,
       console_errors: pageErrors,
       env: {
@@ -128,11 +180,13 @@ export async function handleSongRender({ argv }) {
         { name: sampleService.name, url: sampleService.url, reused: sampleService.reused },
         { name: viteService.name, url: viteService.url, reused: viteService.reused },
       ],
-      outputs: {
+    };
+    if (status === 'ok') {
+      payload.outputs = {
         mix: join(runDir, 'mix.wav'),
         sections: validation.sections.map((section) => join(runDir, 'sections', `${section.name}.wav`)),
-      },
-    };
+      };
+    }
 
     writeFileSync(join(runDir, 'run.json'), `${JSON.stringify(payload, null, 2)}\n`);
 
@@ -142,15 +196,15 @@ export async function handleSongRender({ argv }) {
       exitCode: status === 'blocked' ? EXIT_CODES.RENDER_BLOCKED : EXIT_CODES.OK,
       song: slug,
       run_dir: runDir,
+      preflight: payload.preflight,
       runtime_blockers: runtimeBlockers,
-      outputs: payload.outputs,
+      outputs: payload.outputs ?? null,
       message:
         status === 'blocked'
           ? `Rendered ${slug} to ${runDir}, but the run is blocked by runtime issues.`
           : `Rendered ${slug} to ${runDir}`,
     };
   } finally {
-    await context.close();
     await browser.close();
     stopService(viteService.child);
     stopService(sampleService.child);

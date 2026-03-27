@@ -3,6 +3,7 @@ import { CommandError, EXIT_CODES, isMainModule, runCliCommand } from '../lib/co
 import { handleSongAnalyze } from './song-analyze.mjs';
 import { handleSongCritique } from './song-critique.mjs';
 import { handleSongRender } from './song-render.mjs';
+import { handleSongRevise } from './song-revise.mjs';
 
 export async function handleSongLoop({ argv }) {
   const slug = resolveSongSlug(argv);
@@ -18,32 +19,44 @@ export async function handleSongLoop({ argv }) {
 
   let iteration = 0;
   let finalExitCode = EXIT_CODES.OK;
+  let reviseResult = null;
+  let activeRunDir = null;
   while (iteration < maxIters) {
     iteration += 1;
 
     const renderResult = await handleSongRender({ argv: ['--song', slug] });
+    activeRunDir = renderResult.run_dir ?? activeRunDir;
     finalExitCode = renderResult.exitCode ?? EXIT_CODES.OK;
     if (finalExitCode === EXIT_CODES.RENDER_BLOCKED || finalExitCode !== EXIT_CODES.OK) {
       break;
     }
 
     const analyzeResult = await handleSongAnalyze({ argv: ['--song', slug] });
+    activeRunDir = analyzeResult.run_dir ?? activeRunDir;
     finalExitCode = analyzeResult.exitCode ?? EXIT_CODES.OK;
     if (finalExitCode === EXIT_CODES.ANALYSIS_BLOCKED || finalExitCode !== EXIT_CODES.OK) {
       break;
     }
 
     const critiqueResult = await handleSongCritique({ argv: ['--song', slug] });
+    activeRunDir = critiqueResult.run_dir ?? activeRunDir;
     finalExitCode = critiqueResult.exitCode ?? EXIT_CODES.OK;
     if (finalExitCode !== EXIT_CODES.OK) {
       break;
     }
 
-    // There is no automatic revise step yet, so one clean pass is enough.
+    reviseResult = await handleSongRevise({ argv: ['--song', slug] });
+    activeRunDir = reviseResult.run_dir ?? activeRunDir;
+    finalExitCode = reviseResult.exitCode ?? EXIT_CODES.OK;
+    if (finalExitCode !== EXIT_CODES.OK) {
+      break;
+    }
+
+    // There is no automatic model rewrite step yet, so one prepared revision pass is enough.
     break;
   }
 
-  const runDir = findLatestRunDir(slug);
+  const runDir = activeRunDir ?? findLatestRunDir(slug);
   return {
     phase: 'song:loop',
     status:
@@ -58,6 +71,8 @@ export async function handleSongLoop({ argv }) {
     song: slug,
     iterations: iteration,
     run_dir: runDir,
+    revision_request_path: reviseResult?.request_path ?? null,
+    revision_prompt_path: reviseResult?.prompt_path ?? null,
     message:
       finalExitCode === EXIT_CODES.OK
         ? `Completed ${iteration} review pass${iteration === 1 ? '' : 'es'} for ${slug}.`

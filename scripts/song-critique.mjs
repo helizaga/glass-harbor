@@ -83,7 +83,9 @@ export async function handleSongCritique({ argv }) {
   const referenceOverlap = average(referenceCards.map((card) => clamp(card.score / 40) || 0));
   const silentRender = (analysis.metrics?.rms ?? 0) === 0 && (analysis.metrics?.peak ?? 0) === 0;
   const runtimeErrors =
-    runInfo.runtime_blockers?.length > 0 ? runInfo.runtime_blockers : normalizeRuntimeErrors(runInfo.console_errors);
+    runInfo.runtime_blockers?.length > 0
+      ? runInfo.runtime_blockers
+      : normalizeRuntimeErrors(runInfo.console_errors, runInfo.dependencies ?? validation.dependencies);
 
   const structureClarity = clamp(validation.errors.length === 0 ? 0.9 : 0.45);
   const grooveStrength = silentRender ? 0 : clamp(((grooveSection.onset_density ?? 0) / 9 + (analysis.metrics?.rms ?? 0) / 0.18) / 2);

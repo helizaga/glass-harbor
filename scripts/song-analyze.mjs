@@ -29,11 +29,47 @@ export async function handleSongAnalyze({ argv }) {
   }
 
   const runDir = resolveRunDir(argv, slug) ?? '';
+  const runPath = runDir ? join(runDir, 'run.json') : '';
 
-  if (!runDir || !existsSync(join(runDir, 'mix.wav'))) {
+  if (!runDir || !existsSync(runPath)) {
     throw new CommandError(`No rendered run found for ${slug}. Run glass-harbor song render ${slug} first.`, {
       exitCode: EXIT_CODES.ANALYSIS_BLOCKED,
       code: 'run_missing',
+    });
+  }
+
+  const runInfo = JSON.parse(readFileSync(runPath, 'utf8'));
+  if (runInfo.status === 'blocked') {
+    const outputPath = join(runDir, 'analysis.json');
+    const blockedPayload = {
+      phase: 'analyze',
+      status: 'blocked',
+      song: slug,
+      run_dir: runDir,
+      readiness: 'blocked',
+      metrics: null,
+      sections: {},
+      anomalies: ['Render phase is blocked; analysis was skipped.'],
+      runtime_blockers: runInfo.runtime_blockers ?? [],
+    };
+    writeFileSync(outputPath, `${JSON.stringify(blockedPayload, null, 2)}\n`);
+    return {
+      phase: 'song:analyze',
+      status: 'blocked',
+      exitCode: EXIT_CODES.ANALYSIS_BLOCKED,
+      song: slug,
+      run_dir: runDir,
+      readiness: 'blocked',
+      anomalies: blockedPayload.anomalies,
+      runtime_blockers: blockedPayload.runtime_blockers,
+      message: `Analysis skipped for ${slug} because the render phase is blocked.`,
+    };
+  }
+
+  if (!existsSync(join(runDir, 'mix.wav'))) {
+    throw new CommandError(`Rendered run for ${slug} is missing mix.wav.`, {
+      exitCode: EXIT_CODES.ANALYSIS_BLOCKED,
+      code: 'mix_missing',
     });
   }
 
@@ -54,10 +90,6 @@ export async function handleSongAnalyze({ argv }) {
   ]);
 
   const raw = JSON.parse(readFileSync(outputPath, 'utf8'));
-  const runInfo = existsSync(join(runDir, 'run.json'))
-    ? JSON.parse(readFileSync(join(runDir, 'run.json'), 'utf8'))
-    : { runtime_blockers: [], console_errors: [] };
-
   const anomalies = [];
   if ((raw.mix?.rms ?? 0) === 0 && (raw.mix?.peak ?? 0) === 0) {
     anomalies.push('Rendered mix is silent.');
@@ -69,7 +101,9 @@ export async function handleSongAnalyze({ argv }) {
     anomalies.push(`Silent sections: ${silentSections.join(', ')}`);
   }
   const runtimeBlockers =
-    runInfo.runtime_blockers?.length > 0 ? runInfo.runtime_blockers : normalizeRuntimeErrors(runInfo.console_errors);
+    runInfo.runtime_blockers?.length > 0
+      ? runInfo.runtime_blockers
+      : normalizeRuntimeErrors(runInfo.console_errors, runInfo.dependencies ?? validation.dependencies);
   if (runtimeBlockers.length > 0) {
     anomalies.push('Render phase reported runtime blockers.');
   }
