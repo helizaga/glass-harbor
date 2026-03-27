@@ -20,6 +20,7 @@ Usage:
   glass-harbor song critique <slug> [--run <path>] [--json] [--quiet] [--verbose]
   glass-harbor song revise <slug> [--run <path>] [--json] [--quiet] [--verbose]
   glass-harbor song status <slug> [--json] [--quiet] [--verbose]
+  glass-harbor song next <slug> [--json] [--quiet] [--verbose]
   glass-harbor song approve <slug> [--run <path>] [--reason <text>] [--json] [--quiet] [--verbose]
   glass-harbor song reject <slug> [--run <path>] [--reason <text>] [--json] [--quiet] [--verbose]
   glass-harbor song loop <slug> [--max-iters <n>] [--json] [--quiet] [--verbose]
@@ -104,6 +105,8 @@ if (namespace === 'song') {
     spawnCommand(process.execPath, [scriptPath('song-revise.mjs'), ...parseSongArgs(rest, { requireSlug: true })]);
   } else if (command === 'status') {
     spawnCommand(process.execPath, [scriptPath('song-status.mjs'), ...parseSongArgs(rest, { requireSlug: true })]);
+  } else if (command === 'next') {
+    spawnCommand(process.execPath, [scriptPath('song-next.mjs'), ...parseSongArgs(rest, { requireSlug: true })]);
   } else if (command === 'approve') {
     spawnCommand(process.execPath, [scriptPath('song-approve.mjs'), ...parseSongArgs(rest, { requireSlug: true })]);
   } else if (command === 'reject') {

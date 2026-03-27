@@ -149,15 +149,17 @@ npm exec -- glass-harbor song compare open-water-signal horizon-answer
 If you want Codex threads to be the interface, use these commands as the control surface:
 
 - `glass-harbor song status <slug>`
+- `glass-harbor song next <slug>`
 - `glass-harbor song approve <slug> [--run <path>] [--reason <text>]`
 - `glass-harbor song reject <slug> [--run <path>] [--reason <text>]`
 
 The intended loop is:
 
-1. agent runs `song loop`, `song compare`, or `song explore`
-2. agent summarizes `summary.md` or `verdict.md` in the thread
-3. you reply with approval or rejection
-4. agent calls `song approve` or `song reject` and continues
+1. agent runs `song next <slug>` to choose the best next move
+2. if needed, agent runs `song loop`, `song compare`, or `song explore`
+3. agent summarizes `summary.md` or `verdict.md` in the thread
+4. you reply with approval or rejection
+5. agent calls `song approve` or `song reject` and continues
 
 ## Stable Sound Vocabulary
 
@@ -243,6 +245,7 @@ Primary CLI:
 - `glass-harbor song critique <slug>`
 - `glass-harbor song revise <slug>`
 - `glass-harbor song status <slug>`
+- `glass-harbor song next <slug>`
 - `glass-harbor song approve <slug> [--run <path>] [--reason <text>]`
 - `glass-harbor song reject <slug> [--run <path>] [--reason <text>]`
 - `glass-harbor song loop <slug>`
