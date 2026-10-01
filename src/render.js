@@ -30,6 +30,7 @@ import {
 
 const statusNode = document.querySelector('#status');
 const params = new URLSearchParams(window.location.search);
+const OFFLINE_RENDER_SAMPLE_RATE = 24000;
 
 window.__renderState = {
   status: 'booting',
@@ -39,6 +40,7 @@ window.__renderState = {
   error: null,
   preflight: null,
   runtime_blockers: [],
+  rendered_wav_base64: null,
 };
 
 const noopOutput = async () => {};
@@ -413,6 +415,18 @@ async function downloadRenderedBuffer(renderedBuffer, outputName) {
   URL.revokeObjectURL(url);
 }
 
+function audioBufferToBase64(renderedBuffer) {
+  const wavBuffer = audioBufferToWav(renderedBuffer);
+  const bytes = new Uint8Array(wavBuffer);
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    const chunk = bytes.subarray(index, index + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
+}
+
 function hapToValue(hap) {
   hap.ensureObjectValue?.();
   return hap.value;
@@ -442,6 +456,7 @@ async function renderPatternAudioStable({ pattern, cps, begin, end, outputName, 
   }
 
   const renderedBuffer = await audioContext.startRendering();
+  window.__renderState.rendered_wav_base64 = audioBufferToBase64(renderedBuffer);
   await downloadRenderedBuffer(renderedBuffer, outputName);
 }
 
@@ -478,7 +493,7 @@ async function renderSong() {
   }
 
   const cps = runtimeRepl.scheduler.cps;
-  const frameCount = Math.max(1, Math.ceil(((end - begin) / cps) * 44100));
+  const frameCount = Math.max(1, Math.ceil(((end - begin) / cps) * OFFLINE_RENDER_SAMPLE_RATE));
   let manifest;
   try {
     manifest = await fetchSampleManifest(sampleManifestUrl);
@@ -514,7 +529,7 @@ async function renderSong() {
   const audioContext = await initOfflineRuntime({
     manifest,
     sampleBaseUrl,
-    sampleRate: 44100,
+    sampleRate: OFFLINE_RENDER_SAMPLE_RATE,
     frameCount,
   });
   const { preflight, blockers } = buildPreflight({ code, manifest, sampleManifestUrl });

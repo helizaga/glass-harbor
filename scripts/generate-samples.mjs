@@ -199,6 +199,84 @@ function makeVocalChop() {
   });
 }
 
+function makeBassTonal(variant) {
+  return smooth(
+    render(1.1, (index, length) => {
+      const t = index / sampleRate;
+      const env = envelope(index, length, 0.003, 1.45);
+      const base = variant === 0 ? 49 : 55;
+      const wobble = Math.sin(2 * Math.PI * 2.2 * t) * 0.5 + 0.5;
+      const body = Math.sin(2 * Math.PI * base * t) * 0.82;
+      const over = Math.sin(2 * Math.PI * base * 2 * t) * (0.14 + wobble * 0.08);
+      return (body + over) * env;
+    }),
+  );
+}
+
+function makeStabTonal(variant) {
+  return smooth(
+    render(0.72, (index, length) => {
+      const t = index / sampleRate;
+      const env = envelope(index, length, 0.002, 1.8);
+      const freq = variant === 0 ? 261.63 : 329.63;
+      const body =
+        Math.sin(2 * Math.PI * freq * t) * 0.48 +
+        Math.sin(2 * Math.PI * freq * 2 * t) * 0.24 +
+        Math.sin(2 * Math.PI * freq * 3 * t) * 0.12;
+      return body * env;
+    }),
+  );
+}
+
+function makePluckTonal(variant) {
+  return smooth(
+    render(0.84, (index, length) => {
+      const t = index / sampleRate;
+      const env = envelope(index, length, 0.001, 2.2);
+      const freq = variant === 0 ? 523.25 : 659.25;
+      const body =
+        Math.sin(2 * Math.PI * freq * t) * 0.4 +
+        Math.sin(2 * Math.PI * freq * 2 * t) * 0.18 +
+        Math.sin(2 * Math.PI * freq * 4 * t) * 0.08;
+      return body * env;
+    }),
+  );
+}
+
+function noteKeyToFrequency(note) {
+  const match = `${note ?? ''}`.match(/^([A-Ga-g])([#b]?)(-?\d+)$/);
+  if (!match) {
+    throw new Error(`Invalid note key: ${note}`);
+  }
+  const base = {
+    c: 0,
+    d: 2,
+    e: 4,
+    f: 5,
+    g: 7,
+    a: 9,
+    b: 11,
+  }[match[1].toLowerCase()];
+  const accidental = match[2] === '#' ? 1 : match[2] === 'b' ? -1 : 0;
+  const octave = Number.parseInt(match[3], 10);
+  const midi = (octave + 1) * 12 + base + accidental;
+  return 440 * Math.pow(2, (midi - 69) / 12);
+}
+
+function makeBassPitched(noteKey, variant = 0) {
+  const base = noteKeyToFrequency(noteKey);
+  return smooth(
+    render(0.92, (index, length) => {
+      const t = index / sampleRate;
+      const env = envelope(index, length, 0.002, 1.55);
+      const wobble = Math.sin(2 * Math.PI * (1.8 + variant * 0.2) * t) * 0.5 + 0.5;
+      const body = Math.sin(2 * Math.PI * base * t) * 0.82;
+      const over = Math.sin(2 * Math.PI * base * 2 * t) * (0.12 + wobble * 0.08);
+      return (body + over) * env;
+    }),
+  );
+}
+
 const families = {
   kick_main: [makeKick(0), makeKick(1)],
   clap_main: [makeClap(0), makeClap(1)],
@@ -210,13 +288,30 @@ const families = {
   shimmer_fx: [makeShimmer()],
   air_texture: [makeAirTexture()],
   vocal_chop: [makeVocalChop()],
+  bass_tonal: [makeBassTonal(0), makeBassTonal(1)],
+  stab_tonal: [makeStabTonal(0), makeStabTonal(1)],
+  pluck_tonal: [makePluckTonal(0), makePluckTonal(1)],
+  bass_pitched: {
+    a1: [makeBassPitched('A1', 0)],
+    c2: [makeBassPitched('C2', 1)],
+    e2: [makeBassPitched('E2', 0)],
+  },
 };
 
 for (const [family, renders] of Object.entries(families)) {
   const familyDir = join(outputRoot, family);
   mkdirSync(familyDir, { recursive: true });
 
-  renders.forEach((samples, index) => {
-    writeWav(join(familyDir, `${index}.wav`), samples);
-  });
+  if (Array.isArray(renders)) {
+    renders.forEach((samples, index) => {
+      writeWav(join(familyDir, `${index}.wav`), samples);
+    });
+    continue;
+  }
+
+  for (const [note, noteRenders] of Object.entries(renders)) {
+    noteRenders.forEach((samples, index) => {
+      writeWav(join(familyDir, `${note.toLowerCase()}-${index}.wav`), samples);
+    });
+  }
 }

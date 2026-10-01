@@ -17,6 +17,19 @@ This repo is designed to stay shareable while letting you work with paid commerc
 4. Run `npm run vendor:import`.
 5. In the app, switch pack mode to `Private Overlay` or leave it on `Auto`.
 
+For pitch-aware tonal families, `import-map.json` can also use note-keyed objects instead of flat arrays, for example:
+
+```json
+{
+  "families": {
+    "stab_pitched": {
+      "a3": ["stabs/a3-stab.wav"],
+      "c4": ["stabs/c4-stab.wav"]
+    }
+  }
+}
+```
+
 ## Rules
 
 - Do not commit anything under `private-packs/`.
@@ -33,3 +46,4 @@ This repo is designed to stay shareable while letting you work with paid commerc
   - `shimmer_fx`
   - `air_texture`
   - `vocal_chop`
+- Prefer note-keyed `stab_pitched` / `pluck_pitched` mappings when you want tonal sample playback with `note(...).s(...)`.

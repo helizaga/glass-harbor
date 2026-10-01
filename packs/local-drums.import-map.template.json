@@ -1,0 +1,57 @@
+{
+  "families": {
+    "kick_main": [
+      "kicks/your-best-kick.wav",
+      "kicks/your-warm-alt-kick.wav"
+    ],
+    "clap_main": [
+      "claps/your-main-clap.wav",
+      "claps/your-wide-alt-clap.wav"
+    ],
+    "hat_closed": [
+      "hats/your-tight-hat.wav",
+      "hats/your-soft-hat.wav"
+    ],
+    "hat_open": [
+      "hats/your-open-hat.wav"
+    ],
+    "perc_top": [],
+    "air_texture": [
+      "textures/your-air-texture.wav"
+    ],
+    "shimmer_fx": [],
+    "riser_up": [],
+    "impact_wide": [],
+    "vocal_chop": [],
+    "bass_tonal": [],
+    "stab_tonal": [],
+    "pluck_tonal": [],
+    "bass_pitched": {
+      "a1": [
+        "bass/your-bass-a1.wav"
+      ],
+      "c2": [
+        "bass/your-bass-c2.wav"
+      ],
+      "e2": [
+        "bass/your-bass-e2.wav"
+      ]
+    },
+    "stab_pitched": {
+      "a3": [
+        "stabs/your-stab-a3.wav"
+      ],
+      "c4": [
+        "stabs/your-stab-c4.wav"
+      ]
+    },
+    "pluck_pitched": {
+      "a3": [
+        "leads/your-pluck-a3.wav"
+      ],
+      "c4": [
+        "leads/your-pluck-c4.wav"
+      ]
+    }
+  }
+}

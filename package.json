@@ -11,6 +11,7 @@
     "build": "vite build && node scripts/copy-samples.mjs",
     "preview": "vite preview",
     "generate:samples": "node scripts/generate-samples.mjs",
+    "install:free-pack": "node scripts/install-free-starter-pack.mjs && npm run pack:json",
     "pack:json": "node scripts/build-pack-json.mjs --root samples/edm-core --base-url /samples/edm-core",
     "prep": "npm run generate:samples && npm run pack:json",
     "postinstall": "npm run prep",
@@ -31,12 +32,16 @@
     "song:loop": "node ./bin/glass-harbor.mjs song loop",
     "song:compare": "node ./bin/glass-harbor.mjs song compare",
     "song:explore": "node ./bin/glass-harbor.mjs song explore",
+    "taste:ingest": "node ./bin/glass-harbor.mjs taste ingest",
     "debug:ui": "node ./bin/glass-harbor.mjs debug ui",
     "debug:osc": "node ./bin/glass-harbor.mjs debug osc",
     "samples:serve": "node scripts/serve-samples.mjs",
     "vendor:init": "node scripts/init-private-pack.mjs",
     "vendor:import": "node scripts/import-private-pack.mjs",
-    "vendor:manifest": "node scripts/build-pack-json.mjs --root private-packs/runtime/edm-core --base-url /private-packs/runtime/edm-core"
+    "vendor:manifest": "node scripts/build-pack-json.mjs --root private-packs/runtime/edm-core --base-url /private-packs/runtime/edm-core",
+    "drums:init": "node scripts/init-local-drums.mjs",
+    "drums:prep": "node scripts/prep-local-drums.mjs",
+    "drums:import": "node scripts/import-local-drums.mjs"
   },
   "dependencies": {
     "@strudel/core": "1.2.6",

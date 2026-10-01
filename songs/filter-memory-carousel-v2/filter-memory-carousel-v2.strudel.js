@@ -3,6 +3,7 @@
 // @bpm 122
 // @details Pasteable song file for Strudel web. Run `glass-harbor song serve` before pasting. Variant scaffold 2 explores deeper subtraction and a more withheld return.
 // @sections intro:8, groove:16, lift:8, breakdown:8, drop:16, outro:8
+// @section_roles intro:anchor, groove:groove, lift:lift, breakdown:breath, drop:return, outro:outro
 
 samples('http://localhost:5432')
 setcpm(122 / 4)

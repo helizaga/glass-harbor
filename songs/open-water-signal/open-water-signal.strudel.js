@@ -3,6 +3,7 @@
 // @bpm 120
 // @details Pasteable song file for Strudel web. Run `glass-harbor song serve` before pasting.
 // @sections intro:16, pulse:16, lift:8, breakdown:16, bloom:16, afterglow:16, outro:8
+// @section_roles intro:anchor, pulse:groove, lift:lift, breakdown:breath, bloom:return, afterglow:return, outro:outro
 
 samples('http://localhost:5432')
 setcpm(120 / 4)

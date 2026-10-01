@@ -3,21 +3,11 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { parseCommonArgs } from '../lib/command-runtime.mjs';
+import { STABLE_SOUND_ROLES } from '../lib/song-contract.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
-const requiredFamilies = [
-  'kick_main',
-  'clap_main',
-  'hat_closed',
-  'hat_open',
-  'perc_top',
-  'impact_wide',
-  'riser_up',
-  'shimmer_fx',
-  'air_texture',
-  'vocal_chop',
-];
+const requiredFamilies = STABLE_SOUND_ROLES;
 
 function manifestIsComplete(manifestPath) {
   if (!existsSync(manifestPath)) {

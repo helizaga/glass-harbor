@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 
+import { recordPackOutcome } from '../lib/pack-curation.mjs';
 import { findLatestRunDir, resolveSongSlug } from '../lib/song-contract.mjs';
 import { CommandError, EXIT_CODES, isMainModule, runCliCommand } from '../lib/command-runtime.mjs';
 import { appendMemoryHistory, chooseBaselineRun, ensureSongMemory, updateSongMemory } from '../lib/review-gates.mjs';
@@ -81,12 +82,20 @@ export async function handleSongLoop({ argv }) {
 
   const runDir = activeRunDir ?? findLatestRunDir(slug);
   let verdict = null;
+  let critique = null;
   if (runDir && reviseResult?.verdict_path) {
     try {
       verdict = JSON.parse(readFileSync(reviseResult.verdict_path, 'utf8'));
     } catch (error) {
       console.warn(`Failed to parse ${reviseResult.verdict_path}: ${error.message}`);
       verdict = null;
+    }
+  }
+  if (runDir) {
+    try {
+      critique = JSON.parse(readFileSync(`${runDir}/critique.json`, 'utf8'));
+    } catch {
+      critique = null;
     }
   }
   if (verdict) {
@@ -114,6 +123,14 @@ export async function handleSongLoop({ argv }) {
         },
       ),
     );
+
+    recordPackOutcome({
+      song: slug,
+      runDir,
+      baselineRunDir,
+      verdict,
+      critique,
+    });
   }
 
   return {

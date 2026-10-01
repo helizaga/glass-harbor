@@ -21,11 +21,12 @@ Usage:
   glass-harbor song revise <slug> [--run <path>] [--json] [--quiet] [--verbose]
   glass-harbor song status <slug> [--json] [--quiet] [--verbose]
   glass-harbor song next <slug> [--json] [--quiet] [--verbose]
-  glass-harbor song approve <slug> [--run <path>] [--reason <text>] [--json] [--quiet] [--verbose]
-  glass-harbor song reject <slug> [--run <path>] [--reason <text>] [--json] [--quiet] [--verbose]
+  glass-harbor song approve <slug> [--run <path>] [--reason <text>] [--preserve <trait>] [--avoid <trait>] [--tradeoff <note>] [--json] [--quiet] [--verbose]
+  glass-harbor song reject <slug> [--run <path>] [--reason <text>] [--preserve <trait>] [--avoid <trait>] [--tradeoff <note>] [--json] [--quiet] [--verbose]
   glass-harbor song loop <slug> [--max-iters <n>] [--json] [--quiet] [--verbose]
   glass-harbor song compare <slug> [<other-slug> ...] [--json] [--quiet] [--verbose]
   glass-harbor song explore <slug> [--count <n>] [--max-iters <n>] [--json] [--quiet] [--verbose]
+  glass-harbor taste ingest <slug> [--json] [--quiet] [--verbose]
   glass-harbor debug ui
   glass-harbor debug osc [--debug]
 
@@ -60,7 +61,7 @@ function scriptPath(name) {
 
 function parseSongArgs(args, { requireSlug = false } = {}) {
   const hasSongFlag = args.includes('--song') || args.includes('-s');
-  const flagsWithValues = new Set(['--song', '-s', '--run', '--count', '--max-iters', '--reason']);
+  const flagsWithValues = new Set(['--song', '-s', '--run', '--count', '--max-iters', '--reason', '--preserve', '--avoid', '--tradeoff']);
   const rest = [];
   let slug = null;
 
@@ -124,6 +125,12 @@ if (namespace === 'song') {
     spawnCommand(process.execPath, [scriptPath('song-compare.mjs'), ...rest]);
   } else if (command === 'explore') {
     spawnCommand(process.execPath, [scriptPath('song-explore.mjs'), ...parseSongArgs(rest, { requireSlug: true })]);
+  } else {
+    fail(usage());
+  }
+} else if (namespace === 'taste') {
+  if (command === 'ingest') {
+    spawnCommand(process.execPath, [scriptPath('taste-ingest.mjs'), ...parseSongArgs(rest, { requireSlug: true })]);
   } else {
     fail(usage());
   }

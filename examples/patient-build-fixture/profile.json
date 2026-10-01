@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "slug": "patient-build-fixture",
+  "title": "Patient Build Fixture",
+  "tags": [
+    "progressive",
+    "patient",
+    "night-drive",
+    "spacious",
+    "patient groove",
+    "readable arrangement",
+    "gradual brightness lift",
+    "sustained emotional tone"
+  ],
+  "bpm_range": {
+    "min": 116,
+    "max": 122,
+    "source": "text"
+  },
+  "why_you_like_it": [
+    "the track keeps momentum without rushing the payoff",
+    "the arrangement stays readable even when it gets bigger"
+  ],
+  "preserve_traits": [
+    "patient groove",
+    "readable arrangement",
+    "gradual brightness lift",
+    "sustained emotional tone"
+  ],
+  "avoid_traits": [
+    "abrupt payoff",
+    "too much harmonic drift",
+    "weak groove continuity"
+  ],
+  "section_role_summary": [
+    {
+      "clip": "anchor",
+      "role": "anchor"
+    },
+    {
+      "clip": "breath",
+      "role": "breath"
+    },
+    {
+      "clip": "groove",
+      "role": "groove"
+    },
+    {
+      "clip": "return",
+      "role": "return"
+    }
+  ],
+  "section_notes": [
+    "anchor: establish tone quickly without overcommitting the rhythm",
+    "groove: make the motion feel stable and repeatable",
+    "breath: carve space before the biggest section",
+    "return: re-enter with confidence",
+    "not surprise clutter"
+  ],
+  "groove_notes": [
+    "groove should feel stable enough to survive repetition",
+    "transitions should be gradual until the final return",
+    "low end should remain supportive rather than dominant"
+  ],
+  "clip_coverage": {
+    "count": 4,
+    "clips": [
+      "anchor.wav",
+      "breath.wav",
+      "groove.wav",
+      "return.wav"
+    ]
+  },
+  "reliability": {
+    "overall": 0.949,
+    "level": "high",
+    "analysis_engine": "librosa-rich",
+    "notes": [
+      "Aggregated from 4 private example clip(s)."
+    ]
+  },
+  "rhythm_tendencies": {
+    "estimated_tempo": 119.667,
+    "groove_continuity": 0.747,
+    "syncopation_proxy": 0.466,
+    "inter_beat_loudness_consistency": 0.652
+  },
+  "timbre_tendencies": {
+    "spectral_centroid": 2458.916,
+    "sub_energy_ratio": 0.164,
+    "bass_energy_ratio": 0.272,
+    "high_band_energy_ratio": 0.006
+  },
+  "calibration_targets": {
+    "estimated_tempo": 119.667,
+    "groove_continuity": 0.747,
+    "syncopation_proxy": 0.466,
+    "inter_beat_loudness_consistency": 0.652,
+    "harmonic_stability": 0.973,
+    "chord_change_proxy": 0.497,
+    "sub_energy_ratio": 0.164,
+    "bass_energy_ratio": 0.272,
+    "spectral_centroid": 2458.916
+  },
+  "example_targets": []
+}

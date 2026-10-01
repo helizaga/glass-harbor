@@ -14,6 +14,15 @@ The primary workflow is:
 8. or let the CLI orchestrate the whole branch-and-rank pass with `glass-harbor song explore <slug>`
 9. optionally use the local app for debugging or SuperDirt verification
 
+For normal Codex-thread use, the intended experience is simpler:
+
+1. you describe the song you want in plain language
+2. Codex turns that into a brief and picks a slug
+3. Codex writes one canonical song by default
+4. Codex validates it automatically
+5. Codex only runs a hidden review pass when the first draft looks risky or you explicitly ask for optimization
+6. you get the song file plus a short note, not the whole artifact stack unless it matters
+
 ## What This Repo Is
 
 - an agent-first songwriting workspace built around pasteable Strudel files
@@ -31,10 +40,28 @@ Songs live under `songs/<slug>/`:
 
 Reference cards live under `references/` and capture reusable arrangement patterns without copying copyrighted songs.
 
+Taste examples live under `examples/<slug>/`:
+
+- committed: `example.md`, `profile.json`
+- local only: `clips/*.wav`, `analysis.json`
+
+Named-song references from normal generation requests are prompt-only by default. They should shape the generated brief and song for that request, but they should not be ingested into `examples/` unless you explicitly ask to teach that taste permanently.
+
 Start with:
 
 - [songs/glass-harbor/glass-harbor.brief.md](songs/glass-harbor/glass-harbor.brief.md)
 - [songs/glass-harbor/glass-harbor.strudel.js](songs/glass-harbor/glass-harbor.strudel.js)
+
+## Local Strudel Reference
+
+The repo now includes a small local Strudel lookup layer for agents and humans:
+
+- [docs/strudel/README.md](docs/strudel/README.md)
+- [docs/strudel/technique-index.md](docs/strudel/technique-index.md)
+- [docs/strudel/sound-guide.md](docs/strudel/sound-guide.md)
+- [docs/strudel/style-lanes.md](docs/strudel/style-lanes.md)
+
+These are meant to keep songwriting decisions fast and lane-aware without loading the entire Strudel documentation set every time.
 
 ## Fastest Workflow
 
@@ -46,6 +73,21 @@ npm exec -- glass-harbor song serve
 Then open `https://strudel.cc/`, paste the contents of a song file from `songs/`, and press play.
 
 `glass-harbor song serve` serves the active runtime pack on `http://localhost:5432`, which is what the authored song files expect. `npm run song:serve` remains as a compatibility shim.
+
+## Thread-First Song Creation
+
+If you are using Codex threads as the interface, you should not need to think in CLI steps for normal creation requests. The default behavior should be:
+
+1. say what you want musically
+2. optionally cite real songs or artists as prompt-only references
+3. let Codex create the brief and song under `songs/<slug>/`
+4. get back:
+   - the song file
+   - the brief file
+   - one short note on what it is aiming for
+   - one short note on whether it was only validated or also review-checked
+
+The deeper CLI review flow is still there, but it should stay in the background unless it materially changes the answer.
 
 ## Optional Local Debug Runner
 
@@ -87,6 +129,7 @@ Each song also keeps local agent memory in `songs/<slug>/memory.json`:
 - last attempted run
 - pending review run
 - current open issue
+- active taste profile
 - short decision history
 
 This file is local state and is gitignored.
@@ -105,6 +148,121 @@ Optional style-alignment env:
 - `GLASS_HARBOR_MULAN_MODEL_PATH=/path/to/local/model`
 
 If the MuLan backend is unavailable, critique falls back to deterministic MIR and retrieval-based style scoring with lower confidence.
+
+If you want to teach the critic from songs you like, ingest a local private example:
+
+```sh
+npm exec -- glass-harbor taste ingest <example-slug>
+```
+
+That reads `examples/<slug>/example.md` plus local `examples/<slug>/clips/*.wav`, writes a local `analysis.json`, and refreshes the committed `profile.json` used during song critique.
+
+For thread-first generation, `song validate <slug> --json` now exposes a `generation_strategy` block. When it reports `two_candidate_hidden`, the intended behavior is to silently branch a rhythm-forward and melody-forward draft, keep the stronger one, and only surface a single winner in the thread.
+
+If you want a better public scaffold pack than the fully synthetic default, install the curated free alternates:
+
+```sh
+npm run install:free-pack
+```
+
+That keeps the synthetic drum core intact, adds curated free alternates for FX/textures under `samples/edm-core/`, and records their sources in `samples/edm-core/free-starter-pack.json`.
+
+## Manual Local Pack Upgrade
+
+For better sound quality, use the local stable-pack overlay workflow:
+
+```sh
+npm run drums:init
+```
+
+That creates:
+
+- `private-packs/vendor-sources/local-drums/raw/`
+- `private-packs/vendor-sources/local-drums/import-map.json`
+
+Drop your downloaded files into any of these folders:
+
+- `private-packs/vendor-sources/local-drums/raw/kicks/`
+- `private-packs/vendor-sources/local-drums/raw/claps/`
+- `private-packs/vendor-sources/local-drums/raw/hats/`
+- `private-packs/vendor-sources/local-drums/raw/perc/`
+- `private-packs/vendor-sources/local-drums/raw/bass/`
+- `private-packs/vendor-sources/local-drums/raw/stabs/`
+- `private-packs/vendor-sources/local-drums/raw/leads/`
+- `private-packs/vendor-sources/local-drums/raw/textures/`
+- `private-packs/vendor-sources/local-drums/raw/vocals/`
+- `private-packs/vendor-sources/local-drums/raw/risers/`
+- `private-packs/vendor-sources/local-drums/raw/impacts/`
+- `private-packs/vendor-sources/local-drums/raw/shimmer/`
+
+Then edit `import-map.json` so it points at the files you want to use for:
+
+- `kick_main`
+- `clap_main`
+- `hat_closed`
+- `hat_open`
+- optional `perc_top`
+- optional `air_texture`
+- optional `shimmer_fx`
+- optional `riser_up`
+- optional `impact_wide`
+- optional `vocal_chop`
+- optional `bass_tonal`
+- optional `stab_tonal`
+- optional `pluck_tonal`
+- optional pitch-aware `bass_pitched`
+- optional pitch-aware `stab_pitched`
+- optional pitch-aware `pluck_pitched`
+
+Example mapping:
+
+```json
+{
+  "families": {
+    "kick_main": ["kicks/main-kick.wav", "kicks/warm-kick.wav"],
+    "clap_main": ["claps/main-clap.wav"],
+    "hat_closed": ["hats/tight-hat.wav", "hats/soft-hat.wav"],
+    "hat_open": ["hats/open-hat.wav"],
+    "perc_top": [],
+    "air_texture": ["textures/air-texture.wav"],
+    "shimmer_fx": ["shimmer/shimmer.wav"],
+    "riser_up": ["risers/riser.wav"],
+    "impact_wide": ["impacts/impact.wav"],
+    "vocal_chop": ["vocals/chop.wav"],
+    "bass_tonal": ["bass/bass-shot.wav"],
+    "stab_tonal": ["stabs/stab-shot.wav"],
+    "pluck_tonal": ["leads/pluck-shot.wav"],
+    "stab_pitched": {
+      "a3": ["stabs/stab-a3.wav"],
+      "c4": ["stabs/stab-c4.wav"]
+    },
+    "pluck_pitched": {
+      "a3": ["leads/pluck-a3.wav"],
+      "c4": ["leads/pluck-c4.wav"]
+    }
+  }
+}
+```
+
+Import the overlay with:
+
+```sh
+npm run drums:prep
+npm run drums:import
+```
+
+`drums:prep` reads `private-packs/vendor-sources/local-drums/prep-plan.json` and writes trimmed / filtered working assets back into the local workspace before import.
+
+`drums:import` writes a merged runtime pack to `private-packs/runtime/edm-core/` and keeps any untouched families falling back to the public scaffold pack.
+
+After `song loop`, the repo now records local pack evidence under:
+
+- `private-packs/curation/outcomes.json`
+- `private-packs/curation/pairwise.json`
+
+Those records tie active kick / bass / vocal choices to real song outcomes instead of relying on filenames alone.
+
+When a brief includes `## Example Targets`, the tool prefers those attached example profiles before falling back to generic reference cards. This is the main quality lever for artist-adjacent prompts.
 
 ## Variant Comparison
 
@@ -165,8 +323,8 @@ If you want Codex threads to be the interface, use these commands as the control
 
 - `glass-harbor song status <slug>`
 - `glass-harbor song next <slug>`
-- `glass-harbor song approve <slug> [--run <path>] [--reason <text>]`
-- `glass-harbor song reject <slug> [--run <path>] [--reason <text>]`
+- `glass-harbor song approve <slug> [--run <path>] [--reason <text>] [--preserve <trait>] [--avoid <trait>]`
+- `glass-harbor song reject <slug> [--run <path>] [--reason <text>] [--preserve <trait>] [--avoid <trait>]`
 
 The intended loop is:
 
@@ -175,6 +333,15 @@ The intended loop is:
 3. agent summarizes `summary.md` or `verdict.md` in the thread
 4. you reply with approval or rejection
 5. agent calls `song approve` or `song reject` and continues
+
+`song approve` and `song reject` also accept optional taste-teaching flags:
+
+- `--preserve <trait>`
+- `--avoid <trait>`
+- `--tradeoff <note>`
+- `--reason <text>`
+
+These are recorded into local song memory so future drafts preserve what you liked instead of only updating the baseline pointer.
 
 ## Stable Sound Vocabulary
 
@@ -191,6 +358,12 @@ Generated songs should only target these sampled roles unless you explicitly exp
 - `air_texture`
 - `vocal_chop`
 
+Optional tonal sample families are available when they materially improve hook quality:
+
+- `bass_tonal`
+- `stab_tonal`
+- `pluck_tonal`
+
 This keeps song code portable across sound-pack changes.
 
 ## Song Metadata Contract
@@ -202,14 +375,28 @@ Generated songs should start with:
 - `@bpm`
 - `@details`
 - `@sections`
+- `@section_roles`
 
 `@sections` uses cycle counts, for example:
 
 ```js
 // @sections intro:8, groove:16, lift:8, breakdown:16, drop:16, outro:8
+// @section_roles intro:anchor, groove:groove, lift:lift, breakdown:breath, drop:return, outro:outro
 ```
 
-The render loop uses this metadata to create named section clips automatically.
+The render loop uses this metadata to create named section clips automatically, and the critic uses `@section_roles` to judge section intent without guessing from section names alone.
+
+## Brief References
+
+Briefs may include:
+
+- `## Example Targets`
+  Use this only for committed taste-memory examples under `examples/`.
+- `## Prompt References`
+  Use this for real songs or artists cited in the current request, plus short notes about what to borrow and what not to copy.
+
+`Prompt References` are ephemeral by default and should not automatically become durable taste memory.
+They create a temporary per-song style lens for reference retrieval, calibration, and critique without writing anything into `examples/` or long-term taste memory.
 
 ## Public Scaffold vs Private Overlay
 

@@ -2,6 +2,15 @@
   "air_texture": [
     "/samples/edm-core/air_texture/0.wav"
   ],
+  "bass_pitched": {
+    "a1": "/samples/edm-core/bass_pitched/a1-0.wav",
+    "c2": "/samples/edm-core/bass_pitched/c2-0.wav",
+    "e2": "/samples/edm-core/bass_pitched/e2-0.wav"
+  },
+  "bass_tonal": [
+    "/samples/edm-core/bass_tonal/0.wav",
+    "/samples/edm-core/bass_tonal/1.wav"
+  ],
   "clap_main": [
     "/samples/edm-core/clap_main/0.wav",
     "/samples/edm-core/clap_main/1.wav"
@@ -27,11 +36,19 @@
     "/samples/edm-core/perc_top/0.wav",
     "/samples/edm-core/perc_top/1.wav"
   ],
+  "pluck_tonal": [
+    "/samples/edm-core/pluck_tonal/0.wav",
+    "/samples/edm-core/pluck_tonal/1.wav"
+  ],
   "riser_up": [
     "/samples/edm-core/riser_up/0.wav"
   ],
   "shimmer_fx": [
     "/samples/edm-core/shimmer_fx/0.wav"
+  ],
+  "stab_tonal": [
+    "/samples/edm-core/stab_tonal/0.wav",
+    "/samples/edm-core/stab_tonal/1.wav"
   ],
   "vocal_chop": [
     "/samples/edm-core/vocal_chop/0.wav"

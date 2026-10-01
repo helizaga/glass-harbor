@@ -15,6 +15,12 @@ This repo ships a compact sound pack with stable names so tracks survive sample 
 - `air_texture`: background wash and atmosphere
 - `vocal_chop`: phrase punctuation and ear candy
 
+## Optional Tonal Families
+
+- `bass_tonal`: sampled low-end hook layer when the bass needs more character than a browser synth
+- `stab_tonal`: short harmonic or synth punctuation for hook identity
+- `pluck_tonal`: short melodic or arpeggiated sample hook material
+
 ## Replacement Rules
 
 - Keep the family names stable even when you replace the audio.
@@ -23,6 +29,7 @@ This repo ships a compact sound pack with stable names so tracks survive sample 
 - Keep `kick_main`, `clap_main`, and `hat_closed` especially disciplined because they define the whole groove identity.
 - Song code must reference these stable families only, not vendor filenames or raw private paths.
 - Review and generation tooling assume these family names stay stable across pack upgrades.
+- Optional tonal families are additive. They can improve hook quality, but they must never replace the required core pack families.
 
 ## Quality Bar
 

@@ -513,29 +513,97 @@ def merge_section_payload(analysis, channels):
     return legacy
 
 
+def merge_numeric_dicts(payloads):
+    if not payloads:
+        return {}
+
+    keys = sorted({key for payload in payloads for key in payload.keys()})
+    merged = {}
+    for key in keys:
+        values = [payload.get(key) for payload in payloads if key in payload]
+        if not values:
+            continue
+
+        first = values[0]
+        if isinstance(first, dict):
+            merged[key] = merge_numeric_dicts(values)
+        elif isinstance(first, (int, float)):
+            merged[key] = float(sum(float(value) for value in values) / len(values))
+        elif isinstance(first, list):
+            merged[key] = list(dict.fromkeys(item for value in values for item in value))
+        else:
+            merged[key] = first
+
+    return merged
+
+
+def average_analyses(analyses):
+    if not analyses:
+        return analyze_audio([], 44100)
+
+    return {
+        "legacy": merge_numeric_dicts([analysis["legacy"] for analysis in analyses]),
+        "rhythm": merge_numeric_dicts([analysis["rhythm"] for analysis in analyses]),
+        "structure": merge_numeric_dicts([analysis["structure"] for analysis in analyses]),
+        "tonal": merge_numeric_dicts([analysis["tonal"] for analysis in analyses]),
+        "timbre": merge_numeric_dicts([analysis["timbre"] for analysis in analyses]),
+        "notes": list(dict.fromkeys(item for analysis in analyses for item in analysis["notes"])),
+    }
+
+
+def analyze_audio_file(path):
+    samples, sample_rate, channels = read_audio(path)
+    analysis = analyze_audio(samples, sample_rate)
+    return analysis, channels
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--run-dir", required=True)
+    parser.add_argument("--run-dir")
+    parser.add_argument("--mix-path")
+    parser.add_argument("--sections-dir")
+    parser.add_argument("--clips-dir")
     parser.add_argument("--song", required=True)
     parser.add_argument("--bpm", default="0")
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
 
-    mix_path = os.path.join(args.run_dir, "mix.wav")
-    sections_dir = os.path.join(args.run_dir, "sections")
-
-    mix_samples, mix_rate, mix_channels = read_audio(mix_path)
-    mix_analysis = analyze_audio(mix_samples, mix_rate)
-
     section_metrics = {}
-    if os.path.isdir(sections_dir):
-        for name in sorted(os.listdir(sections_dir)):
-            if not name.endswith(".wav"):
-                continue
-            section_path = os.path.join(sections_dir, name)
-            section_samples, section_rate, section_channels = read_audio(section_path)
-            analysis = analyze_audio(section_samples, section_rate)
-            section_metrics[name.replace(".wav", "")] = merge_section_payload(analysis, section_channels)
+    if args.clips_dir:
+        if not os.path.isdir(args.clips_dir):
+            raise FileNotFoundError(f"Clips directory not found: {args.clips_dir}")
+
+        clip_names = sorted(name for name in os.listdir(args.clips_dir) if name.endswith(".wav"))
+        if not clip_names:
+            raise FileNotFoundError(f"No .wav clips found in {args.clips_dir}")
+
+        clip_analyses = []
+        clip_channels = []
+        for name in clip_names:
+            clip_path = os.path.join(args.clips_dir, name)
+            analysis, channels = analyze_audio_file(clip_path)
+            clip_analyses.append(analysis)
+            clip_channels.append(channels)
+            section_metrics[name.replace(".wav", "")] = merge_section_payload(analysis, channels)
+
+        mix_analysis = average_analyses(clip_analyses)
+        mix_channels = max(clip_channels) if clip_channels else 1
+        mix_analysis["notes"] = [
+            *mix_analysis["notes"],
+            f"Aggregated from {len(clip_names)} private example clip(s).",
+        ]
+    else:
+        mix_path = args.mix_path or os.path.join(args.run_dir, "mix.wav")
+        sections_dir = args.sections_dir or os.path.join(args.run_dir, "sections")
+
+        mix_analysis, mix_channels = analyze_audio_file(mix_path)
+        if os.path.isdir(sections_dir):
+            for name in sorted(os.listdir(sections_dir)):
+                if not name.endswith(".wav"):
+                    continue
+                section_path = os.path.join(sections_dir, name)
+                analysis, section_channels = analyze_audio_file(section_path)
+                section_metrics[name.replace(".wav", "")] = merge_section_payload(analysis, section_channels)
 
     payload = {
         "song": args.song,

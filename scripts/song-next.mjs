@@ -1,5 +1,6 @@
 import { resolveSongSlug } from '../lib/song-contract.mjs';
 import { CommandError, EXIT_CODES, isMainModule, runCliCommand } from '../lib/command-runtime.mjs';
+import { summaryPath } from '../lib/review-gates.mjs';
 import { handleSongStatus } from './song-status.mjs';
 
 function buildApproveCommand(slug, runDir) {
@@ -22,6 +23,9 @@ function buildNextAction(statusPayload) {
   const slug = statusPayload.song;
   const pending = statusPayload.pending_review;
   const baseline = statusPayload.baseline;
+  const tasteProfile = statusPayload.taste_profile ?? {};
+  const styleProfile = statusPayload.style_profile ?? null;
+  const styleRolePlan = statusPayload.style_role_plan ?? null;
 
   if (pending?.run_dir) {
     return {
@@ -35,6 +39,11 @@ function buildNextAction(statusPayload) {
         reject: buildRejectCommand(slug, pending.run_dir),
       },
       summary_path: pending.summary_path ?? null,
+      taste_profile: tasteProfile,
+      style_profile: styleProfile,
+      style_profile_usage: statusPayload.style_profile_usage ?? null,
+      style_role_plan: styleRolePlan,
+      strudel_techniques: statusPayload.strudel_techniques ?? null,
     };
   }
 
@@ -49,6 +58,11 @@ function buildNextAction(statusPayload) {
         run: buildLoopCommand(slug),
       },
       summary_path: null,
+      taste_profile: tasteProfile,
+      style_profile: styleProfile,
+      style_profile_usage: statusPayload.style_profile_usage ?? null,
+      style_role_plan: styleRolePlan,
+      strudel_techniques: statusPayload.strudel_techniques ?? null,
     };
   }
 
@@ -64,6 +78,11 @@ function buildNextAction(statusPayload) {
       target_run_dir: baseline.run_dir,
       commands: {},
       summary_path: baseline.summary_path ?? null,
+      taste_profile: tasteProfile,
+      style_profile: styleProfile,
+      style_profile_usage: statusPayload.style_profile_usage ?? null,
+      style_role_plan: styleRolePlan,
+      strudel_techniques: statusPayload.strudel_techniques ?? null,
     };
   }
 
@@ -78,7 +97,12 @@ function buildNextAction(statusPayload) {
       revise: buildReviseCommand(slug, revisionRunDir),
       loop: buildLoopCommand(slug),
     },
-    summary_path: baseline.summary_path ?? null,
+    summary_path: summaryPath(revisionRunDir) ?? baseline.summary_path ?? null,
+    taste_profile: tasteProfile,
+    style_profile: styleProfile,
+    style_profile_usage: statusPayload.style_profile_usage ?? null,
+    style_role_plan: styleRolePlan,
+    strudel_techniques: statusPayload.strudel_techniques ?? null,
   };
 }
 
@@ -105,6 +129,8 @@ export async function handleSongNext({ argv }) {
     approval_required: nextAction.approval_required,
     next_action: nextAction,
     status_snapshot: {
+      approved_baseline_run_dir: statusPayload.approved_baseline_run_dir,
+      comparison_baseline_run_dir: statusPayload.comparison_baseline_run_dir,
       pending_review_run_dir: statusPayload.pending_review_run_dir,
       last_attempted_run_dir: statusPayload.last_attempted_run_dir,
       current_open_issue: statusPayload.current_open_issue,

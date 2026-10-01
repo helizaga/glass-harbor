@@ -3,6 +3,8 @@ dist/
 private-packs/
 runs/
 songs/**/memory.json
+examples/**/clips/
+examples/**/analysis.json
 .playwright-cli/
 __pycache__/
 .glass-harbor-venv/

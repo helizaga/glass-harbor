@@ -3,15 +3,20 @@ import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 
 import {
+  buildPromptStyleLens,
+  deriveGenerationStrategy,
   normalizeRuntimeErrors,
+  parseExampleTargets,
   parseBrief,
   readText,
   resolveRunDir,
   resolveSongSlug,
+  selectExampleProfiles,
   selectReferenceCards,
   songPaths,
   validateSongCode,
 } from '../lib/song-contract.mjs';
+import { buildCalibrationProfile, buildMetricReliability, buildSignalReliability } from '../lib/analysis-helpers.mjs';
 import { CommandError, EXIT_CODES, isMainModule, runCliCommand } from '../lib/command-runtime.mjs';
 import { resolvePythonExecutable } from '../lib/python-runtime.mjs';
 import { computeEmbeddingAlignment } from './song-embedding-provider.mjs';
@@ -148,6 +153,7 @@ export async function handleSongAnalyze({ argv }) {
   const song = songPaths(slug);
   const code = readText(song.songPath);
   const brief = parseBrief(readText(song.briefPath));
+  const promptStyleLens = buildPromptStyleLens(brief);
   const validation = validateSongCode(code);
   const outputPath = join(runDir, 'analysis.json');
 
@@ -205,9 +211,16 @@ export async function handleSongAnalyze({ argv }) {
     anomalies.push('Render phase reported runtime blockers.');
   }
 
+  const hasSilentAudio = anomalies.some((message) => message === 'Rendered mix is silent.' || message.startsWith('Silent sections:'));
   const readiness =
-    runtimeBlockers.length > 0 ? 'blocked' : anomalies.length > 0 ? 'provisional' : 'ready_for_critique';
-  const referenceCards = selectReferenceCards(brief, 3);
+    runtimeBlockers.length > 0 || hasSilentAudio
+      ? 'blocked'
+      : anomalies.length > 0
+        ? 'provisional'
+        : 'ready_for_critique';
+  const exampleProfiles = selectExampleProfiles(brief);
+  const generationStrategy = deriveGenerationStrategy(brief, { exampleProfiles, styleLens: promptStyleLens });
+  const referenceCards = selectReferenceCards(brief, 3, { styleLens: promptStyleLens, exampleProfiles });
   const embeddingAlignment = await computeEmbeddingAlignment({
     analysis: raw,
     brief,
@@ -216,6 +229,27 @@ export async function handleSongAnalyze({ argv }) {
   });
   const sectionNames = validation.sections.map((section) => section.name).filter((name) => raw.sections?.[name]);
   const confidenceNotes = [...new Set([...(raw.confidence_notes ?? []), ...(embeddingAlignment.confidence_notes ?? [])])];
+  const signalReliability = buildSignalReliability({
+    analysis: {
+      ...raw,
+      metrics: raw.mix,
+      confidence_notes: confidenceNotes,
+    },
+    anomalies,
+  });
+  const metricReliability = buildMetricReliability({
+    analysis: {
+      ...raw,
+      metrics: raw.mix,
+    },
+    signalReliability,
+  });
+  const calibrationProfile = buildCalibrationProfile({
+    brief,
+    exampleProfiles,
+    declaredBpm: Number(validation.metadata.bpm ?? raw.declared_bpm ?? 0),
+    promptStyleLens,
+  });
   const payload = {
     phase: 'analyze',
     status: readiness === 'ready_for_critique' ? 'ok' : readiness === 'blocked' ? 'blocked' : 'partial',
@@ -228,8 +262,21 @@ export async function handleSongAnalyze({ argv }) {
     tonal: raw.tonal ?? raw.mix?.tonal ?? {},
     timbre: raw.timbre ?? raw.mix?.timbre ?? {},
     sections: raw.sections,
+    section_role_map: validation.sectionRoleMap,
     section_transitions: computeSectionTransitions(sectionNames, raw.sections ?? {}),
     embedding_alignment: embeddingAlignment,
+    signal_reliability: signalReliability,
+    metric_reliability: metricReliability,
+    calibration_profile: calibrationProfile,
+    prompt_style_lens: promptStyleLens,
+    generation_strategy: generationStrategy,
+    attached_examples: exampleProfiles.map((entry) => ({
+      slug: entry.slug,
+      title: entry.profile?.title ?? entry.slug,
+      reliability: entry.profile?.reliability ?? null,
+      calibration_targets: entry.profile?.calibration_targets ?? {},
+    })),
+    example_targets: parseExampleTargets(brief),
     confidence_notes: confidenceNotes,
     anomalies,
     runtime_blockers: runtimeBlockers,
@@ -251,7 +298,7 @@ export async function handleSongAnalyze({ argv }) {
     approval_required: false,
     message:
       payload.status === 'blocked'
-        ? `Analysis completed for ${slug}, but the run is blocked by render/runtime issues.`
+        ? `Analysis completed for ${slug}, but the run is blocked by render/runtime or silent-audio issues.`
         : `Wrote analysis to ${outputPath}`,
   };
 }

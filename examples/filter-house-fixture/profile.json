@@ -1,0 +1,108 @@
+{
+  "version": 1,
+  "slug": "filter-house-fixture",
+  "title": "Filter House Fixture",
+  "tags": [
+    "loop-house",
+    "filtered",
+    "robotic",
+    "restrained",
+    "tight drum and bass pocket",
+    "loop-first momentum",
+    "filter motion over chord churn",
+    "clear subtractive breakdown"
+  ],
+  "bpm_range": {
+    "min": 118,
+    "max": 124,
+    "source": "text"
+  },
+  "why_you_like_it": [
+    "the groove feels locked before the return arrives",
+    "the movement comes from filter staging and subtraction more than harmonic sprawl"
+  ],
+  "preserve_traits": [
+    "tight drum and bass pocket",
+    "loop-first momentum",
+    "filter motion over chord churn",
+    "clear subtractive breakdown"
+  ],
+  "avoid_traits": [
+    "cinematic wash",
+    "oversized riser stack",
+    "busy melodic top line"
+  ],
+  "section_role_summary": [
+    {
+      "clip": "anchor",
+      "role": "anchor"
+    },
+    {
+      "clip": "breath",
+      "role": "breath"
+    },
+    {
+      "clip": "groove",
+      "role": "groove"
+    },
+    {
+      "clip": "return",
+      "role": "return"
+    }
+  ],
+  "section_notes": [
+    "anchor: sparse setup with texture and implied pulse",
+    "groove: drums and bass settle early",
+    "breath: subtraction makes room for the return",
+    "return: the payoff wins by re-entry clarity",
+    "not clutter"
+  ],
+  "groove_notes": [
+    "kick and bass should feel glued",
+    "not smeared",
+    "syncopation should support the pocket instead of fighting it",
+    "transitions should feel earned by removal and filter opening"
+  ],
+  "clip_coverage": {
+    "count": 4,
+    "clips": [
+      "anchor.wav",
+      "breath.wav",
+      "groove.wav",
+      "return.wav"
+    ]
+  },
+  "reliability": {
+    "overall": 0.891,
+    "level": "high",
+    "analysis_engine": "librosa-rich",
+    "notes": [
+      "Short render reduced structure-confidence.",
+      "Aggregated from 4 private example clip(s)."
+    ]
+  },
+  "rhythm_tendencies": {
+    "estimated_tempo": 80.512,
+    "groove_continuity": 0.721,
+    "syncopation_proxy": 0.501,
+    "inter_beat_loudness_consistency": 0.646
+  },
+  "timbre_tendencies": {
+    "spectral_centroid": 2822.521,
+    "sub_energy_ratio": 0.217,
+    "bass_energy_ratio": 0.33,
+    "high_band_energy_ratio": 0.014
+  },
+  "calibration_targets": {
+    "estimated_tempo": 80.512,
+    "groove_continuity": 0.721,
+    "syncopation_proxy": 0.501,
+    "inter_beat_loudness_consistency": 0.646,
+    "harmonic_stability": 0.968,
+    "chord_change_proxy": 0.485,
+    "sub_energy_ratio": 0.217,
+    "bass_energy_ratio": 0.33,
+    "spectral_centroid": 2822.521
+  },
+  "example_targets": []
+}

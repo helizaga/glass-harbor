@@ -25,6 +25,11 @@ D minor center with bright borrowed color in the loop movement.
 - 16-cycle drop
 - 8-cycle outro
 
+## Example Targets
+
+- filter-house-fixture
+- patient-build-fixture
+
 ## Sonic Goals
 
 - make the song feel built from one strong loop idea rather than many harmonic sections

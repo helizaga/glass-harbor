@@ -37,6 +37,36 @@
     ],
     "vocal_chop": [
       "Vocals/replace-with-your-vocal-chop-01.wav"
+    ],
+    "bass_tonal": [],
+    "stab_tonal": [],
+    "pluck_tonal": [],
+    "bass_pitched": {
+      "a1": [
+        "Bass/replace-with-your-bass-a1.wav"
+      ],
+      "c2": [
+        "Bass/replace-with-your-bass-c2.wav"
+      ],
+      "e2": [
+        "Bass/replace-with-your-bass-e2.wav"
+      ]
+    },
+    "stab_pitched": {
+      "a3": [
+        "Synths/Stabs/replace-with-your-stab-a3.wav"
+      ],
+      "c4": [
+        "Synths/Stabs/replace-with-your-stab-c4.wav"
+      ]
+    },
+    "pluck_pitched": {
+      "a3": [
+        "Synths/Leads/replace-with-your-pluck-a3.wav"
+      ],
+      "c4": [
+        "Synths/Leads/replace-with-your-pluck-c4.wav"
+      ]
     ]
   }
 }

@@ -2,13 +2,22 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
+  buildStyleRolePlan,
+  extractStrudelTechniqueProfile,
+  OPTIONAL_TONAL_SAMPLE_ROLES,
+  OPTIONAL_PITCHED_SAMPLE_ROLES,
   STABLE_SOUND_ROLES,
+  buildPromptStyleLens,
+  deriveGenerationStrategy,
   parseBrief,
   readText,
+  resolveStyleProfile,
   resolveRunDir,
   resolveSongSlug,
+  selectExampleProfiles,
   selectReferenceCards,
   songPaths,
+  validateSongCode,
 } from '../lib/song-contract.mjs';
 import { CommandError, EXIT_CODES, isMainModule, runCliCommand } from '../lib/command-runtime.mjs';
 import {
@@ -18,6 +27,7 @@ import {
   derivePreserveAxes,
   deriveTargetAxes,
   ensureSongMemory,
+  REVIEW_GATE_VERSION,
   writeVerdictArtifacts,
 } from '../lib/review-gates.mjs';
 
@@ -32,7 +42,9 @@ function referenceCardSummaries(critique, brief) {
     }));
   }
 
-  return selectReferenceCards(brief, 3).map((card) => ({
+  const promptStyleLens = buildPromptStyleLens(brief);
+  const exampleProfiles = selectExampleProfiles(brief);
+  return selectReferenceCards(brief, 3, { styleLens: promptStyleLens, exampleProfiles }).map((card) => ({
     name: card.name,
     path: card.path,
     metadata_path: card.metadataPath,
@@ -41,7 +53,21 @@ function referenceCardSummaries(critique, brief) {
   }));
 }
 
-function buildRevisionPrompt({ slug, brief, song, critique, references, runDir, verdict, baselineRunDir }) {
+function buildRevisionPrompt({
+  slug,
+  brief,
+  song,
+  critique,
+  references,
+  runDir,
+  verdict,
+  baselineRunDir,
+  generationStrategy,
+  techniqueProfile,
+  styleProfile,
+  styleProfileUsage,
+  styleRolePlan,
+}) {
   const actions = critique.revision_actions ?? [];
   const scoreLines = Object.entries(critique.scores ?? {}).map(([key, value]) => `- ${key}: ${value}`);
   const referenceLines =
@@ -70,7 +96,9 @@ function buildRevisionPrompt({ slug, brief, song, critique, references, runDir, 
     '- preserve top metadata comments: @title, @genre, @bpm, @details, @sections',
     '- keep `samples(\'http://localhost:5432\')` as the runtime sample source',
     '- do not add repo-specific wrappers or imports to the song file',
-    `- use only the stable sampled roles: ${STABLE_SOUND_ROLES.join(', ')}`,
+    `- keep the required core sampled roles limited to: ${STABLE_SOUND_ROLES.join(', ')}`,
+    `- optional tonal sample families may be used only when they materially improve hook quality: ${OPTIONAL_TONAL_SAMPLE_ROLES.join(', ')}`,
+    `- prefer pitch-aware tonal sample families when writing note-driven hooks or harmony: ${OPTIONAL_PITCHED_SAMPLE_ROLES.join(', ')}`,
     '- keep tonal parts readable and modular with named layer constants',
     '- revise the canonical song file, not a private vendor-specific copy',
     '',
@@ -83,6 +111,10 @@ function buildRevisionPrompt({ slug, brief, song, critique, references, runDir, 
     `- verdict: ${verdict.verdict}`,
     `- recommended next action: ${verdict.recommended_next_action}`,
     `- approval required: ${verdict.approval_required ? 'yes' : 'no'}`,
+    `- generation strategy: ${generationStrategy?.mode ?? 'single_draft'}`,
+    `- style lane: ${styleProfile?.label ?? 'none'}`,
+    `- accent: ${styleProfile?.accent ?? 'none'}`,
+    `- lane fit score: ${styleProfileUsage?.score ?? 'n/a'}`,
     '',
     '## Scores',
     ...(scoreLines.length > 0 ? scoreLines : ['- none']),
@@ -91,11 +123,112 @@ function buildRevisionPrompt({ slug, brief, song, critique, references, runDir, 
     ...(verdict.preserve_axes?.length > 0
       ? verdict.preserve_axes.map((axis) => `- keep ${axis.key} near ${axis.value}; do not sacrifice it casually`)
       : ['- none']),
+    ...(verdict.taste_memory?.preserve_traits?.length > 0
+      ? ['', '## Human Preserve Traits', ...verdict.taste_memory.preserve_traits.map((entry) => `- ${entry}`)]
+      : []),
+    ...(verdict.taste_memory?.avoid_traits?.length > 0
+      ? ['', '## Human Avoid Traits', ...verdict.taste_memory.avoid_traits.map((entry) => `- ${entry}`)]
+      : []),
+    ...(verdict.taste_memory?.accepted_tradeoffs?.length > 0
+      ? ['', '## Accepted Tradeoffs', ...verdict.taste_memory.accepted_tradeoffs.map((entry) => `- ${entry}`)]
+      : []),
+    ...(verdict.taste_memory?.source_material_sources?.length > 0
+      ? ['', '## Source Material Sources', ...verdict.taste_memory.source_material_sources.map((entry) => `- ${entry}`)]
+      : []),
+    ...(verdict.taste_memory?.sourced_truths?.length > 0
+      ? ['', '## Sourced Truths', ...verdict.taste_memory.sourced_truths.map((entry) => `- ${entry}`)]
+      : []),
+    ...(verdict.taste_memory?.musical_inferences?.length > 0
+      ? ['', '## Musical Inferences', ...verdict.taste_memory.musical_inferences.map((entry) => `- ${entry}`)]
+      : []),
+    ...(verdict.taste_memory?.capability_gaps?.length > 0
+      ? ['', '## Capability Gaps', ...verdict.taste_memory.capability_gaps.map((entry) => `- ${entry}`)]
+      : []),
+    ...(verdict.taste_memory?.example_targets?.length > 0
+      ? ['', '## Example Targets', ...verdict.taste_memory.example_targets.map((entry) => `- ${entry}`)]
+      : []),
+    ...(critique.prompt_style_lens?.references?.length > 0
+      ? [
+          '',
+          '## Prompt Reference Lens',
+          ...critique.prompt_style_lens.references.map((entry) => `- ${entry.label}`),
+          ...(critique.prompt_style_lens.preserveTraits?.length > 0
+            ? ['', '### Keep From Prompt Lens', ...critique.prompt_style_lens.preserveTraits.map((entry) => `- ${entry}`)]
+            : []),
+          ...(critique.prompt_style_lens.avoidTraits?.length > 0
+            ? ['', '### Do Not Drift Toward', ...critique.prompt_style_lens.avoidTraits.map((entry) => `- ${entry}`)]
+            : []),
+        ]
+      : []),
     '',
     '## Improvement Targets',
     ...(verdict.target_axes?.length > 0
       ? verdict.target_axes.map((axis) => `- improve ${axis.key} from ${axis.value}`)
       : ['- none']),
+    ...(generationStrategy?.mode === 'two_candidate_hidden'
+      ? [
+          '',
+          '## Hidden Branching Guidance',
+          '- If the next draft still feels uncertain, branch two candidates internally and keep only the better one.',
+          ...generationStrategy.candidate_profiles.map((entry) => `- ${entry.label}: ${entry.guidance}`),
+        ]
+      : []),
+    ...(styleProfile
+      ? [
+          '',
+          '## Style Lane Profile',
+          `- lane: ${styleProfile.label}`,
+          ...(styleProfile.accent ? [`- accent: ${styleProfile.accent}`] : []),
+          ...(styleProfile.arrangement_archetypes?.length > 0
+            ? [`- archetypes: ${styleProfile.arrangement_archetypes.join(', ')}`]
+            : []),
+          ...(styleProfile.preferred_roles?.length > 0
+            ? [`- prefer roles: ${styleProfile.preferred_roles.join(', ')}`]
+            : []),
+          ...(styleProfile.preferred_techniques?.length > 0
+            ? [`- prefer techniques: ${styleProfile.preferred_techniques.join(', ')}`]
+            : []),
+          ...(styleProfile.anti_patterns?.length > 0
+            ? [`- avoid: ${styleProfile.anti_patterns.join(', ')}`]
+            : []),
+          ...(styleProfileUsage?.warnings?.length > 0
+            ? [`- lane warnings: ${styleProfileUsage.warnings.join(' | ')}`]
+            : []),
+        ]
+      : []),
+    ...(styleRolePlan
+      ? [
+          '',
+          '## Style Role Plan',
+          ...(styleRolePlan.dominant_roles?.length > 0
+            ? [`- dominant roles: ${styleRolePlan.dominant_roles.join(', ')}`]
+            : []),
+          ...(styleRolePlan.support_roles?.length > 0
+            ? [`- support roles: ${styleRolePlan.support_roles.join(', ')}`]
+            : []),
+          ...(styleRolePlan.primary_hook_roles?.length > 0
+            ? [`- primary hook roles: ${styleRolePlan.primary_hook_roles.join(', ')}`]
+            : []),
+          `- max hook roles: ${styleRolePlan.max_hook_roles}`,
+          ...(styleRolePlan.prune_first_roles?.length > 0
+            ? [`- prune first if the lane drifts: ${styleRolePlan.prune_first_roles.join(', ')}`]
+            : []),
+          ...(styleRolePlan.suggested_pruned_roles?.length > 0
+            ? [`- suggested prune now: ${styleRolePlan.suggested_pruned_roles.join(', ')}`]
+            : []),
+          ...(styleRolePlan.guidance?.length > 0
+            ? styleRolePlan.guidance.map((entry) => `- ${entry}`)
+            : []),
+        ]
+      : []),
+    '',
+    '## Strudel Technique Snapshot',
+    ...(techniqueProfile?.strengths?.length > 0
+      ? techniqueProfile.strengths.map((entry) => `- keep: ${entry}`)
+      : ['- keep: readable named layers and section assembly']),
+    ...(techniqueProfile?.opportunities?.length > 0
+      ? ['', '## Strudel Technique Opportunities', ...techniqueProfile.opportunities.map((entry) => `- ${entry}`)]
+      : []),
     '',
     '## Revision Actions',
     ...(actions.length > 0
@@ -145,6 +278,18 @@ export async function handleSongRevise({ argv }) {
   }
 
   const brief = parseBrief(readText(song.briefPath));
+  const currentSongCode = readText(song.songPath);
+  const currentValidation = validateSongCode(currentSongCode);
+  const exampleProfiles = selectExampleProfiles(brief);
+  const memory = ensureSongMemory(slug, { excludeRunDir: runDir });
+  const styleLens = buildPromptStyleLens(brief);
+  const styleProfile = resolveStyleProfile(brief, { tasteProfile: memory.taste_profile ?? null, styleLens, exampleProfiles });
+  const generationStrategy = deriveGenerationStrategy(brief, { exampleProfiles, styleLens, styleProfile });
+  const styleRolePlan = buildStyleRolePlan({
+    styleProfile,
+    dependencies: currentValidation.dependencies,
+    strudelTechniques: currentValidation.strudelTechniques,
+  });
   let critique;
   try {
     critique = JSON.parse(readFileSync(critiquePath, 'utf8'));
@@ -155,7 +300,7 @@ export async function handleSongRevise({ argv }) {
     });
   }
   const references = referenceCardSummaries(critique, brief);
-  const memory = ensureSongMemory(slug, { excludeRunDir: runDir });
+  const techniqueProfile = extractStrudelTechniqueProfile(currentSongCode);
   const baselineRunDir = chooseBaselineRun(slug, { memory, excludeRunDir: runDir });
   const baselineCritique = critiqueForRun(baselineRunDir);
   const verdict =
@@ -169,7 +314,7 @@ export async function handleSongRevise({ argv }) {
         })
       : {
           phase: 'verdict',
-          version: '2026-03-27-v1',
+          version: REVIEW_GATE_VERSION,
           song: slug,
           run_dir: runDir,
           baseline_run_dir: baselineRunDir,
@@ -233,8 +378,16 @@ export async function handleSongRevise({ argv }) {
     },
     baseline_run_dir: baselineRunDir,
     baseline_scores: verdict.baseline_scores,
+    taste_memory: verdict.taste_memory ?? memory.taste_profile ?? null,
+    style_profile: styleProfile,
+    style_profile_usage: verdict.style_profile_usage ?? null,
+    style_role_plan: styleRolePlan,
+    generation_strategy: generationStrategy,
+    style_lens: critique.prompt_style_lens ?? null,
+    prompt_reference_alignment: critique.prompt_reference_alignment ?? null,
     preserve_axes: verdict.preserve_axes,
     target_axes: verdict.target_axes,
+    strudel_techniques: techniqueProfile,
     approval_required: verdict.approval_required,
     recommended_next_action: verdict.recommended_next_action,
     constraints: {
@@ -242,6 +395,8 @@ export async function handleSongRevise({ argv }) {
       sample_server_url: 'http://localhost:5432',
       required_metadata: ['title', 'genre', 'bpm', 'details', 'sections'],
       stable_sample_roles: STABLE_SOUND_ROLES,
+      optional_tonal_sample_roles: OPTIONAL_TONAL_SAMPLE_ROLES,
+      optional_pitched_sample_roles: OPTIONAL_PITCHED_SAMPLE_ROLES,
       must_edit_in_place: true,
     },
     references,
@@ -263,6 +418,11 @@ export async function handleSongRevise({ argv }) {
     runDir,
     verdict,
     baselineRunDir,
+    generationStrategy,
+    techniqueProfile,
+    styleProfile,
+    styleProfileUsage: verdict.style_profile_usage ?? null,
+    styleRolePlan,
   });
   writeFileSync(requestPath, `${JSON.stringify(requestPayload, null, 2)}\n`);
   writeFileSync(promptPath, `${prompt}\n`);
@@ -276,6 +436,7 @@ export async function handleSongRevise({ argv }) {
     baseline_run_dir: baselineRunDir,
     request_path: requestPath,
     prompt_path: promptPath,
+    style_role_plan: requestPayload.style_role_plan,
     verdict_path: verdictArtifacts.verdict_path,
     verdict_markdown_path: verdictArtifacts.verdict_markdown_path,
     summary_path: verdictArtifacts.summary_path,
