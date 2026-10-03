@@ -41,7 +41,7 @@ In Tape Notes, James Hunt describes subtle swung gating on bass and pads to make
 Translate those broad production traits into a restrained bass pulse, slowly moving pad filters, warm detuned sample tones and a clear subtractive break. The chords, melodies and arrangement are original choices for this sketch.
 
 ## Capability Gaps
-This is an instrumental browser sketch with original synthesized samples. There is no recorded vocal, live drum performance or studio master. New root-labelled stab_pitched and pluck_pitched samples replace the untuned character-shot hook from the rejected version.
+This is an instrumental browser sketch, without a recorded vocal or studio master. The current local render uses Goldbaby's free recorded PPG synths, Hapi/xylophone instrument and Elektron drums in the private overlay. The public fallback uses original synthesized instruments with native roots for all notes in this song; it is audibly different from the local recorded palette.
 
 ## Sonic Goals
 Coherent harmony, an audible bass identity, soft stereo movement, a controlled low end and a return that restores depth without an oversized riser.
@@ -54,6 +54,13 @@ The listener flagged weird volume and fade transitions in the pitched version. R
 
 ## Stable Sound Roles
 kick_main, clap_main, hat_closed, hat_open and perc_top. Optional bass_pitched, stab_pitched and pluck_pitched carry the tuned musical parts.
+
+## Sample Curation
+The listener requested better sound sources after the synthetic palette review. Use the Goldbaby free libraries locally: PPG Simple3 for the stereo chord bed, the distinct PPG NiceA program for mono bass, Hapi vs Xylophone for the hook, and MPC60 vs MD vs Rytm for drums. Read the supplied sampler root and fine-tuning fields before repitching. Prepare all notes used here, preserve instrument stereo, leave peak headroom, and give the pad enough sustain for the held chords. Restore the return in two stages, introducing the high response after its first four cycles.
+
+- [Goldbaby free recordings](https://www.goldbaby.co.nz/freestuff.html)
+- [Goldbaby's free-sample licence](https://www.goldbaby.co.nz/termsandconditio.html)
+- [Source comparison and local installation](../../docs/sample-sources.md)
 
 ## Notes For Agent
 Author and revise in the subscribed Codex session, with both optional AI providers set to none. The user rejected the earlier scaffold. Do not promote another candidate without a new listening decision.

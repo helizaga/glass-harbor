@@ -5,7 +5,11 @@
   "bass_pitched": {
     "a1": "/samples/edm-core/bass_pitched/a1-0.wav",
     "c2": "/samples/edm-core/bass_pitched/c2-0.wav",
-    "e2": "/samples/edm-core/bass_pitched/e2-0.wav"
+    "d2": "/samples/edm-core/bass_pitched/d2-0.wav",
+    "e2": "/samples/edm-core/bass_pitched/e2-0.wav",
+    "f1": "/samples/edm-core/bass_pitched/f1-0.wav",
+    "g1": "/samples/edm-core/bass_pitched/g1-0.wav",
+    "g2": "/samples/edm-core/bass_pitched/g2-0.wav"
   },
   "bass_tonal": [
     "/samples/edm-core/bass_tonal/0.wav",
@@ -38,9 +42,16 @@
   ],
   "pluck_pitched": {
     "a4": "/samples/edm-core/pluck_pitched/a4-0.wav",
+    "b4": "/samples/edm-core/pluck_pitched/b4-0.wav",
     "c4": "/samples/edm-core/pluck_pitched/c4-0.wav",
     "c5": "/samples/edm-core/pluck_pitched/c5-0.wav",
-    "f4": "/samples/edm-core/pluck_pitched/f4-0.wav"
+    "d4": "/samples/edm-core/pluck_pitched/d4-0.wav",
+    "d5": "/samples/edm-core/pluck_pitched/d5-0.wav",
+    "e4": "/samples/edm-core/pluck_pitched/e4-0.wav",
+    "e5": "/samples/edm-core/pluck_pitched/e5-0.wav",
+    "f4": "/samples/edm-core/pluck_pitched/f4-0.wav",
+    "g4": "/samples/edm-core/pluck_pitched/g4-0.wav",
+    "g5": "/samples/edm-core/pluck_pitched/g5-0.wav"
   },
   "pluck_tonal": [
     "/samples/edm-core/pluck_tonal/0.wav",
@@ -54,9 +65,15 @@
   ],
   "stab_pitched": {
     "a3": "/samples/edm-core/stab_pitched/a3-0.wav",
+    "a4": "/samples/edm-core/stab_pitched/a4-0.wav",
+    "b3": "/samples/edm-core/stab_pitched/b3-0.wav",
     "c3": "/samples/edm-core/stab_pitched/c3-0.wav",
     "c4": "/samples/edm-core/stab_pitched/c4-0.wav",
-    "f3": "/samples/edm-core/stab_pitched/f3-0.wav"
+    "d4": "/samples/edm-core/stab_pitched/d4-0.wav",
+    "e4": "/samples/edm-core/stab_pitched/e4-0.wav",
+    "f3": "/samples/edm-core/stab_pitched/f3-0.wav",
+    "g3": "/samples/edm-core/stab_pitched/g3-0.wav",
+    "g4": "/samples/edm-core/stab_pitched/g4-0.wav"
   },
   "stab_tonal": [
     "/samples/edm-core/stab_tonal/0.wav",

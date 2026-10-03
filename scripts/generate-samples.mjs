@@ -6,11 +6,10 @@ import { renderPitchedTone } from '../lib/pitched-samples.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
-const outputRoot = join(root, 'samples', 'edm-core');
-
+const args = process.argv.slice(2);
+const outputIndex = args.indexOf('--output');
+const outputRoot = resolve(root, outputIndex === -1 ? 'samples/edm-core' : args[outputIndex + 1]);
 assertInsideRoot(root, outputRoot, 'Generated sample output');
-rmSync(outputRoot, { recursive: true, force: true });
-mkdirSync(outputRoot, { recursive: true });
 
 const sampleRate = 44100;
 
@@ -20,9 +19,13 @@ function clamp(value) {
 
 function writeWav(filePath, samples) {
   const pcm = Buffer.alloc(samples.length * 2);
+  const peak = samples.reduce((max, value) => Math.max(max, Math.abs(value)), 0);
+  if (!Number.isFinite(peak)) throw new Error(`Non-finite sample in ${filePath}`);
+  const headroom = peak > 0.85 ? 0.85 / peak : 1;
 
   for (let i = 0; i < samples.length; i += 1) {
-    const int = Math.round(clamp(samples[i]) * 32767);
+    const fadeOut = Math.min(1, (samples.length - 1 - i) / (sampleRate * 0.005));
+    const int = Math.round(clamp(samples[i] * headroom * fadeOut) * 32767);
     pcm.writeInt16LE(int, i * 2);
   }
 
@@ -52,8 +55,11 @@ function envelope(index, length, attack = 0.002, decay = 1) {
   return attackValue * decayValue;
 }
 
+let noiseSeed = 0x676c6173;
 function noise() {
-  return Math.random() * 2 - 1;
+  // Reproducible noise: reinstalling dependencies must not change the drum takes.
+  noiseSeed = (Math.imul(noiseSeed, 1664525) + 1013904223) >>> 0;
+  return noiseSeed / 0x80000000 - 1;
 }
 
 function render(durationSeconds, sampleFn) {
@@ -250,40 +256,6 @@ function makePluckTonal(variant) {
   );
 }
 
-function noteKeyToFrequency(note) {
-  const match = `${note ?? ''}`.match(/^([A-Ga-g])([#b]?)(-?\d+)$/);
-  if (!match) {
-    throw new Error(`Invalid note key: ${note}`);
-  }
-  const base = {
-    c: 0,
-    d: 2,
-    e: 4,
-    f: 5,
-    g: 7,
-    a: 9,
-    b: 11,
-  }[match[1].toLowerCase()];
-  const accidental = match[2] === '#' ? 1 : match[2] === 'b' ? -1 : 0;
-  const octave = Number.parseInt(match[3], 10);
-  const midi = (octave + 1) * 12 + base + accidental;
-  return 440 * Math.pow(2, (midi - 69) / 12);
-}
-
-function makeBassPitched(noteKey, variant = 0) {
-  const base = noteKeyToFrequency(noteKey);
-  return smooth(
-    render(0.92, (index, length) => {
-      const t = index / sampleRate;
-      const env = envelope(index, length, 0.002, 1.55);
-      const wobble = Math.sin(2 * Math.PI * (1.8 + variant * 0.2) * t) * 0.5 + 0.5;
-      const body = Math.sin(2 * Math.PI * base * t) * 0.82;
-      const over = Math.sin(2 * Math.PI * base * 2 * t) * (0.12 + wobble * 0.08);
-      return (body + over) * env;
-    }),
-  );
-}
-
 const families = {
   kick_main: [makeKick(0), makeKick(1)],
   clap_main: [makeClap(0), makeClap(1)],
@@ -298,17 +270,20 @@ const families = {
   bass_tonal: [makeBassTonal(0), makeBassTonal(1)],
   stab_tonal: [makeStabTonal(0), makeStabTonal(1)],
   pluck_tonal: [makePluckTonal(0), makePluckTonal(1)],
-  stab_pitched: Object.fromEntries(['c3', 'f3', 'a3', 'c4'].map((note) => [note, [renderPitchedTone(note, 'pad')]])),
-  pluck_pitched: Object.fromEntries(['c4', 'f4', 'a4', 'c5'].map((note) => [note, [renderPitchedTone(note, 'pluck')]])),
-  bass_pitched: {
-    a1: [makeBassPitched('A1', 0)],
-    c2: [makeBassPitched('C2', 1)],
-    e2: [makeBassPitched('E2', 0)],
-  },
+  stab_pitched: Object.fromEntries(['c3', 'f3', 'g3', 'a3', 'b3', 'c4', 'd4', 'e4', 'g4', 'a4'].map((note) => [note, [renderPitchedTone(note, 'pad')]])),
+  pluck_pitched: Object.fromEntries(['c4', 'd4', 'e4', 'f4', 'g4', 'a4', 'b4', 'c5', 'd5', 'e5', 'g5'].map((note) => [note, [renderPitchedTone(note, 'pluck')]])),
+  bass_pitched: Object.fromEntries(['f1', 'g1', 'a1', 'c2', 'd2', 'e2', 'g2'].map((note) => [note, [renderPitchedTone(note, 'bass')]])),
 };
 
-for (const [family, renders] of Object.entries(families)) {
+const familiesIndex = args.indexOf('--families');
+const selected = familiesIndex === -1 ? Object.keys(families) : (args[familiesIndex + 1] ?? '').split(',');
+if (selected.some((family) => !Object.hasOwn(families, family))) throw new Error('Unknown sample family');
+mkdirSync(outputRoot, { recursive: true });
+for (const family of selected) {
+  const renders = families[family];
   const familyDir = join(outputRoot, family);
+  assertInsideRoot(outputRoot, familyDir, 'Generated sample family');
+  rmSync(familyDir, { recursive: true, force: true });
   mkdirSync(familyDir, { recursive: true });
 
   if (Array.isArray(renders)) {

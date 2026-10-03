@@ -180,6 +180,8 @@ npm run install:free-pack
 
 That keeps the synthetic drum core intact, adds curated free alternates for FX/textures under `samples/edm-core/`, and records their sources in `samples/edm-core/free-starter-pack.json`.
 
+For the recorded synth, mallet and drum palette used in the current Daybreak Ferry render, see [the source comparison and Goldbaby installation](docs/sample-sources.md). The installer prepares downloaded archives offline and keeps all third-party samples in the private overlay.
+
 ## Manual Local Pack Upgrade
 
 For better sound quality, use the local stable-pack overlay workflow:

@@ -14,6 +14,7 @@
     "preview": "vite preview",
     "generate:samples": "node scripts/generate-samples.mjs",
     "install:free-pack": "node scripts/install-free-starter-pack.mjs && npm run pack:json",
+    "install:goldbaby-pack": "node scripts/install-goldbaby-pack.mjs",
     "pack:json": "node scripts/build-pack-json.mjs --root samples/edm-core --base-url /samples/edm-core",
     "prep": "npm run generate:samples && npm run pack:json",
     "postinstall": "npm run prep",
