@@ -36,6 +36,12 @@
     "/samples/edm-core/perc_top/0.wav",
     "/samples/edm-core/perc_top/1.wav"
   ],
+  "pluck_pitched": {
+    "a4": "/samples/edm-core/pluck_pitched/a4-0.wav",
+    "c4": "/samples/edm-core/pluck_pitched/c4-0.wav",
+    "c5": "/samples/edm-core/pluck_pitched/c5-0.wav",
+    "f4": "/samples/edm-core/pluck_pitched/f4-0.wav"
+  },
   "pluck_tonal": [
     "/samples/edm-core/pluck_tonal/0.wav",
     "/samples/edm-core/pluck_tonal/1.wav"
@@ -46,6 +52,12 @@
   "shimmer_fx": [
     "/samples/edm-core/shimmer_fx/0.wav"
   ],
+  "stab_pitched": {
+    "a3": "/samples/edm-core/stab_pitched/a3-0.wav",
+    "c3": "/samples/edm-core/stab_pitched/c3-0.wav",
+    "c4": "/samples/edm-core/stab_pitched/c4-0.wav",
+    "f3": "/samples/edm-core/stab_pitched/f3-0.wav"
+  },
   "stab_tonal": [
     "/samples/edm-core/stab_tonal/0.wav",
     "/samples/edm-core/stab_tonal/1.wav"

@@ -15,6 +15,7 @@ import {
   resetGlobalEffects,
   setAudioContext,
   setSuperdoughAudioController,
+  setMaxPolyphony,
   superdough,
 } from 'superdough';
 import { Orbit, SuperdoughAudioController } from 'superdough/superdoughoutput.mjs';
@@ -435,13 +436,14 @@ function hapToValue(hap) {
 async function renderPatternAudioStable({ pattern, cps, begin, end, outputName, audioContext }) {
   const haps = pattern
     .queryArc(begin, end, { _cps: cps })
+    .filter((hap) => hap.hasOnset())
     .sort((left, right) => left.whole.begin.valueOf() - right.whole.begin.valueOf());
 
-  for (const hap of haps) {
-    if (!hap.hasOnset()) {
-      continue;
-    }
+  // Offline time stays at zero while every future note is scheduled. A live
+  // voice limit would steal already scheduled notes before rendering begins.
+  setMaxPolyphony(haps.length + 1);
 
+  for (const hap of haps) {
     try {
       await superdough(
         hapToValue(hap),

@@ -24,10 +24,7 @@ import {
   buildRunVerdict,
   chooseBaselineRun,
   critiqueForRun,
-  derivePreserveAxes,
-  deriveTargetAxes,
   ensureSongMemory,
-  REVIEW_GATE_VERSION,
   writeVerdictArtifacts,
 } from '../lib/review-gates.mjs';
 
@@ -303,47 +300,7 @@ export async function handleSongRevise({ argv }) {
   const techniqueProfile = extractStrudelTechniqueProfile(currentSongCode);
   const baselineRunDir = chooseBaselineRun(slug, { memory, excludeRunDir: runDir });
   const baselineCritique = critiqueForRun(baselineRunDir);
-  const verdict =
-    critique.gate === 'blocked' || baselineCritique || baselineRunDir === runDir
-      ? buildRunVerdict({
-          slug,
-          runDir,
-          critique,
-          baselineRunDir,
-          baselineCritique,
-        })
-      : {
-          phase: 'verdict',
-          version: REVIEW_GATE_VERSION,
-          song: slug,
-          run_dir: runDir,
-          baseline_run_dir: baselineRunDir,
-          verdict: 'flat',
-          approval_required: false,
-          recommended_next_action: 'revise',
-          baseline_scores: {},
-          current_scores: critique.scores ?? {},
-          preserve_axes: derivePreserveAxes(critique.scores ?? {}),
-          target_axes: deriveTargetAxes(critique.scores ?? {}),
-          regression_flags: [],
-          change_summary: {
-            weighted_baseline: 0,
-            weighted_current: 0,
-            weighted_delta: 0,
-            top_metric_changes: [],
-          },
-          regression_vs_baseline: {
-            baseline_run_dir: baselineRunDir,
-            weighted_baseline: 0,
-            weighted_current: 0,
-            weighted_delta: 0,
-            deltas: {},
-            preserve_axes: [],
-            target_axes: [],
-            regression_flags: [],
-          },
-          summary: critique.summary ?? 'Current run needs revision.',
-        };
+  const verdict = buildRunVerdict({ slug, runDir, critique, baselineRunDir, baselineCritique });
   const verdictArtifacts = writeVerdictArtifacts(runDir, verdict);
   const promptPath = join(runDir, 'revision-prompt.md');
   const requestPath = join(runDir, 'revision-request.json');

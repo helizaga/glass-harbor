@@ -1,11 +1,14 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { assertInsideRoot } from '../lib/pack-overlay.mjs';
+import { renderPitchedTone } from '../lib/pitched-samples.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const root = join(here, '..');
+const root = resolve(here, '..');
 const outputRoot = join(root, 'samples', 'edm-core');
 
+assertInsideRoot(root, outputRoot, 'Generated sample output');
 rmSync(outputRoot, { recursive: true, force: true });
 mkdirSync(outputRoot, { recursive: true });
 
@@ -90,14 +93,18 @@ function highpassish(samples) {
 }
 
 function makeKick(variant) {
-  return render(0.82, (index, length) => {
+  return render(0.45, (index, length) => {
     const t = index / sampleRate;
-    const env = envelope(index, length, 0.001, 2.6);
-    const freq = 152 * Math.exp(-t * (7.2 + variant * 0.3)) + 36;
-    const phase = 2 * Math.PI * freq * t;
-    const body = Math.sin(phase) * 0.94;
-    const click = Math.sin(2 * Math.PI * (2200 + variant * 140) * t) * Math.exp(-t * 55) * 0.18;
-    return (body + click) * env;
+    const base = 49 + variant * 3;
+    const sweep = 100;
+    const decay = 35;
+    // Integrate the changing frequency; multiplying f(t) by t reverses the pitch sweep.
+    const phase = 2 * Math.PI * (base * t + sweep * (1 - Math.exp(-decay * t)) / decay);
+    const attack = Math.min(1, t / 0.001);
+    const fadeOut = Math.min(1, (length - 1 - index) / (sampleRate * 0.04));
+    const body = Math.sin(phase) * Math.exp(-t * 9) * 0.88;
+    const click = Math.sin(2 * Math.PI * (2200 + variant * 140) * t) * Math.exp(-t * 180) * 0.1;
+    return (body + click) * attack * fadeOut;
   });
 }
 
@@ -291,6 +298,8 @@ const families = {
   bass_tonal: [makeBassTonal(0), makeBassTonal(1)],
   stab_tonal: [makeStabTonal(0), makeStabTonal(1)],
   pluck_tonal: [makePluckTonal(0), makePluckTonal(1)],
+  stab_pitched: Object.fromEntries(['c3', 'f3', 'a3', 'c4'].map((note) => [note, [renderPitchedTone(note, 'pad')]])),
+  pluck_pitched: Object.fromEntries(['c4', 'f4', 'a4', 'c5'].map((note) => [note, [renderPitchedTone(note, 'pluck')]])),
   bass_pitched: {
     a1: [makeBassPitched('A1', 0)],
     c2: [makeBassPitched('C2', 1)],

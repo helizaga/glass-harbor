@@ -7,8 +7,8 @@ const root = join(here, '..');
 const sampleRoot = join(root, 'samples', 'edm-core');
 
 const child = spawn(
-  process.platform === 'win32' ? 'npx.cmd' : 'npx',
-  ['@strudel/sampler'],
+  process.execPath,
+  [join(root, 'node_modules', '@strudel', 'sampler', 'sample-server.mjs')],
   {
     cwd: sampleRoot,
     stdio: 'inherit',

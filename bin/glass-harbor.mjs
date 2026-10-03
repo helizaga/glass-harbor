@@ -136,9 +136,9 @@ if (namespace === 'song') {
   }
 } else if (namespace === 'debug') {
   if (command === 'ui') {
-    spawnCommand(process.platform === 'win32' ? 'npx.cmd' : 'npx', ['vite', ...rest]);
+    spawnCommand(process.execPath, [resolve(root, 'node_modules', 'vite', 'bin', 'vite.js'), ...rest]);
   } else if (command === 'osc') {
-    spawnCommand(process.platform === 'win32' ? 'npx.cmd' : 'npx', ['@strudel/osc', ...rest]);
+    spawnCommand(process.execPath, [resolve(root, 'node_modules', '@strudel', 'osc', 'server.js'), ...rest]);
   } else {
     fail(usage());
   }

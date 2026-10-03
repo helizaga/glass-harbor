@@ -1,19 +1,21 @@
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { chromium } from 'playwright';
 
 import { inspectRenderedWav } from '../lib/audio-integrity.mjs';
+import { writeRenderedSections } from '../lib/render-sections.mjs';
 import {
   createRunDir,
   normalizeRuntimeErrors,
   readText,
   resolveSongSlug,
   songPaths,
+  repoRoot,
   validateSongCode,
 } from '../lib/song-contract.mjs';
 import { CommandError, EXIT_CODES, isMainModule, runCliCommand } from '../lib/command-runtime.mjs';
-import { commandName, ensureService, stopService } from '../lib/process-utils.mjs';
+import { ensureService, stopService } from '../lib/process-utils.mjs';
 
 export async function handleSongRender({ argv }) {
   const slug = resolveSongSlug(argv);
@@ -37,39 +39,22 @@ export async function handleSongRender({ argv }) {
   const runDir = createRunDir(slug);
   mkdirSync(join(runDir, 'sections'), { recursive: true });
 
-  const sampleService = await ensureService({
-    name: 'sample server',
-    url: 'http://127.0.0.1:5432/strudel.json',
-    command: process.execPath,
-    args: ['scripts/serve-active-pack.mjs', '--quiet'],
-    cwd: process.cwd(),
-  });
-
-  const viteService = await ensureService({
-    name: 'render harness',
-    url: 'http://127.0.0.1:5173/render.html',
-    command: commandName('npx'),
-    args: ['vite', '--', '--host', '127.0.0.1', '--port', '5173'],
-    cwd: process.cwd(),
-  });
-
-  const browser = await chromium.launch({ headless: true });
+  let sampleService;
+  let viteService;
+  let browser;
   const pageErrors = [];
   const savedOutputs = [];
   let preflight = null;
   let runtimeBlockers = [];
   const integrityIssues = [];
-
   const sectionTargetPaths = validation.sections.map((section) => join(runDir, 'sections', `${section.name}.wav`));
 
-  const targets = [
-    ...validation.sections.map((section) => ({
-      output: `section-${section.name}`,
-      begin: section.begin,
-      end: section.end,
-      targetPath: join(runDir, 'sections', `${section.name}.wav`),
-    })),
-  ];
+  const targets = [{
+    output: 'mix',
+    begin: 0,
+    end: validation.sections.at(-1).end,
+    targetPath: join(runDir, 'mix.wav'),
+  }];
 
   async function renderTarget(target) {
     const context = await browser.newContext({ acceptDownloads: true });
@@ -153,6 +138,22 @@ export async function handleSongRender({ argv }) {
   }
 
   try {
+    sampleService = await ensureService({
+      name: 'sample server',
+      url: 'http://127.0.0.1:5432/strudel.json',
+      command: process.execPath,
+      args: [join(repoRoot, 'scripts', 'serve-active-pack.mjs'), '--quiet'],
+      cwd: repoRoot,
+    });
+    viteService = await ensureService({
+      name: 'render harness',
+      url: 'http://127.0.0.1:5173/render.html',
+      command: process.execPath,
+      args: [join(repoRoot, 'node_modules', 'vite', 'bin', 'vite.js'), '--host', '127.0.0.1', '--port', '5173'],
+      cwd: repoRoot,
+    });
+    browser = await chromium.launch({ headless: true });
+
     for (const target of targets) {
       const result = await renderTarget(target);
       pageErrors.push(...result.targetErrors);
@@ -175,7 +176,8 @@ export async function handleSongRender({ argv }) {
     }
 
     if (runtimeBlockers.length === 0) {
-      concatenateSectionWavs(sectionTargetPaths, join(runDir, 'mix.wav'));
+      const sectionPaths = writeRenderedSections(join(runDir, 'mix.wav'), validation.sections, join(runDir, 'sections'));
+      savedOutputs.push(...sectionPaths);
       const mixInspection = inspectRenderedWav(join(runDir, 'mix.wav'));
       if (mixInspection.silent) {
         runtimeBlockers = [
@@ -245,66 +247,15 @@ export async function handleSongRender({ argv }) {
           : `Rendered ${slug} to ${runDir}`,
     };
   } finally {
-    await browser.close();
-    stopService(viteService.child);
-    stopService(sampleService.child);
+    try {
+      await browser?.close();
+    } finally {
+      stopService(viteService?.child);
+      stopService(sampleService?.child);
+    }
   }
 }
 
 if (isMainModule(import.meta.url)) {
   process.exit(await runCliCommand(handleSongRender, process.argv.slice(2)));
-}
-
-function concatenateSectionWavs(sectionPaths, outputPath) {
-  const chunks = sectionPaths.map((filePath) => readFileSync(filePath));
-  if (chunks.length === 0) {
-    throw new Error('No section WAVs were available to assemble the mix.');
-  }
-
-  const first = chunks[0];
-  if (first.length < 44) {
-    throw new Error(`Section WAV is invalid: ${sectionPaths[0]}`);
-  }
-
-  const audioFormat = first.readUInt16LE(20);
-  const numChannels = first.readUInt16LE(22);
-  const sampleRate = first.readUInt32LE(24);
-  const byteRate = first.readUInt32LE(28);
-  const blockAlign = first.readUInt16LE(32);
-  const bitDepth = first.readUInt16LE(34);
-
-  const pcmChunks = chunks.map((buffer, index) => {
-    if (buffer.length < 44) {
-      throw new Error(`Section WAV is invalid: ${sectionPaths[index]}`);
-    }
-    if (
-      buffer.readUInt16LE(20) !== audioFormat ||
-      buffer.readUInt16LE(22) !== numChannels ||
-      buffer.readUInt32LE(24) !== sampleRate ||
-      buffer.readUInt32LE(28) !== byteRate ||
-      buffer.readUInt16LE(32) !== blockAlign ||
-      buffer.readUInt16LE(34) !== bitDepth
-    ) {
-      throw new Error(`Section WAV format mismatch: ${sectionPaths[index]}`);
-    }
-    return buffer.subarray(44);
-  });
-
-  const pcmLength = pcmChunks.reduce((sum, chunk) => sum + chunk.length, 0);
-  const header = Buffer.alloc(44);
-  header.write('RIFF', 0);
-  header.writeUInt32LE(36 + pcmLength, 4);
-  header.write('WAVE', 8);
-  header.write('fmt ', 12);
-  header.writeUInt32LE(16, 16);
-  header.writeUInt16LE(audioFormat, 20);
-  header.writeUInt16LE(numChannels, 22);
-  header.writeUInt32LE(sampleRate, 24);
-  header.writeUInt32LE(byteRate, 28);
-  header.writeUInt16LE(blockAlign, 32);
-  header.writeUInt16LE(bitDepth, 34);
-  header.write('data', 36);
-  header.writeUInt32LE(pcmLength, 40);
-
-  writeFileSync(outputPath, Buffer.concat([header, ...pcmChunks]));
 }

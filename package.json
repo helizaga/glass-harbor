@@ -9,6 +9,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build && node scripts/copy-samples.mjs",
+    "test": "node --test test/*.test.mjs",
+    "test:render": "node --test test/render-audio.integration.mjs",
     "preview": "vite preview",
     "generate:samples": "node scripts/generate-samples.mjs",
     "install:free-pack": "node scripts/install-free-starter-pack.mjs && npm run pack:json",

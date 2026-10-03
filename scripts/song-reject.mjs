@@ -8,6 +8,7 @@ import {
   ensureSongMemory,
   loadRunVerdict,
   updateSongMemory,
+  weightedScore,
 } from '../lib/review-gates.mjs';
 
 function parseReason(argv) {
@@ -29,10 +30,6 @@ function parseMultiFlag(argv, flag) {
     }
   }
   return [...new Set(values)];
-}
-
-function seededTechniqueWeaknesses(critique) {
-  return critique?.strudel_techniques?.opportunities ?? [];
 }
 
 export async function handleSongReject({ argv }) {
@@ -69,11 +66,13 @@ export async function handleSongReject({ argv }) {
   const avoid = parseMultiFlag(argv, '--avoid');
   const avoidTechniques = parseMultiFlag(argv, '--avoid-technique');
   const tradeoffs = parseMultiFlag(argv, '--tradeoff');
-  const baselineRunDir = chooseBaselineRun(slug, { memory });
+  const baselineRunDir = chooseBaselineRun(slug, { memory, excludeRunDir: runDir });
   const nextMemory = updateSongMemory(slug, (current) =>
     appendMemoryHistory(
       {
         ...current,
+        approved_baseline_run_dir: baselineRunDir,
+        current_best_comparison_score: baselineRunDir ? weightedScore(critiqueForRun(baselineRunDir)?.scores) : null,
         pending_review_run_dir: current.pending_review_run_dir === runDir ? null : current.pending_review_run_dir,
         last_attempted_run_dir: runDir,
         current_open_issue: reason ?? critique.summary ?? current.current_open_issue ?? null,
@@ -85,12 +84,7 @@ export async function handleSongReject({ argv }) {
               ...(critique.taste_memory?.preferred_lanes ?? []),
             ]),
           ],
-          avoid_lanes: [
-            ...new Set([
-              ...(current.taste_profile?.avoid_lanes ?? []),
-              ...(critique.style_profile?.label ? [critique.style_profile.label] : []),
-            ]),
-          ],
+          avoid_lanes: current.taste_profile?.avoid_lanes ?? [],
           current_lane: current.taste_profile?.current_lane ?? critique.taste_memory?.current_lane ?? null,
           current_accent: current.taste_profile?.current_accent ?? critique.taste_memory?.current_accent ?? null,
           lane_notes: [
@@ -115,7 +109,7 @@ export async function handleSongReject({ argv }) {
               ...(current.taste_profile?.avoid_techniques ?? []),
               ...(avoidTechniques.length > 0
                 ? avoidTechniques
-                : [...(critique.taste_memory?.avoid_techniques ?? []), ...seededTechniqueWeaknesses(critique)]),
+                : critique.taste_memory?.avoid_techniques ?? []),
             ]),
           ],
           source_material_sources:
@@ -166,7 +160,7 @@ export async function handleSongReject({ argv }) {
     taste_profile: nextMemory.taste_profile,
     verdict: verdict?.verdict ?? null,
     pending_review_run_dir: nextMemory.pending_review_run_dir ?? null,
-    message: `Rejected ${slug} run ${runDir}; baseline remains unchanged.`,
+    message: `Rejected ${slug} run ${runDir}; approved baseline is ${baselineRunDir ?? 'none'}.`,
   };
 }
 

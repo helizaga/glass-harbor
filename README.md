@@ -123,6 +123,10 @@ This produces a gitignored run under `runs/<slug>/<timestamp>/` with:
 
 The render path uses a local browser runtime driven by Playwright. You do not need to use a browser UI by hand, but Strudel still needs a browser engine for reliable playback and offline rendering.
 
+The full mix is rendered continuously, then split into exact section clips for analysis. Reverb and delay carry across section boundaries, and offline scheduling does not use the live playback voice limit. Run `npm test` for CLI and review-gate checks; after installing Chromium with `npx playwright install chromium`, run `npm run test:render` for the continuous-render volume regression.
+
+Reviewed runs become approved baselines only after `glass-harbor song approve`. Rejected runs cannot be selected as a fallback baseline, and rejecting one candidate does not reject its entire style lane.
+
 Each song also keeps local agent memory in `songs/<slug>/memory.json`:
 
 - current approved baseline run
@@ -134,13 +138,22 @@ Each song also keeps local agent memory in `songs/<slug>/memory.json`:
 
 This file is local state and is gitignored.
 
-The analyzer now prefers a repo-local Python environment at `.glass-harbor-venv/bin/python` when present, then falls back to `GLASS_HARBOR_PYTHON`, then `python3`. For the richer MIR stack, install:
+The analyzer uses `GLASS_HARBOR_PYTHON` when explicitly set, then a repo-local environment (`.glass-harbor-venv/bin/python` on macOS/Linux or `.glass-harbor-venv/Scripts/python.exe` on Windows), then `python3` on macOS/Linux or `python` on Windows. For the richer MIR stack, install:
 
 ```sh
 python3 -m venv .glass-harbor-venv
 . .glass-harbor-venv/bin/activate
 python -m pip install -r scripts/requirements-analysis.txt
 ```
+
+On Windows, run these in PowerShell:
+
+```powershell
+python -m venv .glass-harbor-venv
+& .\.glass-harbor-venv\Scripts\python.exe -m pip install -r scripts/requirements-analysis.txt
+```
+
+Generation and revision can happen in your subscribed Codex session. Local rendering, analysis and deterministic critique do not require an AI API key. Set `GLASS_HARBOR_EMBEDDING_PROVIDER=none` and `GLASS_HARBOR_AUDIO_REVIEW_PROVIDER=none` for this local review path.
 
 Optional style-alignment env:
 
