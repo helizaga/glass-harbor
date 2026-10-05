@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "slug": "bloom-fixture",
+  "title": "Bloom Fixture",
+  "tags": [
+    "bloom",
+    "emotional",
+    "long-build",
+    "patient",
+    "clear valley before the bloom",
+    "strong return payoff",
+    "spacious lead and pad interplay",
+    "controlled low end"
+  ],
+  "bpm_range": {
+    "min": 118,
+    "max": 122,
+    "source": "text"
+  },
+  "why_you_like_it": [
+    "the payoff feels delayed and earned",
+    "the return opens emotionally without turning into clutter"
+  ],
+  "preserve_traits": [
+    "clear valley before the bloom",
+    "strong return payoff",
+    "spacious lead and pad interplay",
+    "controlled low end"
+  ],
+  "avoid_traits": [
+    "flat section contrast",
+    "brittle high end",
+    "overstuffed drop"
+  ],
+  "section_role_summary": [
+    {
+      "clip": "anchor",
+      "role": "anchor"
+    },
+    {
+      "clip": "breath",
+      "role": "breath"
+    },
+    {
+      "clip": "groove",
+      "role": "groove"
+    },
+    {
+      "clip": "return",
+      "role": "return"
+    }
+  ],
+  "section_notes": [
+    "anchor: atmosphere with implied motion",
+    "groove: pulse should stay patient",
+    "breath: remove enough weight to make the bloom arrive clearly",
+    "return: widen and brighten without losing low-end control"
+  ],
+  "groove_notes": [
+    "low end should stay controlled when the bloom opens",
+    "the return should feel bigger through contrast and width",
+    "not extra layers everywhere",
+    "keep top-end lift smooth instead of sharp"
+  ],
+  "clip_coverage": {
+    "count": 4,
+    "clips": [
+      "anchor.wav",
+      "breath.wav",
+      "groove.wav",
+      "return.wav"
+    ]
+  },
+  "reliability": {
+    "overall": 0.944,
+    "level": "high",
+    "analysis_engine": "librosa-rich",
+    "notes": [
+      "Aggregated from 4 private example clip(s)."
+    ]
+  },
+  "rhythm_tendencies": {
+    "estimated_tempo": 117.113,
+    "groove_continuity": 0.73,
+    "syncopation_proxy": 0.417,
+    "inter_beat_loudness_consistency": 0.681
+  },
+  "timbre_tendencies": {
+    "spectral_centroid": 1960.489,
+    "sub_energy_ratio": 0.179,
+    "bass_energy_ratio": 0.359,
+    "high_band_energy_ratio": 0.004
+  },
+  "calibration_targets": {
+    "estimated_tempo": 117.113,
+    "groove_continuity": 0.73,
+    "syncopation_proxy": 0.417,
+    "inter_beat_loudness_consistency": 0.681,
+    "harmonic_stability": 0.971,
+    "chord_change_proxy": 0.493,
+    "sub_energy_ratio": 0.179,
+    "bass_energy_ratio": 0.359,
+    "spectral_centroid": 1960.489
+  },
+  "example_targets": []
+}

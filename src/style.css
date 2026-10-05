@@ -1,0 +1,207 @@
+:root {
+  color-scheme: dark;
+  --bg: #07131a;
+  --bg-accent: #102532;
+  --panel: rgba(7, 19, 26, 0.84);
+  --panel-border: rgba(152, 205, 216, 0.18);
+  --text: #e7f1ee;
+  --muted: #9fb7bd;
+  --accent: #73d6c0;
+  --accent-strong: #ffd166;
+  --shadow: 0 24px 80px rgba(0, 0, 0, 0.34);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "IBM Plex Sans", "Avenir Next", sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(circle at top, rgba(115, 214, 192, 0.16), transparent 36%),
+    radial-gradient(circle at 80% 0%, rgba(255, 209, 102, 0.15), transparent 28%),
+    linear-gradient(180deg, #08161d 0%, #050d12 100%);
+}
+
+code {
+  font-family: "IBM Plex Mono", SFMono-Regular, monospace;
+}
+
+.shell {
+  width: min(1240px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 32px 0 48px;
+}
+
+.hero {
+  padding: 28px 28px 16px;
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  font-size: 0.78rem;
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: clamp(2.5rem, 5vw, 4.5rem);
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+}
+
+.lede {
+  max-width: 760px;
+  margin: 16px 0 0;
+  color: var(--muted);
+  font-size: 1.05rem;
+  line-height: 1.6;
+}
+
+.toolbar,
+.notes,
+.editor-frame {
+  margin: 16px 0 0;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 24px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(16px);
+}
+
+.toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 420px) minmax(0, 1fr);
+  gap: 20px;
+  padding: 22px;
+}
+
+.control-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.control-label {
+  margin: 0 0 10px;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.track-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.pack-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.track-button,
+.pack-button {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  padding: 12px 18px;
+  font: inherit;
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.track-button:hover,
+.track-button[data-active="true"],
+.pack-button:hover,
+.pack-button[data-active="true"] {
+  transform: translateY(-1px);
+  border-color: rgba(115, 214, 192, 0.45);
+  background: rgba(115, 214, 192, 0.14);
+}
+
+.status p {
+  margin: 0;
+}
+
+#track-label {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+#track-description {
+  margin-top: 8px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+#pack-label {
+  margin-top: 10px;
+  color: var(--accent-strong);
+  line-height: 1.45;
+}
+
+.notes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  padding: 22px;
+}
+
+.notes h2 {
+  margin: 0 0 10px;
+  font-size: 1rem;
+}
+
+.notes p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.editor-frame {
+  padding: 20px;
+}
+
+#repl-root {
+  min-height: 720px;
+}
+
+strudel-editor {
+  display: block;
+  width: 100%;
+}
+
+.error {
+  margin: 0;
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(255, 92, 92, 0.12);
+  color: #ffd8d8;
+}
+
+@media (max-width: 920px) {
+  .toolbar,
+  .notes {
+    grid-template-columns: 1fr;
+  }
+
+  .shell {
+    width: min(100vw - 20px, 1240px);
+    padding-top: 20px;
+  }
+
+  .hero,
+  .toolbar,
+  .notes,
+  .editor-frame {
+    border-radius: 20px;
+  }
+}

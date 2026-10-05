@@ -1,0 +1,28 @@
+{
+  "genre_tags": ["transition design", "melodic house"],
+  "mood_tags": ["dusky", "shifting", "elegant", "poised"],
+  "bpm_range": [121, 126],
+  "section_map": ["intro:8", "groove:16", "lift:8", "pivot:8", "breakdown:16", "drop:16", "outro:8"],
+  "energy_curve": ["low", "medium", "medium-high", "medium-low", "low", "high", "low"],
+  "roles_by_section": {
+    "intro": ["air_texture"],
+    "groove": ["kick_main", "clap_main", "hat_closed"],
+    "lift": ["hat_open", "perc_top"],
+    "pivot": ["riser_up"],
+    "drop": ["kick_main", "clap_main", "hat_closed", "impact_wide"]
+  },
+  "groove_notes": [
+    "transitions should turn, not crash",
+    "subtraction can be more dramatic than extra FX",
+    "hats should signal the pivot before the impact does"
+  ],
+  "harmonic_summary": "stable chord base with voicing changes around transitions",
+  "transition_recipes": [
+    "filter collapse into single-bar pivot",
+    "delayed clap return after impact"
+  ],
+  "anti_goals": [
+    "avoid generic every-8-bars crash behavior",
+    "avoid overstuffed transition FX"
+  ]
+}

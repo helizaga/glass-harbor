@@ -1,0 +1,30 @@
+{
+  "genre_tags": ["french house study", "bass pocket"],
+  "mood_tags": ["sleek", "flirtatious", "nocturnal", "compressed"],
+  "bpm_range": [120, 124],
+  "section_map": ["intro:8", "groove:16", "lift:8", "breakdown:8", "drop:16", "outro:8"],
+  "energy_curve": ["medium", "medium-high", "high", "medium-low", "high", "low"],
+  "roles_by_section": {
+    "intro": ["kick_main", "air_texture"],
+    "groove": ["kick_main", "clap_main", "hat_closed"],
+    "lift": ["hat_open", "vocal_chop"],
+    "breakdown": ["air_texture", "vocal_chop"],
+    "drop": ["kick_main", "clap_main", "hat_closed", "hat_open", "impact_wide"],
+    "outro": ["kick_main", "air_texture"]
+  },
+  "groove_notes": [
+    "kick and bass should feel quantized together before anything else matters",
+    "transitions can snap through cuts and micro-pauses instead of long sweeps",
+    "robotic phrases should answer the groove, not take over it"
+  ],
+  "harmonic_summary": "keep the center stable and let timbre, cutoff, and phrasing provide personality",
+  "transition_recipes": [
+    "micro-pause before the return",
+    "filtered bass ghost during the breakdown"
+  ],
+  "anti_goals": [
+    "avoid soft bass attacks that smear the pocket",
+    "avoid long emotional pad swells",
+    "avoid overfilled toplines"
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "genre_tags": ["organic texture", "club precision"],
+  "mood_tags": ["airy", "exact", "tense", "controlled"],
+  "bpm_range": [120, 126],
+  "section_map": ["intro:8", "groove:16", "lift:8", "breakdown:16", "drop:16", "outro:8"],
+  "energy_curve": ["low", "medium", "medium-high", "low", "high", "low"],
+  "roles_by_section": {
+    "intro": ["air_texture", "shimmer_fx"],
+    "groove": ["kick_main", "clap_main", "hat_closed"],
+    "lift": ["hat_open", "riser_up"],
+    "breakdown": ["vocal_chop"],
+    "drop": ["kick_main", "clap_main", "hat_closed", "hat_open", "perc_top", "impact_wide"]
+  },
+  "groove_notes": [
+    "low end should feel machined and exact",
+    "atmospheres should stay loose and wind-like",
+    "contrast comes from surfaces colliding cleanly"
+  ],
+  "harmonic_summary": "minimal harmonic motion with textural drama",
+  "transition_recipes": [
+    "airy swell into dry groove",
+    "hard impact after soft pre-drop subtraction"
+  ],
+  "anti_goals": [
+    "avoid a washed-out kick",
+    "avoid letting ambience blur the drop"
+  ]
+}
