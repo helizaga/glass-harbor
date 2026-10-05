@@ -25,8 +25,8 @@ Read only what you need:
 3. `songs/<slug>/memory.json` if it exists
 4. Attached example profiles in `examples/<slug>/profile.json` when the brief lists `## Example Targets`
 5. The brief if the intent is unclear
-6. [docs/strudel/technique-index.md](/Users/tommy/Documents/GitHub/song/docs/strudel/technique-index.md) when you need a fast Strudel-technique judgment
-7. [docs/strudel/style-lanes.md](/Users/tommy/Documents/GitHub/song/docs/strudel/style-lanes.md) when deciding whether a song drifted into the wrong accent
+6. [docs/strudel/technique-index.md](../../docs/strudel/technique-index.md) when you need a fast Strudel-technique judgment
+7. [docs/strudel/style-lanes.md](../../docs/strudel/style-lanes.md) when deciding whether a song drifted into the wrong accent
 8. Any source-material study in the brief when the song references a real artist, song, or style lane
 9. Comparison or exploration artifacts if multiple candidates are involved
 10. Reference cards only when they help choose between revision directions after examples/memory

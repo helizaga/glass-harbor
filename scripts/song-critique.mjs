@@ -1151,7 +1151,7 @@ export async function handleSongCritique({ argv }) {
     `Confidence: ${confidence.level} (${confidence.score})`,
     `Style alignment: ${styleAlignment.overall}`,
     `Signal reliability: ${signalReliability.level} (${signalReliability.overall})`,
-    `Examples: ${exampleTargets.length > 0 ? exampleTargets.join(', ') : 'none'}`,
+    `Examples: ${exampleTargets.length > 0 ? exampleTargets.map((target) => target.slug).join(', ') : 'none'}`,
     '',
     '## Scores',
     ...Object.entries(scores).map(([key, value]) => `- ${key}: ${value}`),

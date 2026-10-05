@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { repoRoot } from '../lib/song-contract.mjs';
@@ -43,6 +44,23 @@ test('sample regeneration is reproducible, preserves headroom and covers the son
     }
   } finally {
     assertInsideRoot(repoRoot, root, 'Sample test cleanup');
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('note-keyed manifests keep sharp notes and encode them in sample URLs', () => {
+  const root = mkdtempSync(join(tmpdir(), 'glass-harbor-notes-'));
+  try {
+    mkdirSync(join(root, 'keys'));
+    for (const file of ['c#3-0.wav', 'd3-0.wav', 'd3-1.wav']) writeFileSync(join(root, 'keys', file), '');
+    assert.deepEqual(buildManifestFromRoot(root, '/samples'), {
+      keys: {
+        'c#3': '/samples/keys/c%233-0.wav',
+        d3: ['/samples/keys/d3-0.wav', '/samples/keys/d3-1.wav'],
+      },
+    });
+  } finally {
+    assertInsideRoot(tmpdir(), root, 'Note manifest test cleanup');
     rmSync(root, { recursive: true, force: true });
   }
 });

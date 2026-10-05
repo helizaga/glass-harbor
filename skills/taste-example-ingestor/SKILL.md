@@ -11,7 +11,7 @@ Use this skill when the job is to capture a liked-song example for the critic.
 
 1. `examples/README.md`
 2. `examples/example-template.md`
-3. [AGENTS.md](/Users/tommy/Documents/GitHub/song/AGENTS.md)
+3. [AGENTS.md](../../AGENTS.md)
 
 ## Output Contract
 

@@ -4,9 +4,9 @@ These notes are the local, agent-friendly Strudel layer for Glass Harbor.
 
 Use them when you need fast guidance without loading the full Strudel docs:
 
-- [technique-index.md](/Users/tommy/Documents/GitHub/song/docs/strudel/technique-index.md)
-- [sound-guide.md](/Users/tommy/Documents/GitHub/song/docs/strudel/sound-guide.md)
-- [style-lanes.md](/Users/tommy/Documents/GitHub/song/docs/strudel/style-lanes.md)
+- [technique-index.md](technique-index.md)
+- [sound-guide.md](sound-guide.md)
+- [style-lanes.md](style-lanes.md)
 
 What this is for:
 

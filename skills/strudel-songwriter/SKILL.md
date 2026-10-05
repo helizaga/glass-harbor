@@ -28,16 +28,16 @@ Read only what you need:
 
 1. The user request itself if this starts from a freeform thread prompt
 2. The target brief in `songs/<slug>/<slug>.brief.md` if it already exists
-3. [AGENTS.md](/Users/tommy/Documents/GitHub/song/AGENTS.md)
-4. [songs/README.md](/Users/tommy/Documents/GitHub/song/songs/README.md)
-5. [docs/strudel/technique-index.md](/Users/tommy/Documents/GitHub/song/docs/strudel/technique-index.md) when you need a fast Strudel-technique lookup
-6. [docs/strudel/sound-guide.md](/Users/tommy/Documents/GitHub/song/docs/strudel/sound-guide.md) when choosing role subsets or hook carriers
-7. [docs/strudel/style-lanes.md](/Users/tommy/Documents/GitHub/song/docs/strudel/style-lanes.md) when the lane/accent matters
+3. [AGENTS.md](../../AGENTS.md)
+4. [songs/README.md](../../songs/README.md)
+5. [docs/strudel/technique-index.md](../../docs/strudel/technique-index.md) when you need a fast Strudel-technique lookup
+6. [docs/strudel/sound-guide.md](../../docs/strudel/sound-guide.md) when choosing role subsets or hook carriers
+7. [docs/strudel/style-lanes.md](../../docs/strudel/style-lanes.md) when the lane/accent matters
 8. `songs/<slug>/memory.json` if it exists
 9. Attached example profiles in `examples/<slug>/profile.json` only when the brief lists `## Example Targets`
 10. The existing canonical song file if this is a revision
 11. Relevant reference cards in `references/` only if the brief still needs style guidance after prompt references, examples, and memory
-12. [songs/arrangement-archetypes.md](/Users/tommy/Documents/GitHub/song/songs/arrangement-archetypes.md) when you need a stronger macro-structure than the prompt alone provides
+12. [songs/arrangement-archetypes.md](../../songs/arrangement-archetypes.md) when you need a stronger macro-structure than the prompt alone provides
 
 If the song folder does not exist yet, scaffold it with:
 

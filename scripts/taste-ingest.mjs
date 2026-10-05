@@ -7,6 +7,7 @@ import {
   parseBrief,
   parseListItems,
   readText,
+  repoRoot,
   resolveSongSlug,
   validateExampleBrief,
 } from '../lib/song-contract.mjs';
@@ -16,7 +17,7 @@ import { resolvePythonExecutable } from '../lib/python-runtime.mjs';
 
 function runPython(args) {
   return new Promise((resolve, reject) => {
-    const child = spawn(resolvePythonExecutable(), args, { stdio: 'inherit' });
+    const child = spawn(resolvePythonExecutable(), args, { cwd: repoRoot, stdio: 'inherit' });
     child.on('exit', (code) => {
       if (code === 0) {
         resolve();
@@ -150,7 +151,7 @@ export async function handleTasteIngest({ argv }) {
 
   try {
     await runPython([
-      'scripts/song-analyze.py',
+      join(repoRoot, 'scripts', 'song-analyze.py'),
       '--clips-dir',
       paths.clipsDir,
       '--song',

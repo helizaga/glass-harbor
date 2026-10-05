@@ -36,7 +36,9 @@ export async function handleSongStatus({ argv }) {
   const memory = ensureSongMemory(slug);
   const approvedBaselineRunDir = memory.approved_baseline_run_dir ?? null;
   const comparisonBaselineRunDir = chooseBaselineRun(slug, { memory });
-  const baselineRunDir = approvedBaselineRunDir ?? comparisonBaselineRunDir;
+  // chooseBaselineRun only returns listener-approved runs, so a seeded or
+  // rejected approved_baseline_run_dir is never reported as the baseline.
+  const baselineRunDir = comparisonBaselineRunDir;
   const pendingRunDir = memory.pending_review_run_dir ?? null;
   const songValidation = validateSongCode(readText(songPaths(slug).songPath));
   const baselineVerdict = loadRunVerdict(baselineRunDir);
@@ -191,7 +193,7 @@ export async function handleSongStatus({ argv }) {
     approval_required: Boolean(pendingRunDir),
     baseline: {
       run_dir: baselineRunDir,
-      approved: Boolean(approvedBaselineRunDir && baselineRunDir === approvedBaselineRunDir),
+      approved: Boolean(baselineRunDir),
       verdict: baselineVerdict?.verdict ?? null,
       summary: baselineVerdict?.summary ?? baselineCritique?.summary ?? null,
       gate: baselineCritique?.gate ?? null,
@@ -211,7 +213,7 @@ export async function handleSongStatus({ argv }) {
     history: latestHistory(memory.history),
     message: pendingRunDir
         ? `Song ${slug} has a pending review run waiting for approval.`
-        : !approvedBaselineRunDir
+        : !baselineRunDir
           ? `Song ${slug} does not have an approved baseline yet.`
           : memory.current_open_issue || laneNeedsPrune
             ? `Song ${slug} still has feedback to address.`

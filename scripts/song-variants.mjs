@@ -1,16 +1,22 @@
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative, sep } from 'node:path';
 
 import {
   parseBrief,
   parseSongMetadata,
   readText,
+  repoRoot,
   resolveSongSlug,
   sanitizeSlug,
   songPaths,
   titleFromSlug,
 } from '../lib/song-contract.mjs';
 import { CommandError, EXIT_CODES, isMainModule, runCliCommand } from '../lib/command-runtime.mjs';
+
+// Manifests are committed, so record paths relative to the repo, with '/'.
+function repoRelative(filePath) {
+  return relative(repoRoot, filePath).split(sep).join('/');
+}
 
 function parseCount(argv) {
   const index = argv.indexOf('--count');
@@ -115,16 +121,16 @@ export async function handleSongVariants({ argv }) {
       variant_index: index,
       source_slug: sourceSlug,
       title,
-      brief_path: target.briefPath,
-      song_path: target.songPath,
-      source_song_path: source.songPath,
+      brief_path: repoRelative(target.briefPath),
+      song_path: repoRelative(target.songPath),
+      source_song_path: repoRelative(source.songPath),
     });
   }
 
   const manifest = {
     source_slug: sourceSlug,
-    source_brief_path: source.briefPath,
-    source_song_path: source.songPath,
+    source_brief_path: repoRelative(source.briefPath),
+    source_song_path: repoRelative(source.songPath),
     generated_at: new Date().toISOString(),
     variants,
   };

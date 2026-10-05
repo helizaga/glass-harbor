@@ -41,9 +41,12 @@ def read_wav_stdlib(path):
     if sample_width not in (1, 2, 4):
         raise ValueError(f"Unsupported sample width: {sample_width}")
 
+    # 8-bit PCM WAV is unsigned and centred on 128; wider widths are signed.
+    offset = 0.0
     if sample_width == 1:
-        fmt = "b"
+        fmt = "B"
         scale = 128.0
+        offset = 128.0
     elif sample_width == 2:
         fmt = "h"
         scale = 32768.0
@@ -55,7 +58,7 @@ def read_wav_stdlib(path):
     mono = []
     for index in range(0, len(samples), channels):
         frame = samples[index:index + channels]
-        mono.append(sum(frame) / len(frame) / scale)
+        mono.append((sum(frame) / len(frame) - offset) / scale)
 
     return mono, sample_rate, channels
 

@@ -5,11 +5,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { assertInsideRoot } from '../lib/pack-overlay.mjs';
-import { chooseBaselineRun, ensureSongMemory, loadSongMemory } from '../lib/review-gates.mjs';
+import { chooseBaselineRun, ensureSongMemory, loadSongMemory, songMemoryPath } from '../lib/review-gates.mjs';
 import { songPaths, songsRoot } from '../lib/song-contract.mjs';
 import { handleSongRevise } from '../scripts/song-revise.mjs';
 import { handleSongApprove } from '../scripts/song-approve.mjs';
 import { handleSongReject } from '../scripts/song-reject.mjs';
+import { handleSongStatus } from '../scripts/song-status.mjs';
 
 test('the first reviewed run reaches the listener gate without becoming an approved baseline', async () => {
   const slug = `review-gate-test-${randomUUID()}`;
@@ -58,6 +59,30 @@ test('automated verdicts and legacy seeded baselines do not imply approval', () 
     ],
   };
   assert.equal(chooseBaselineRun('daybreak-ferry', { memory }), null);
+});
+
+test('song status does not report a seeded baseline as approved', async () => {
+  const slug = `status-test-${randomUUID()}`;
+  const songDir = songPaths(slug).dir;
+  mkdirSync(songDir, { recursive: true });
+  try {
+    const source = songPaths('daybreak-ferry');
+    writeFileSync(songPaths(slug).briefPath, readFileSync(source.briefPath));
+    writeFileSync(songPaths(slug).songPath, readFileSync(source.songPath));
+    ensureSongMemory(slug);
+    writeFileSync(songMemoryPath(slug), JSON.stringify({
+      ...loadSongMemory(slug),
+      approved_baseline_run_dir: 'seeded',
+      history: [{ run_dir: 'seeded', decision: 'seed_baseline' }],
+    }));
+    const status = await handleSongStatus({ argv: [slug] });
+    assert.equal(status.baseline_run_dir, null);
+    assert.equal(status.baseline.approved, false);
+    assert.match(status.message, /does not have an approved baseline yet/);
+  } finally {
+    assertInsideRoot(songsRoot, songDir, 'Test song');
+    rmSync(songDir, { recursive: true, force: true });
+  }
 });
 
 test('a rejected candidate does not replace a previous approved run', () => {

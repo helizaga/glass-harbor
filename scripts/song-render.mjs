@@ -15,7 +15,7 @@ import {
   validateSongCode,
 } from '../lib/song-contract.mjs';
 import { CommandError, EXIT_CODES, isMainModule, runCliCommand } from '../lib/command-runtime.mjs';
-import { ensureService, stopService } from '../lib/process-utils.mjs';
+import { ensureService, stopServiceOrWarn } from '../lib/process-utils.mjs';
 
 export async function handleSongRender({ argv }) {
   const slug = resolveSongSlug(argv);
@@ -250,8 +250,8 @@ export async function handleSongRender({ argv }) {
     try {
       await browser?.close();
     } finally {
-      stopService(viteService?.child);
-      stopService(sampleService?.child);
+      stopServiceOrWarn(viteService?.child);
+      stopServiceOrWarn(sampleService?.child);
     }
   }
 }

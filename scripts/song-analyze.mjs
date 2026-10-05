@@ -9,6 +9,7 @@ import {
   parseExampleTargets,
   parseBrief,
   readText,
+  repoRoot,
   resolveRunDir,
   resolveSongSlug,
   selectExampleProfiles,
@@ -23,7 +24,7 @@ import { computeEmbeddingAlignment } from './song-embedding-provider.mjs';
 
 function runPython(args) {
   return new Promise((resolve, reject) => {
-    const child = spawn(resolvePythonExecutable(), args, { stdio: 'inherit' });
+    const child = spawn(resolvePythonExecutable(), args, { cwd: repoRoot, stdio: 'inherit' });
     child.on('exit', (code) => {
       if (code === 0) {
         resolve();
@@ -159,7 +160,7 @@ export async function handleSongAnalyze({ argv }) {
 
   try {
     await runPython([
-      'scripts/song-analyze.py',
+      join(repoRoot, 'scripts', 'song-analyze.py'),
       '--run-dir',
       runDir,
       '--song',
