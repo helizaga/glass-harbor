@@ -1,0 +1,210 @@
+"""Local stem separation with python-audio-separator (free, runs on the machine).
+
+Quality profiles:
+- ``balanced`` (default): unwa's "Resurrection" BS-RoFormer models (the strongest members of the community
+  ensembles): one pass for vocals, one for the instrumental, then HT-Demucs (fine-tuned) on the instrumental for
+  drums/bass/other. About 4 minutes per pass for a 4-minute song on an M1 Pro.
+- ``best``: the community-recommended two-model RoFormer ensembles (deton24 guide presets bundled with
+  audio-separator) for vocals and instrumental. Roughly 2.5x slower; use for final acapellas.
+- ``fast``: a single HT-Demucs pass for all four stems; instrumental = drums + bass + other.
+"""
+
+from __future__ import annotations
+
+import re
+import tempfile
+import warnings
+from pathlib import Path
+from typing import Callable
+
+from glass_harbor import audio as A
+from glass_harbor import library
+from glass_harbor.paths import model_dir
+
+PROFILES = {
+    "balanced": {
+        "vocals": {"model": "bs_roformer_vocals_resurrection_unwa.ckpt"},
+        "instrumental": {"model": "bs_roformer_instrumental_resurrection_unwa.ckpt"},
+        "four_stem": {"model": "htdemucs_ft.yaml"},
+    },
+    "best": {
+        "vocals": {"ensemble_preset": "vocal_balanced"},
+        "instrumental": {"ensemble_preset": "instrumental_clean"},
+        "four_stem": {"model": "htdemucs_ft.yaml"},
+    },
+    "fast": {"all": {"model": "htdemucs.yaml"}},
+}
+
+CLEAN_MODELS = {
+    "dereverb": "dereverb_mel_band_roformer_anvuew_sdr_19.1729.ckpt",
+    "dereverb-gentle": "dereverb_mel_band_roformer_less_aggressive_anvuew_sdr_18.8050.ckpt",
+    "deecho": "dereverb-echo_mel_band_roformer_sdr_13.4843_v2.ckpt",
+    "denoise": "denoise_mel_band_roformer_aufr33_sdr_27.9959.ckpt",
+}
+_CLEAN_LABELS = ("noreverb", "no reverb", "dry", "no echo", "no noise")
+
+_LABELS = {
+    "vocals": "vocals",
+    "vocal": "vocals",
+    "instrumental": "instrumental",
+    "instrum": "instrumental",
+    "no vocals": "instrumental",
+    "other": "other",
+    "drums": "drums",
+    "bass": "bass",
+}
+
+Log = Callable[[str], None]
+
+
+def _label_of(filename: str) -> str | None:
+    lowered = filename.lower()
+    for match in re.findall(r"\(([^)]+)\)", lowered)[::-1]:
+        if match.strip() in _LABELS:
+            return _LABELS[match.strip()]
+    for token, label in sorted(_LABELS.items(), key=lambda kv: -len(kv[0])):
+        if re.search(rf"(^|[_\-\s.]){re.escape(token)}([_\-\s.]|$)", lowered):
+            return label
+    return None
+
+
+def _two_stem(outputs: dict[str, Path]) -> dict[str, Path]:
+    """Vocal/instrumental models often name the non-vocal output "other"; that stem is the instrumental."""
+    if "instrumental" not in outputs and "other" in outputs:
+        outputs = {**outputs, "instrumental": outputs["other"]}
+    return outputs
+
+
+def _run_audio_separator(source: Path, out_dir: Path, *, model: str | None = None,
+                         ensemble_preset: str | None = None) -> dict[str, Path]:
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        from audio_separator.separator import Separator
+
+        model_dir().mkdir(parents=True, exist_ok=True)
+        separator = Separator(
+            log_level=30,
+            model_file_dir=str(model_dir()),
+            output_dir=str(out_dir),
+            output_format="FLAC",
+            ensemble_preset=ensemble_preset,
+        )
+        if ensemble_preset:
+            separator.load_model()
+        else:
+            separator.load_model(model_filename=model)
+        outputs = separator.separate(str(source))
+    found: dict[str, Path] = {}
+    for name in outputs:
+        path = Path(name) if Path(name).is_absolute() else out_dir / name
+        label = _label_of(path.name)
+        if label and label not in found:
+            found[label] = path
+    return found
+
+
+def _separate_fast(track_id: str, wanted: set[str], tmp_dir: Path, log: Log) -> dict[str, dict]:
+    spec = PROFILES["fast"]["all"]
+    log(f"separating all stems with {spec}")
+    outputs = _run_audio_separator(library.audio_path(track_id), tmp_dir / "fast", **spec)
+    produced: dict[str, dict] = {}
+    for name in ("vocals", "drums", "bass", "other"):
+        library.copy_stem_file(track_id, name, outputs[name])
+        produced[name] = {"quality": "fast", **spec}
+    parts = [A.load(outputs[name]) for name in ("drums", "bass", "other")]
+    frames = min(part.shape[0] for part in parts)
+    A.save(library.stem_path(track_id, "instrumental"), sum(part[:frames] for part in parts), subtype="PCM_24")
+    produced["instrumental"] = {"quality": "fast", "derived": "drums + bass + other", **spec}
+    return {name: info for name, info in produced.items() if name in wanted}
+
+
+def separate_local(track_id: str, wanted: set[str], quality: str, log: Log) -> dict[str, dict]:
+    produced: dict[str, dict] = {}
+    with tempfile.TemporaryDirectory(prefix="gh-sep-") as tmp:
+        tmp_dir = Path(tmp)
+        if quality == "fast":
+            return _separate_fast(track_id, wanted, tmp_dir, log)
+        profile = PROFILES[quality]
+        source = library.audio_path(track_id)
+        need_instrumental = bool(wanted & {"instrumental", "drums", "bass", "other"})
+
+        if "vocals" in wanted:
+            spec = profile["vocals"]
+            log(f"separating vocals with {spec}")
+            outputs = _two_stem(_run_audio_separator(source, tmp_dir / "vocals", **spec))
+            library.copy_stem_file(track_id, "vocals", outputs["vocals"])
+            produced["vocals"] = {"quality": quality, **spec}
+            if spec == profile["instrumental"] and "instrumental" in outputs and need_instrumental:
+                library.copy_stem_file(track_id, "instrumental", outputs["instrumental"])
+                produced["instrumental"] = {"quality": quality, **spec}
+
+        reuse = library.stem_path(track_id, "instrumental").exists() and "instrumental" not in wanted
+        if need_instrumental and "instrumental" not in produced and not reuse:
+            spec = profile["instrumental"]
+            log(f"separating instrumental with {spec}")
+            outputs = _two_stem(_run_audio_separator(source, tmp_dir / "instrumental", **spec))
+            library.copy_stem_file(track_id, "instrumental", outputs["instrumental"])
+            produced["instrumental"] = {"quality": quality, **spec}
+
+        four = wanted & {"drums", "bass", "other"}
+        if four:
+            spec = profile["four_stem"]
+            log(f"splitting the instrumental into drums/bass/other with {spec}")
+            outputs = _run_audio_separator(library.stem_path(track_id, "instrumental"), tmp_dir / "four", **spec)
+            for name in sorted(four):
+                library.copy_stem_file(track_id, name, outputs[name])
+                produced[name] = {"quality": quality, "input": "instrumental", **spec}
+    return produced
+
+
+def clean_stem(track_id: str, stem: str = "vocals", mode: str = "dereverb", log: Log = print) -> dict[str, str]:
+    """Strip reverb/echo/noise from a stem (keeps the original under stems/raw/). Dry acapellas sit tighter on
+    dry club beats and survive time-stretching better."""
+    import shutil
+
+    if mode not in CLEAN_MODELS:
+        raise ValueError(f"mode must be one of {', '.join(CLEAN_MODELS)}")
+    source = library.stem_path(track_id, stem)
+    if not source.exists():
+        raise FileNotFoundError(f"{track_id} has no {stem} stem to clean")
+    raw = source.parent / "raw" / source.name
+    raw.parent.mkdir(parents=True, exist_ok=True)
+    if not raw.exists():
+        shutil.copyfile(source, raw)
+    model = CLEAN_MODELS[mode]
+    log(f"cleaning {track_id}/{stem} with {model}")
+    with tempfile.TemporaryDirectory(prefix="gh-clean-") as tmp:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            from audio_separator.separator import Separator
+
+            separator = Separator(log_level=30, model_file_dir=str(model_dir()), output_dir=tmp, output_format="FLAC")
+            separator.load_model(model_filename=model)
+            outputs = [Path(o) if Path(o).is_absolute() else Path(tmp) / o for o in separator.separate(str(raw))]
+        cleaned = next((o for o in outputs if any(f"({label})" in o.name.lower() for label in _CLEAN_LABELS)), None)
+        if cleaned is None:
+            raise RuntimeError(f"could not find the cleaned output among {[o.name for o in outputs]}")
+        library.copy_stem_file(track_id, stem, cleaned)
+    meta = library.load_meta(track_id)
+    meta.setdefault("stems", {}).setdefault(stem, {})["cleaned"] = {"mode": mode, "model": model}
+    library.save_meta(track_id, meta)
+    return {"stem": stem, "mode": mode, "model": model, "raw": str(raw)}
+
+
+def separate_track(track_id: str, *, stems: list[str] | None = None, quality: str = "balanced",
+                   force: bool = False, log: Log = print) -> dict[str, dict]:
+    wanted = set(stems or library.STEM_NAMES)
+    unknown = wanted - set(library.STEM_NAMES)
+    if unknown:
+        raise ValueError(f"Unknown stems: {', '.join(sorted(unknown))}")
+    if not force:
+        wanted -= set(library.available_stems(track_id))
+    if not wanted:
+        return {}
+    if quality not in PROFILES:
+        raise ValueError(f"quality must be one of {', '.join(PROFILES)}")
+    produced = separate_local(track_id, wanted, quality, log)
+    meta = library.load_meta(track_id)
+    meta.setdefault("stems", {}).update(produced)
+    library.save_meta(track_id, meta)
+    return produced

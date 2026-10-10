@@ -1,0 +1,481 @@
+{
+  "version": 1,
+  "title": "Janice STFU x Keep Workin'",
+  "kind": "mashup",
+  "bpm": 127.0,
+  "beats_per_bar": 4,
+  "sources": {
+    "vox": {
+      "track": "janice-stfu",
+      "semitones": 0
+    },
+    "bed": {
+      "track": "keep-workin"
+    }
+  },
+  "clips": [
+    {
+      "id": "bed",
+      "source": "bed",
+      "stem": "instrumental",
+      "from_bar": 1,
+      "bars": 111,
+      "at_bar": 1,
+      "duck": {
+        "under": "vocals",
+        "db": 3
+      },
+      "automation": {
+        "gain_db": [
+          [
+            79.747,
+            0
+          ],
+          [
+            79.75,
+            -60
+          ],
+          [
+            79.998,
+            -60
+          ],
+          [
+            80.0,
+            0
+          ],
+          [
+            90.747,
+            0
+          ],
+          [
+            90.75,
+            -60
+          ],
+          [
+            90.998,
+            -60
+          ],
+          [
+            91.0,
+            0
+          ],
+          [
+            103,
+            0
+          ],
+          [
+            111,
+            -40
+          ]
+        ],
+        "highpass_hz": [
+          [
+            72.0,
+            20
+          ],
+          [
+            79.75,
+            700
+          ],
+          [
+            79.998,
+            700
+          ],
+          [
+            80.0,
+            20
+          ],
+          [
+            83.0,
+            20
+          ],
+          [
+            90.75,
+            700
+          ],
+          [
+            90.998,
+            700
+          ],
+          [
+            91.0,
+            20
+          ]
+        ]
+      }
+    },
+    {
+      "id": "intro-verse",
+      "source": "vox",
+      "stem": "vocals",
+      "from_bar": 1,
+      "bars": 8,
+      "at_bar": 9,
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            110
+          ]
+        ]
+      }
+    },
+    {
+      "id": "chops-tease",
+      "source": "vox",
+      "stem": "vocals",
+      "at_bar": 17,
+      "bars": 8,
+      "chop": {
+        "slices": {
+          "j": {
+            "word": "janice",
+            "occurrence": 1
+          },
+          "h": {
+            "word": "hey",
+            "occurrence": 4
+          },
+          "b": {
+            "word": "baby",
+            "occurrence": 1
+          },
+          "k": {
+            "word": "janice",
+            "occurrence": 1,
+            "semitones": 5
+          },
+          "l": {
+            "word": "janice",
+            "occurrence": 1,
+            "semitones": 7
+          },
+          "m": {
+            "word": "janice",
+            "occurrence": 1,
+            "semitones": 12
+          },
+          "r": {
+            "word": "real",
+            "occurrence": 5
+          }
+        },
+        "pattern": [
+          "h---j-----------",
+          "........b-------",
+          "h---j-----------",
+          "........b---b---",
+          "h---j-----------",
+          "........b-------",
+          "j-------j-------",
+          "j---j---j-j-j-j-"
+        ]
+      },
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            200
+          ]
+        ]
+      },
+      "fx": {
+        "echo": {
+          "beats": 0.75,
+          "feedback": 0.35,
+          "mix": 0.25
+        }
+      }
+    },
+    {
+      "id": "hook1",
+      "source": "vox",
+      "stem": "vocals",
+      "from_bar": 10,
+      "bars": 15.5,
+      "at_bar": 25,
+      "fade_out_beats": 1,
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            110
+          ]
+        ]
+      }
+    },
+    {
+      "id": "verse",
+      "source": "vox",
+      "stem": "vocals",
+      "from_bar": 34,
+      "bars": 8,
+      "at_bar": 41,
+      "pre_beats": 1,
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            110
+          ]
+        ]
+      }
+    },
+    {
+      "id": "hook2",
+      "source": "vox",
+      "stem": "vocals",
+      "from_bar": 42,
+      "bars": 15,
+      "at_bar": 49,
+      "fade_out_beats": 0.5,
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            110
+          ]
+        ]
+      }
+    },
+    {
+      "id": "chops-build",
+      "source": "vox",
+      "stem": "vocals",
+      "at_bar": 65,
+      "bars": 16,
+      "chop": {
+        "slices": {
+          "j": {
+            "word": "janice",
+            "occurrence": 1
+          },
+          "h": {
+            "word": "hey",
+            "occurrence": 4
+          },
+          "b": {
+            "word": "baby",
+            "occurrence": 1
+          },
+          "k": {
+            "word": "janice",
+            "occurrence": 1,
+            "semitones": 5
+          },
+          "l": {
+            "word": "janice",
+            "occurrence": 1,
+            "semitones": 7
+          },
+          "m": {
+            "word": "janice",
+            "occurrence": 1,
+            "semitones": 12
+          },
+          "r": {
+            "word": "real",
+            "occurrence": 5
+          }
+        },
+        "pattern": [
+          "j-------........",
+          "........b-------",
+          "j-------........",
+          "h---j---b-------",
+          "j-------........",
+          "........b---b---",
+          "j-------j-------",
+          "h---j---b---b---",
+          "j---j---j---j---",
+          "b---b---j---j---",
+          "j---j---j---j---",
+          "j-j-j-j-j-j-j-j-",
+          "j-j-j-j-k-k-k-k-",
+          "k-k-k-k-l-l-l-l-",
+          "jjjjkkkkllllmmmm",
+          "r-----------...."
+        ]
+      },
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            200
+          ],
+          [
+            12,
+            200
+          ],
+          [
+            16,
+            900
+          ]
+        ]
+      },
+      "fx": {
+        "echo": {
+          "beats": 0.75,
+          "feedback": 0.3,
+          "mix": 0.2
+        }
+      }
+    },
+    {
+      "id": "for-real",
+      "source": "vox",
+      "stem": "vocals",
+      "from_bar": 88,
+      "bars": 8,
+      "at_bar": 81,
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            110
+          ]
+        ]
+      }
+    },
+    {
+      "id": "title-break",
+      "source": "vox",
+      "stem": "vocals",
+      "from_bar": 40,
+      "bars": 2,
+      "at_bar": 90,
+      "pre_beats": 1,
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            110
+          ]
+        ]
+      },
+      "fx": {
+        "reverb": {
+          "mix": 0.15,
+          "room": 0.5
+        }
+      }
+    },
+    {
+      "id": "hook3",
+      "source": "vox",
+      "stem": "vocals",
+      "from_bar": 10,
+      "bars": 15.5,
+      "at_bar": 92,
+      "fade_out_beats": 1,
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            110
+          ]
+        ]
+      }
+    },
+    {
+      "id": "tag",
+      "source": "vox",
+      "stem": "vocals",
+      "at_bar": 108,
+      "bars": 1,
+      "chop": {
+        "slices": {
+          "j": {
+            "word": "janice",
+            "occurrence": 1
+          },
+          "h": {
+            "word": "hey",
+            "occurrence": 4
+          },
+          "b": {
+            "word": "baby",
+            "occurrence": 1
+          },
+          "k": {
+            "word": "janice",
+            "occurrence": 1,
+            "semitones": 5
+          },
+          "l": {
+            "word": "janice",
+            "occurrence": 1,
+            "semitones": 7
+          },
+          "m": {
+            "word": "janice",
+            "occurrence": 1,
+            "semitones": 12
+          },
+          "r": {
+            "word": "real",
+            "occurrence": 5
+          }
+        },
+        "pattern": "r---------------"
+      },
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            300
+          ]
+        ]
+      },
+      "fx": {
+        "echo": {
+          "beats": 0.75,
+          "feedback": 0.55,
+          "mix": 0.45
+        }
+      },
+      "tail_beats": 12
+    },
+    {
+      "id": "riser-92",
+      "generate": "riser",
+      "at_bar": 84.0,
+      "bars": 7.75,
+      "gain_db": -9
+    },
+    {
+      "id": "impact-92",
+      "generate": "impact",
+      "at_bar": 92.0,
+      "bars": 2,
+      "gain_db": -5
+    },
+    {
+      "id": "riser-81",
+      "generate": "riser",
+      "at_bar": 73.0,
+      "bars": 7.75,
+      "gain_db": -9
+    },
+    {
+      "id": "impact-81",
+      "generate": "impact",
+      "at_bar": 81.0,
+      "bars": 2,
+      "gain_db": -5
+    }
+  ],
+  "master": {
+    "lufs": -9.0,
+    "ceiling_db": -1.0,
+    "glue": true
+  },
+  "notes": [
+    "bed = Keep Workin' instrumental end to end; vocals follow Janice STFU's lyric structure (chorus repeats 32 bars apart)",
+    "hooks land on the bed's full sections (25, 49, 92); chops fill the breakdowns (17-24, 65-80)",
+    "title line a cappella in the bed's 3-bar break (89-91) right before the bar-92 drop",
+    "keys: rap vocal (low tonality) over a low-confidence bed key; no pitch shift",
+    "drop at bar 92: 8-bar build on bed, riser, impact, 1 beat(s) of silence",
+    "drop at bar 81: 8-bar build on bed, riser, impact, 1 beat(s) of silence"
+  ]
+}
