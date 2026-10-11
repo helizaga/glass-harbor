@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 import pytest
 from conftest import synth_track, write_fake_track
@@ -83,3 +85,46 @@ def test_fast_separation_writes_only_requested_stems(workspace, monkeypatch, tmp
     assert set(produced) == {"drums", "instrumental"}
     assert library.stem_path("song", "vocals").read_bytes() == before  # the existing acapella is untouched
     assert not library.stem_path("song", "bass").exists()
+
+
+def test_clean_steps_stack_and_lead_keeps_backing(workspace, monkeypatch):
+    import sys
+    import types
+
+    from glass_harbor import library, separate
+
+    write_fake_track("song", bpm=120, key="Am", bars=8, stems=("vocals",))
+    original = library.stem_path("song", "vocals").read_bytes()
+    seen = []
+
+    class FakeSeparator:
+        def __init__(self, output_dir, **kwargs):
+            self.out = Path(output_dir)
+
+        def load_model(self, model_filename):
+            self.model = model_filename
+
+        def separate(self, path):
+            seen.append(A.load(path))
+            names = (["input_(Vocals)_k.flac", "input_(Instrumental)_k.flac"] if "karaoke" in self.model
+                     else ["input_(No Reverb)_d.flac", "input_(Reverb)_d.flac"])
+            for i, name in enumerate(names):
+                A.save(self.out / name, np.full((A.SR, 2), 0.1 * (len(seen) + i), dtype=np.float32))
+            return names
+
+    module = types.ModuleType("audio_separator.separator")
+    module.Separator = FakeSeparator
+    monkeypatch.setitem(sys.modules, "audio_separator", types.ModuleType("audio_separator"))
+    monkeypatch.setitem(sys.modules, "audio_separator.separator", module)
+
+    separate.clean_stem("song", "vocals", "dereverb-gentle", log=lambda m: None)
+    result = separate.clean_stem("song", "vocals", "lead", log=lambda m: None)
+    assert result["mode"] == "dereverb-gentle + lead"
+    assert seen[1][0, 0] == pytest.approx(0.1, abs=1e-3)  # lead ran on the de-reverbed stem, not the raw one
+    stems = library.stem_path("song", "vocals").parent
+    assert (stems / "raw" / "vocals.flac").read_bytes() == original
+    assert (stems / "raw" / "vocals-backing.flac").exists()
+    with pytest.raises(ValueError):
+        separate.clean_stem("song", "vocals", "lead", log=lambda m: None)
+    assert separate.clean_stem("song", "vocals", "lead", log=lambda m: None, restart=True)["mode"] == "lead"
+    np.testing.assert_allclose(seen[2], A.load(stems / "raw" / "vocals.flac"))  # restart reads the original separation

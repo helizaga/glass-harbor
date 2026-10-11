@@ -40,7 +40,11 @@ CLEAN_MODELS = {
     "dereverb-gentle": "dereverb_mel_band_roformer_less_aggressive_anvuew_sdr_18.8050.ckpt",
     "deecho": "dereverb-echo_mel_band_roformer_sdr_13.4843_v2.ckpt",
     "denoise": "denoise_mel_band_roformer_aufr33_sdr_27.9959.ckpt",
+    # Lead vs backing vocals: drops harmonies, ad-lib stacks, and vocal samples that were tuned to the original
+    # beat's chords (they are what makes an acapella sound off pitch over a new beat).
+    "lead": "mel_band_roformer_karaoke_becruily.ckpt",
 }
+_MODE_LABELS = {"lead": ("vocals",)}
 _CLEAN_LABELS = ("noreverb", "no reverb", "dry", "no echo", "no noise")
 
 _LABELS = {
@@ -160,9 +164,10 @@ def separate_local(track_id: str, wanted: set[str], quality: str, log: Log) -> d
     return produced
 
 
-def clean_stem(track_id: str, stem: str = "vocals", mode: str = "dereverb", log: Log = print) -> dict[str, str]:
-    """Strip reverb/echo/noise from a stem (keeps the original under stems/raw/). Dry acapellas sit tighter on
-    dry club beats and survive time-stretching better."""
+def clean_stem(track_id: str, stem: str = "vocals", mode: str = "dereverb", log: Log = print,
+               restart: bool = False) -> dict[str, str]:
+    """Clean a stem in place: strip reverb/echo/noise, or keep only the lead vocal (``lead``). Steps stack in order
+    (e.g. dereverb, then lead); the original separation is kept under stems/raw/ and ``restart`` starts over from it."""
     import shutil
 
     if mode not in CLEAN_MODELS:
@@ -174,24 +179,38 @@ def clean_stem(track_id: str, stem: str = "vocals", mode: str = "dereverb", log:
     raw.parent.mkdir(parents=True, exist_ok=True)
     if not raw.exists():
         shutil.copyfile(source, raw)
+    meta = library.load_meta(track_id)
+    info = meta.setdefault("stems", {}).setdefault(stem, {})
+    legacy = [info["cleaned"]["mode"]] if info.get("cleaned") else []  # cleaned before steps were recorded
+    history = [] if restart else list(info.get("cleaned_steps", legacy))
+    if mode in history:
+        raise ValueError(f"{mode} was already applied to {track_id}/{stem}; pass --restart to redo from the original")
     model = CLEAN_MODELS[mode]
     log(f"cleaning {track_id}/{stem} with {model}")
     with tempfile.TemporaryDirectory(prefix="gh-clean-") as tmp:
+        work = Path(tmp) / "input.flac"
+        shutil.copyfile(raw if restart else source, work)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             from audio_separator.separator import Separator
 
             separator = Separator(log_level=30, model_file_dir=str(model_dir()), output_dir=tmp, output_format="FLAC")
             separator.load_model(model_filename=model)
-            outputs = [Path(o) if Path(o).is_absolute() else Path(tmp) / o for o in separator.separate(str(raw))]
-        cleaned = next((o for o in outputs if any(f"({label})" in o.name.lower() for label in _CLEAN_LABELS)), None)
+            outputs = [Path(o) if Path(o).is_absolute() else Path(tmp) / o for o in separator.separate(str(work))]
+        labels = _MODE_LABELS.get(mode, _CLEAN_LABELS)
+        cleaned = next((o for o in outputs if any(f"({label})" in o.name.lower() for label in labels)), None)
         if cleaned is None:
             raise RuntimeError(f"could not find the cleaned output among {[o.name for o in outputs]}")
-        library.copy_stem_file(track_id, stem, cleaned)
-    meta = library.load_meta(track_id)
-    meta.setdefault("stems", {}).setdefault(stem, {})["cleaned"] = {"mode": mode, "model": model}
+        if mode == "lead":
+            removed = next((o for o in outputs if o != cleaned), None)
+            if removed is not None:
+                shutil.copyfile(removed, raw.parent / f"{stem}-backing.flac")
+        shutil.copyfile(cleaned, source)  # in place; the raw copy and history stay
+    history.append(mode)
+    info["cleaned_steps"] = history
+    info["cleaned"] = {"mode": " + ".join(history), "model": model}
     library.save_meta(track_id, meta)
-    return {"stem": stem, "mode": mode, "model": model, "raw": str(raw)}
+    return {"stem": stem, "mode": " + ".join(history), "model": model, "raw": str(raw)}
 
 
 def separate_track(track_id: str, *, stems: list[str] | None = None, quality: str = "balanced",

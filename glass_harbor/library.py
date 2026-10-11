@@ -172,5 +172,7 @@ def copy_stem_file(track_id: str, name: str, source: Path) -> None:
     meta_path = track_dir(track_id) / "track.json"
     if meta_path.exists():
         meta = _read_json(meta_path)
-        meta.get("stems", {}).get(name, {}).pop("cleaned", None)
+        info = meta.get("stems", {}).get(name, {})
+        info.pop("cleaned", None)
+        info.pop("cleaned_steps", None)
         _write_json(meta_path, meta)

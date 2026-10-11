@@ -59,6 +59,7 @@ community two-model RoFormer ensembles (~10 min/track) for the final acapella. E
 
 ```sh
 glass-harbor track clean <vocal-track>     # de-reverb: drier acapellas sit tighter on dry club beats
+glass-harbor track clean <vocal-track> --mode lead   # if harmonies/backing vocals clash with the new beat's chords
 glass-harbor track lyrics <vocal-track>    # word timings, lyric-based phrases, repeated lines = hooks
 ```
 
