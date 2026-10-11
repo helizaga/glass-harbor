@@ -150,3 +150,11 @@ def test_reference_stem_is_validated(workspace):
     assert any("no drums stem" in i.message for i in resolve(plan).issues)
     plan = _plan(master={"reference": {"track": "song-b", "stem": "piano"}})
     assert not resolve(plan).ok
+
+
+def test_master_soft_clip_mode_is_validated(workspace):
+    write_fake_track("song-a", bpm=124, key="Am", bars=32)
+    write_fake_track("song-b", bpm=124, key="Am", bars=32)
+    for ok in (True, False, "auto", "low", "full", "off"):
+        assert resolve(_plan(master={"soft_clip": ok})).ok
+    assert not resolve(_plan(master={"soft_clip": "hard"})).ok

@@ -41,7 +41,7 @@ overlaps, key clashes, audible stretch, silence).
 | `master.glue` | default `true`: gentle bus compression (about 1 dB) before the true-peak limiter |
 | `master.reference` | a library track id (or `{track, stem}`): Matchering matches tonal balance and width to that released master; without `lufs`, its loudness becomes the target (clamped to -14..-6; loud DnB/EDM beds reach -6 with drum clipping) |
 | `master.mono_bass_hz` | default `120`: everything below is folded to mono (club systems); `0` turns it off |
-| `master.soft_clip` | default `true`: a soft clipper shaves the sharpest transients before the limiter |
+| `master.soft_clip` | default `true` (= `"auto"`): soft-clips only the band below 120 Hz (kick and 808 peaks) before the limiter, so the vocal and synths stay clean, and falls back to clipping the whole mix only when the loudness target is otherwise out of reach (club masters). `"low"` and `"full"` force a mode, `false`/`"off"` skips clipping. `render.json` reports the mode used, `clip_products_db`, and any `clip_fallback` |
 | `master.tame_harshness` | default `true`: a dynamic cut of 2-5 kHz (max 3 dB) only when that band jumps above its usual share |
 | `master.stream_version` | default `true`: also writes `mix-stream.wav/mp3` at -14 LUFS with bass harmonics, for uploading to Spotify/YouTube/SoundCloud (they normalize to -14) |
 | `master.phone_version` | default `true`: also writes `mix-phone.m4a` (256k AAC) for sending as a file: about as loud as a release (-8 LUFS, or the club target if quieter, since phones don't normalize files) with bass harmonics for small speakers |

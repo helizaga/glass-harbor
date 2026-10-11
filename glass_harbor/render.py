@@ -652,6 +652,42 @@ def soft_clipper(mix: np.ndarray, threshold_db: float, knee: float = 0.6) -> np.
     return (np.sign(mix) * shaped).astype(np.float32)
 
 
+MASTER_CLIP_MODES = ("auto", "low", "full", "off")
+
+
+def master_clip_mode(value: Any) -> str:
+    """``master.soft_clip``: true (or unset) is "auto", false is "off", or name a mode."""
+    if value is None or value is True:
+        return "auto"
+    if value is False:
+        return "off"
+    return str(value)
+
+
+def low_band_clip(mix: np.ndarray, *, clip_db: float = 2.0, cutoff: float = 120.0, knee: float = 0.8) -> np.ndarray:
+    """Soft-clip only the band below ``cutoff`` (kick and 808 peaks set a master's peak level), ``clip_db`` under its
+    loudest peaks. The band split is zero-phase and complementary, so everything above the cutoff passes untouched:
+    clipping the full mix instead puts distortion on the vocal and synths (about -20 dB of products in 300 Hz-5 kHz
+    on a dense vocal song, against about -40 dB for the low band alone)."""
+    from scipy.signal import butter, sosfiltfilt
+
+    low = sosfiltfilt(butter(2, cutoff, btype="lowpass", fs=A.SR, output="sos"), mix, axis=0)
+    peak = float(np.percentile(np.abs(low), 99.97))
+    if peak <= 0:
+        return mix
+    return (mix - low + soft_clipper(low, A.gain_to_db(peak) - clip_db, knee=knee)).astype(np.float32)
+
+
+def _clip_products_db(before: np.ndarray, after: np.ndarray, out: np.ndarray) -> float:
+    """Level of what the clipper changed in 300 Hz-5 kHz, relative to the master in that band."""
+    from scipy.signal import butter, sosfiltfilt
+
+    sos = butter(2, [300, 5000], btype="bandpass", fs=A.SR, output="sos")
+    diff = sosfiltfilt(sos, (after - before).mean(axis=1))
+    sig = sosfiltfilt(sos, out.mean(axis=1))
+    return round(float(10 * np.log10(np.mean(diff ** 2) / (np.mean(sig ** 2) + 1e-30) + 1e-30)), 1)
+
+
 def tame_harshness(mix: np.ndarray, *, max_cut_db: float = 3.0) -> np.ndarray:
     """Dynamic cut of 2-5 kHz only in moments where that band jumps above its usual share of the mix
     (vocal + hats piling up), at most ``max_cut_db``."""
@@ -839,19 +875,40 @@ def render_generated(res: Resolution, clip: ResolvedClip, timeline_offset: float
                         dry=dry, target_beats=[], source_offset_ms=None, warp_offset_ms=None, warp_jitter_ms=None)
 
 
-def master(mix: np.ndarray, *, lufs: float, ceiling_db: float, soft_clip: bool = True,
-           max_limiting_db: float = MAX_LIMITING_DB) -> tuple[np.ndarray, dict[str, float]]:
-    """Gain to the loudness target through the limiter, but never squash more than ``max_limiting_db``."""
+def master(mix: np.ndarray, *, lufs: float, ceiling_db: float, soft_clip: bool | str = True,
+           max_limiting_db: float = MAX_LIMITING_DB) -> tuple[np.ndarray, dict[str, Any]]:
+    """Gain to the loudness target through the clipper and limiter, but never squash more than ``max_limiting_db``.
+    ``soft_clip``: "low" clips the low band only; "full" clips the whole mix; "off" skips clipping; "auto" (true, the
+    default) clips the low band and falls back to "full" only when the target is otherwise out of reach."""
+    mode = master_clip_mode(soft_clip)
+    if mode == "auto":
+        out, stats = _master(mix, lufs=lufs, ceiling_db=ceiling_db, mode="low", max_limiting_db=max_limiting_db)
+        if stats.get("output_lufs", lufs) >= lufs - 1.0:
+            return out, stats
+        full_out, full_stats = _master(mix, lufs=lufs, ceiling_db=ceiling_db, mode="full", max_limiting_db=max_limiting_db)
+        full_stats["clip_fallback"] = (f"low-band clipping reached {stats['output_lufs']} LUFS against a {lufs} target; "
+                                       "clipped the full mix instead")
+        return full_out, full_stats
+    return _master(mix, lufs=lufs, ceiling_db=ceiling_db, mode=mode, max_limiting_db=max_limiting_db)
+
+
+def _master(mix: np.ndarray, *, lufs: float, ceiling_db: float, mode: str,
+            max_limiting_db: float) -> tuple[np.ndarray, dict[str, Any]]:
     measured = A.integrated_lufs(mix)
     if not math.isfinite(measured):
         return mix, {"input_lufs": measured, "output_lufs": measured, "gain_db": 0.0}
     gain_db = lufs - measured
     out = mix
+
+    def clip(staged: np.ndarray) -> np.ndarray:
+        if mode == "low":
+            return low_band_clip(staged)
+        if mode == "full":  # about 1-2 dB off the sharpest transients of the whole mix
+            return soft_clipper(staged, ceiling_db + 2.0)
+        return staged
+
     def chain(gain: float) -> np.ndarray:
-        staged = mix * A.db_to_gain(gain)
-        if soft_clip:  # clip first (about 1-2 dB off the sharpest transients), then limit
-            staged = soft_clipper(staged, ceiling_db + 2.0)
-        return limit(staged, ceiling_db - 0.2)
+        return limit(clip(mix * A.db_to_gain(gain)), ceiling_db - 0.2)
 
     for _ in range(5):
         out = chain(gain_db)
@@ -868,9 +925,13 @@ def master(mix: np.ndarray, *, lufs: float, ceiling_db: float, soft_clip: bool =
     if peak > ceiling_db:
         out = out * A.db_to_gain(ceiling_db - peak)
     out = np.clip(out, -1.0, 1.0).astype(np.float32)
-    return out, {"input_lufs": round(measured, 2), "gain_db": round(gain_db, 2),
-                 "output_lufs": round(A.integrated_lufs(out), 2), "true_peak_db": round(A.true_peak_db(out), 2),
-                 "limiting_db": round(gain_db - (A.integrated_lufs(out) - measured), 2)}
+    stats: dict[str, Any] = {"input_lufs": round(measured, 2), "gain_db": round(gain_db, 2),
+                             "output_lufs": round(A.integrated_lufs(out), 2), "true_peak_db": round(A.true_peak_db(out), 2),
+                             "limiting_db": round(gain_db - (A.integrated_lufs(out) - measured), 2), "clip": mode}
+    if mode != "off":
+        staged = mix * A.db_to_gain(gain_db)
+        stats["clip_products_db"] = _clip_products_db(staged, clip(staged), out)
+    return out, stats
 
 
 def _half_beat_samples(res: Resolution, clip: ResolvedClip, timeline_offset: float) -> list[tuple[int, int]]:
@@ -1092,7 +1153,7 @@ def render_plan(plan: dict[str, Any], out_dir: Path, *, start_bar: float | None 
         target_lufs = ref_analysis.get("loudness_lufs", -9.0) if reference else -9.0
         target_lufs = float(np.clip(target_lufs, -14.0, LOUDEST_TARGET_LUFS))
     mastered, master_stats = master(mix, lufs=float(target_lufs), ceiling_db=float(master_spec.get("ceiling_db", -1.0)),
-                                    soft_clip=bool(master_spec.get("soft_clip", True)))
+                                    soft_clip=master_spec.get("soft_clip", True))
     master_stats["target_lufs"] = round(float(target_lufs), 2)
     if reference is not None:
         master_stats["reference"] = reference["track"]

@@ -658,6 +658,8 @@ def resolve(plan: dict[str, Any]) -> Resolution:
             res.add("error", "master.ceiling_db", "ceiling_db must be between -6 and 0")
         if "mono_bass_hz" in master and not (_number(master["mono_bass_hz"]) and 0 <= master["mono_bass_hz"] <= 300):
             res.add("error", "master.mono_bass_hz", "mono_bass_hz must be between 0 (off) and 300")
+        if "soft_clip" in master and master["soft_clip"] not in (True, False, "auto", "low", "full", "off"):
+            res.add("error", "master.soft_clip", 'soft_clip must be true, false, "auto", "low", "full", or "off"')
         ref = master.get("reference")
         if ref is not None:
             track = ref if isinstance(ref, str) else ref.get("track") if isinstance(ref, dict) else None

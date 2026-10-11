@@ -4,7 +4,7 @@ import pytest
 from glass_harbor import audio as A
 from glass_harbor import vocals
 from glass_harbor.check import low_end_correlation, tonal_balance
-from glass_harbor.render import master, mono_bass, reference_match, soft_clipper
+from glass_harbor.render import low_band_clip, master, mono_bass, reference_match, soft_clipper
 
 SR = A.SR
 
@@ -93,3 +93,34 @@ def test_reference_match_moves_tone_toward_reference():
     gap_before = abs(tonal_balance(dark)["presence"] - ref["presence"])
     gap_after = abs(tonal_balance(matched)["presence"] - ref["presence"])
     assert gap_after < gap_before - 3
+
+
+def _band_db(x, lo, hi):
+    from scipy.signal import welch
+
+    f, p = welch(x.mean(axis=1), SR, nperseg=8192)
+    return 10 * np.log10(p[(f >= lo) & (f < hi)].sum())
+
+
+def test_low_band_clip_leaves_the_mids_clean():
+    # 808-style sub sine plus a 1 kHz "vocal": the sub sets the peaks, the vocal must stay clean.
+    x = _tone(4.0, freq=35.0, amp=0.8) + _tone(4.0, freq=1000.0, amp=0.15)
+    clipped = low_band_clip(x, clip_db=3.0)
+    assert np.abs(clipped).max() < np.abs(x).max()
+    assert abs(_band_db(clipped, 900, 1100) - _band_db(x, 900, 1100)) < 0.2
+    _, low = master(x, lufs=-8, ceiling_db=-1, soft_clip="low")
+    _, full = master(x, lufs=-8, ceiling_db=-1, soft_clip="full")
+    assert low["clip"] == "low" and full["clip"] == "full"
+    assert low["clip_products_db"] < full["clip_products_db"] - 10
+    _, off = master(x, lufs=-8, ceiling_db=-1, soft_clip=False)
+    assert off["clip"] == "off" and "clip_products_db" not in off
+
+
+def test_auto_clip_falls_back_to_full_only_when_the_target_is_out_of_reach():
+    x = _tone(4.0, freq=35.0, amp=0.8) + _tone(4.0, freq=1000.0, amp=0.15)
+    _, moderate = master(x, lufs=-14, ceiling_db=-1)
+    assert moderate["clip"] == "low" and "clip_fallback" not in moderate
+    _, club = master(x, lufs=-5, ceiling_db=-1)
+    low_only, _ = master(x, lufs=-5, ceiling_db=-1, soft_clip="low")
+    assert A.integrated_lufs(low_only) < -6.0  # low-band clipping alone cannot get there...
+    assert club["clip"] == "full" and "clip_fallback" in club  # ...so auto clips the full mix
