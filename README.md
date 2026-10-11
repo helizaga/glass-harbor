@@ -31,7 +31,7 @@ Everything except the LLM is free and runs on your machine. Audio, stems and lyr
 ```sh
 brew install ffmpeg rubberband
 /opt/homebrew/bin/python3.11 -m venv .venv
-.venv/bin/pip install -e '.[ml,lyrics,structure,dev]'
+.venv/bin/pip install -e '.[ml,lyrics,structure,master,dev]'
 .venv/bin/glass-harbor doctor
 ```
 

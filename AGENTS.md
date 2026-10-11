@@ -42,7 +42,7 @@
 ## Setup
 ```sh
 /opt/homebrew/bin/python3.11 -m venv .venv
-.venv/bin/pip install -e '.[ml,lyrics,structure,dev]'
+.venv/bin/pip install -e '.[ml,lyrics,structure,master,dev]'
 brew install ffmpeg rubberband
 .venv/bin/glass-harbor doctor
 ```
