@@ -107,3 +107,28 @@ def test_instrumental_pass_keeps_the_beats_own_vocal(workspace, monkeypatch, tmp
     produced = separate.separate_track("beat", stems=["instrumental"], quality="balanced", log=lambda m: None)
     assert {"instrumental", "vocals"} <= set(produced)
     assert library.stem_path("beat", "vocals").exists()
+
+
+def test_render_writes_a_phone_version(workspace, synth_files, tmp_path):
+    import shutil
+    import subprocess
+
+    from glass_harbor import library
+    from glass_harbor.analyze import analyze_track
+    from glass_harbor.render import render_plan
+
+    if not shutil.which("ffmpeg"):
+        pytest.skip("ffmpeg not installed")
+    paths = synth_files("p", 120, "Am", bars=8, seed=4)
+    library.add_track(paths["mix"], track_id="p")
+    library.save_analysis("p", analyze_track(library.load_audio("p"), beat_backend="librosa"))
+    plan = {"version": 1, "title": "Phone Test", "kind": "mashup", "bpm": 120, "sources": {"a": {"track": "p"}},
+            "master": {"lufs": -6.5}, "clips": [{"id": "a", "source": "a", "from_bar": 1, "bars": 4, "at_bar": 1}]}
+    report = render_plan(plan, tmp_path / "run", log=lambda m: None, use_cache=False)
+    assert report["files"]["phone"] == "mix-phone.m4a"
+    assert report["phone_master"]["output_lufs"] < report["master"]["output_lufs"]  # -8, not the -6.5 club master
+    probe = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "stream=codec_name:format_tags=title",
+                            "-of", "default=nw=1", str(tmp_path / "run" / "mix-phone.m4a")],
+                           capture_output=True, text=True, check=True).stdout
+    assert "codec_name=aac" in probe and "Phone Test" in probe
+    assert not (tmp_path / "run" / "mix-phone.wav").exists()

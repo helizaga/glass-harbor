@@ -35,7 +35,8 @@
 8. When a comment states a general preference, record it with `glass-harbor taste add "..."` (or `taste set`).
 
 ## Thread handoff
-- Link the rendered `mix.mp3` (or `mix.wav`), the plan, and the brief.
+- Link the rendered `mix.mp3` (or `mix.wav`), the plan, and the brief. To send to someone's phone, use
+  `mix-phone.m4a`; to upload to a streaming platform, `mix-stream.mp3`.
 - One line on the musical idea, one line on what QA found, one line on what needs the user's ears.
 - Only dump `render.json`/`qa.json` details when something failed or the user asks.
 

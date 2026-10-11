@@ -78,6 +78,25 @@ def encode_mp3(wav_path: Path, mp3_path: Path, bitrate: str = "320k") -> Path | 
     return mp3_path
 
 
+def _aac_encoder(ffmpeg: str) -> str:
+    """Apple's AudioToolbox AAC on macOS (the encoder iPhones use), else ffmpeg's built-in one."""
+    listing = subprocess.run([ffmpeg, "-hide_banner", "-encoders"], capture_output=True, text=True, check=False).stdout
+    return "aac_at" if " aac_at " in listing else "aac"
+
+
+def encode_m4a(wav_path: Path, m4a_path: Path, *, bitrate: str = "256k", title: str = "") -> Path | None:
+    """AAC in an MP4 container: plays natively on iPhone and Android and is smaller than a 320k MP3."""
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        return None
+    cmd = [ffmpeg, "-v", "error", "-nostdin", "-y", "-i", str(wav_path), "-codec:a", _aac_encoder(ffmpeg),
+           "-b:a", bitrate, "-movflags", "+faststart"]
+    if title:
+        cmd += ["-metadata", f"title={title}"]
+    subprocess.run([*cmd, str(m4a_path)], check=True)
+    return m4a_path
+
+
 def mono(audio: np.ndarray) -> np.ndarray:
     return audio.mean(axis=1) if audio.ndim == 2 else audio
 

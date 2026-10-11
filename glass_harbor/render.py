@@ -25,6 +25,7 @@ DECLICK_SECONDS = 0.004
 LOUDNESS_MATCH_LIMIT_DB = 12.0
 GATE_DB = 14.0  # acapella level between words (separation bleed from the original beat)
 GROOVE_LOCK = 0.4  # share of the way word onsets move onto the flow's 16th grid
+PHONE_LUFS = -8.0  # sent as a file, nothing normalizes it: loud like a release, a little less squashed than the club master
 LOUDEST_TARGET_LUFS = -6.0  # club masters for loud genres (DnB, EDM); reached with drum clipping + limiting
 MAX_LIMITING_DB = 6.0
 
@@ -1106,6 +1107,16 @@ def render_plan(plan: dict[str, Any], out_dir: Path, *, start_bar: float | None 
         stream_wav = A.save(out_dir / "mix-stream.wav", streamed, subtype="PCM_24")
         if mp3:
             A.encode_mp3(stream_wav, out_dir / "mix-stream.mp3")
+    phone_stats = None
+    if master_spec.get("phone_version", True):
+        # For sending to a phone: about as loud as a release (phones play files as they are), with bass harmonics
+        # so small speakers still carry the bassline, as AAC (native on iPhone and Android, smaller than the MP3).
+        phone, phone_stats = master(small_speaker_bass(premaster), lufs=min(float(target_lufs), PHONE_LUFS),
+                                    ceiling_db=-1.0, soft_clip=True)
+        if mp3:
+            phone_wav = A.save(out_dir / "mix-phone.wav", phone, subtype="PCM_16")
+            if A.encode_m4a(phone_wav, out_dir / "mix-phone.m4a", title=str(plan.get("title", ""))):
+                phone_wav.unlink()
     if write_clips:
         clip_dir = out_dir / "clips"
         for n, r in enumerate(rendered, start=1):
@@ -1121,9 +1132,11 @@ def render_plan(plan: dict[str, Any], out_dir: Path, *, start_bar: float | None 
         "range": {"start_bar": start_bar, "end_bar": end_bar},
         "timeline_offset_s": round(timeline_offset, 4),
         "duration_s": round(mastered.shape[0] / A.SR, 3),
-        "files": {"wav": wav_path.name, "mp3": mp3_path.name if mp3_path else None},
+        "files": {"wav": wav_path.name, "mp3": mp3_path.name if mp3_path else None,
+                  "phone": "mix-phone.m4a" if (out_dir / "mix-phone.m4a").exists() else None},
         "master": master_stats,
         "stream_master": stream_stats,
+        "phone_master": phone_stats,
         "issues": [i.to_dict() for i in res.issues],
         "vocal_presence": presence,
         "pitch_clash": pitch_clash,
