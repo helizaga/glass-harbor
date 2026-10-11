@@ -39,6 +39,9 @@ overlaps, key clashes, audible stretch, silence).
 | `master.ceiling_db` | true-peak ceiling (default -1) |
 | `master.match_loudness` | default `true`: every source is first matched to -14 LUFS so clip gains are relative |
 | `master.glue` | default `true`: gentle bus compression (about 1 dB) before the true-peak limiter |
+| `master.reference` | a library track id (or `{track, stem}`): Matchering matches tonal balance and width to that released master; without `lufs`, its loudness becomes the target (clamped to -14..-7) |
+| `master.mono_bass_hz` | default `120`: everything below is folded to mono (club systems); `0` turns it off |
+| `master.soft_clip` | default `true`: a soft clipper shaves the sharpest transients before the limiter |
 
 ## Sources
 
@@ -62,7 +65,10 @@ overlaps, key clashes, audible stretch, silence).
 | `gain_db`, `fade_in_beats`, `fade_out_beats` | static level and edge fades |
 | `automation` | DJ-mixer channel strip, `param: [[bar_offset, value], ...]`, offsets in output bars from `at_bar` (pickup beats are negative), linear (log for Hz) interpolation |
 | `fx` | `echo: {beats, feedback, mix}` (tempo-synced), `reverb: {mix, room}` |
-| `tail_beats` | keep rendering N beats after the clip for fx tails (default 8 when fx are set) |
+| `tail_beats` | keep rendering N beats after the clip for fx tails (default 8 when fx are set, 4 for vocal chains) |
+| `chain` | vocal processing: `rap` (default on vocal clips), `hook` (more plate + throws), `dry` (default on chops: EQ, de-ess, compression only), `none` |
+| `word_safe` | default `true` on vocal clips: edges move so no word is cut (lyrics), or to the nearest quiet point |
+| `ride` | default `true` on vocal clips: phrase-level gain riding (up to ±6 dB) to an even level |
 
 Automation parameters: `gain_db`, `highpass_hz`, `lowpass_hz`, `eq_low_db` (shelf at 180 Hz), `eq_mid_db`
 (peak at 1 kHz), `eq_high_db` (shelf at 4.5 kHz). `-40` on `eq_low_db` is a DJ bass kill; validation treats
@@ -114,6 +120,14 @@ Types: `riser` (band-passed noise sweeping 250 Hz to 9 kHz with a rising tone, e
 a high-pass sweep (20 Hz to 700 Hz) on every bed clip across the build, a beat of silence before the one, a
 riser that ends on the downbeat, and an impact on the drop. `track show` lists detected drops (bars where kick and
 bass come back hard).
+
+## Vocal chain
+
+Every vocal clip runs through a chain at a fixed internal level (so thresholds mean the same thing on every
+acapella), then returns to its original level: high-pass 90 Hz, -3 dB at 300 Hz (mud), +2.5 dB at 4 kHz (presence),
++2 dB shelf at 10 kHz (air), a dynamic de-esser on 5.5-9 kHz, a fast 4:1 compressor and a slow 2:1 leveler, light
+tanh saturation, a pre-delayed plate reverb send (high- and low-cut), and dotted-eighth delay throws on the last
+word of each lyric line. QA flags any word still cut at a clip edge.
 
 ## Ducking
 

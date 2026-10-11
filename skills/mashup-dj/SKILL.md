@@ -8,6 +8,21 @@ description: Plan, render, and iterate hip hop / EDM mashups, drops, vocal chops
 The agent is the planner; the CLI is the deterministic engine. You cannot hear audio, so lean on analysis and QA,
 say what you could not verify, and treat the user's ears as the final judge.
 
+## Choosing songs
+
+Pick from what is working right now, not from memory:
+
+- **EDM side**: [Beatport](https://www.beatport.com/) Top 100 and genre charts (what DJs buy now; every track has
+  BPM and key). Start here.
+- **Hip-hop side**: [kworb.net](https://kworb.net/) daily Spotify and Apple charts (free, fast). Start here. Also
+  Billboard Hot Rap Songs (official weekly ranking) and Shazam charts (rising tracks, especially from clubs).
+- **Proof on the floor**: [1001Tracklists](https://www.1001tracklists.com/) shows what headline DJs actually play;
+  its track pages list which tracks get played next to which.
+- **Mashup ideas**: Beatport's "DJ Edits" category shows which rap songs DJs already put over house, and at what BPM.
+
+Use 1001Tracklists to check whether a pairing is proven or already overdone before committing to it. Chart BPM/key
+are hints; trust `glass-harbor track show` once the user supplies the files.
+
 ## 0. Source audio
 
 - Work only from audio files the user provides (local paths). Never download copyrighted music; ask the user to

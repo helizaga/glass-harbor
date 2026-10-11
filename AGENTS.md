@@ -21,7 +21,8 @@
 
 ## Canonical workflow
 1. Turn the request into a slug and a brief; list the tracks and the intended moment (energy, setting).
-   Read `taste.json` (defaults, preferences, past verdicts) before planning.
+   Read `taste.json` (defaults, preferences, past verdicts) before planning. When suggesting songs, follow
+   "Choosing songs" in the skill (Beatport + kworb first, 1001Tracklists to check a pairing is proven, not overdone).
 2. `glass-harbor track add <files>` (`--sections allin1` for beds whose structure matters); check
    `glass-harbor track show <id>` (bpm half/double, key + confidence, grid notes, drops).
 3. Separate only what the plan needs (`track separate <id> --stems vocals`), `track clean <id>` the acapella,

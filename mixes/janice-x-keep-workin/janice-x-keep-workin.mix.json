@@ -185,7 +185,8 @@
           "feedback": 0.35,
           "mix": 0.25
         }
-      }
+      },
+      "gain_db": 2.0
     },
     {
       "id": "hook1",
@@ -202,7 +203,8 @@
             110
           ]
         ]
-      }
+      },
+      "chain": "hook"
     },
     {
       "id": "verse",
@@ -236,7 +238,8 @@
             110
           ]
         ]
-      }
+      },
+      "chain": "hook"
     },
     {
       "id": "chops-build",
@@ -319,7 +322,8 @@
           "feedback": 0.3,
           "mix": 0.2
         }
-      }
+      },
+      "gain_db": 2.0
     },
     {
       "id": "for-real",
@@ -375,7 +379,8 @@
             110
           ]
         ]
-      }
+      },
+      "chain": "hook"
     },
     {
       "id": "tag",
@@ -466,9 +471,11 @@
     }
   ],
   "master": {
-    "lufs": -9.0,
+    "reference": "keep-workin",
     "ceiling_db": -1.0,
-    "glue": true
+    "glue": true,
+    "mono_bass_hz": 120,
+    "soft_clip": true
   },
   "notes": [
     "bed = Keep Workin' instrumental end to end; vocals follow Janice STFU's lyric structure (chorus repeats 32 bars apart)",
@@ -476,6 +483,7 @@
     "title line a cappella in the bed's 3-bar break (89-91) right before the bar-92 drop",
     "keys: rap vocal (low tonality) over a low-confidence bed key; no pitch shift",
     "drop at bar 92: 8-bar build on bed, riser, impact, 1 beat(s) of silence",
-    "drop at bar 81: 8-bar build on bed, riser, impact, 1 beat(s) of silence"
+    "drop at bar 81: 8-bar build on bed, riser, impact, 1 beat(s) of silence",
+    "v4: vocal chain (rap on verses, hook on choruses), word-safe edges, vocal rider, master matched to the Keep Workin' original (Matchering), mono bass < 120 Hz, soft clip + true-peak limiter"
   ]
 }

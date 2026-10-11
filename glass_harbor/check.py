@@ -36,6 +36,29 @@ def _bar_levels(audio: np.ndarray, plan: dict, report: dict) -> list[float]:
     return levels
 
 
+BANDS = ((20, 60, "sub"), (60, 150, "bass"), (150, 400, "low-mid"), (400, 2000, "mid"), (2000, 6000, "presence"),
+         (6000, 16000, "air"))
+
+
+def tonal_balance(audio: np.ndarray) -> dict[str, float]:
+    """Share of energy per band in dB relative to the total (spectral shape, independent of loudness)."""
+    from scipy.signal import welch
+
+    freqs, psd = welch(A.mono(audio), fs=A.SR, nperseg=8192)
+    total = float(np.sum(psd[(freqs >= 20) & (freqs <= 16000)])) + 1e-20
+    return {name: round(10 * np.log10(float(np.sum(psd[(freqs >= lo) & (freqs < hi)])) / total + 1e-12), 2)
+            for lo, hi, name in BANDS}
+
+
+def low_end_correlation(audio: np.ndarray, cutoff: float = 120.0) -> float:
+    from scipy.signal import butter, sosfiltfilt
+
+    low = sosfiltfilt(butter(4, cutoff, btype="lowpass", fs=A.SR, output="sos"), audio, axis=0)
+    left, right = low[:, 0], low[:, 1]
+    denom = float(np.sqrt(np.sum(left ** 2) * np.sum(right ** 2))) + 1e-12
+    return round(float(np.sum(left * right)) / denom, 3)
+
+
 def _spans(bars: list[int]) -> str:
     spans, start, prev = [], bars[0], bars[0]
     for bar in bars[1:]:
@@ -70,7 +93,7 @@ def check_run(run_dir: Path) -> dict[str, Any]:
     lufs = A.integrated_lufs(audio)
     true_peak = A.true_peak_db(audio)
     clipped = int(np.sum(np.abs(audio) >= 0.9999))
-    target = float((plan.get("master") or {}).get("lufs", -9.0))
+    target = float(report.get("master", {}).get("target_lufs", (plan.get("master") or {}).get("lufs", -9.0)))
     if abs(lufs - target) > 1.0:
         flag("warning", "master", f"integrated loudness {lufs:.1f} LUFS misses the {target:.1f} target")
     if true_peak > float((plan.get("master") or {}).get("ceiling_db", -1.0)) + 0.5:
@@ -121,6 +144,26 @@ def check_run(run_dir: Path) -> dict[str, Any]:
         if abs(clip.get("stretch_pct", 0)) > 8:
             flag("info", clip["id"], f"{clip['stretch_pct']:+.1f}% stretch; listen for artifacts")
 
+    reference = (plan.get("master") or {}).get("reference")
+    reference_balance = None
+    mix_balance = tonal_balance(audio)
+    if reference:
+        from glass_harbor import library
+
+        ref_track = reference if isinstance(reference, str) else reference.get("track")
+        reference_balance = tonal_balance(library.load_audio(ref_track))
+        for name, value in mix_balance.items():
+            diff = value - reference_balance[name]
+            if abs(diff) > 3.0:
+                flag("warning", f"tone: {name}", f"{diff:+.1f} dB vs the reference master {ref_track}")
+    correlation = low_end_correlation(audio)
+    if correlation < 0.9:
+        flag("warning", "low end", f"bass below 120 Hz is not mono (correlation {correlation:.2f})")
+    for clip in report["clips"]:
+        edges = (clip.get("notes") or {}).get("edges") or {}
+        if edges.get("words_cut"):
+            flag("warning", clip["id"], f"{edges['words_cut']} word(s) still cut at the clip edges")
+
     buried = [item["bar"] for item in report.get("vocal_presence", []) if item["db"] < -3.0]
     if buried:
         spans = _spans(buried)
@@ -138,6 +181,9 @@ def check_run(run_dir: Path) -> dict[str, Any]:
         "clipped_samples": clipped,
         "duration_s": round(audio.shape[0] / A.SR, 2),
         "bar_db": [round(v, 1) for v in levels],
+        "tonal_balance": mix_balance,
+        "reference_balance": reference_balance,
+        "low_end_correlation": correlation,
         "flags": flags,
         "verdict": "fail" if any(f["level"] == "error" for f in flags)
         else "review" if any(f["level"] == "warning" for f in flags) else "pass",

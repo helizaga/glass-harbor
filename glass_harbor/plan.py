@@ -175,6 +175,16 @@ def _check_fx(res: Resolution, where: str, fx: Any) -> None:
             res.add("error", where, f"fx {name}.beats must be in (0, 4]")
 
 
+def _check_vocal_options(res: Resolution, where: str, clip: dict[str, Any]) -> None:
+    from glass_harbor.vocals import CHAINS
+
+    if "chain" in clip and clip["chain"] not in CHAINS:
+        res.add("error", where, f"chain must be one of {', '.join(CHAINS)}")
+    for flag in ("word_safe", "ride"):
+        if flag in clip and not isinstance(clip[flag], bool):
+            res.add("error", where, f"{flag} must be true or false")
+
+
 def _check_duck(res: Resolution, where: str, duck: Any) -> None:
     if duck is None:
         return
@@ -505,6 +515,7 @@ def resolve(plan: dict[str, Any]) -> Resolution:
         _check_automation(res, where, clip.get("automation"))
         _check_fx(res, where, clip.get("fx"))
         _check_duck(res, where, clip.get("duck"))
+        _check_vocal_options(res, where, clip)
 
         grid = res.grids[source_name]
         src_bpb = grid.beats_per_bar
@@ -563,6 +574,15 @@ def resolve(plan: dict[str, Any]) -> Resolution:
             res.add("error", "master.lufs", "lufs must be between -24 and -6")
         if "ceiling_db" in master and not (_number(master["ceiling_db"]) and -6 <= master["ceiling_db"] <= 0):
             res.add("error", "master.ceiling_db", "ceiling_db must be between -6 and 0")
+        if "mono_bass_hz" in master and not (_number(master["mono_bass_hz"]) and 0 <= master["mono_bass_hz"] <= 300):
+            res.add("error", "master.mono_bass_hz", "mono_bass_hz must be between 0 (off) and 300")
+        ref = master.get("reference")
+        if ref is not None:
+            track = ref if isinstance(ref, str) else ref.get("track") if isinstance(ref, dict) else None
+            if not isinstance(track, str):
+                res.add("error", "master.reference", "reference must be a track id or {track, stem}")
+            elif not (library.track_dir(track) / "track.json").exists():
+                res.add("error", "master.reference", f"reference track {track!r} is not in the library")
 
     if res.ok and res.clips:
         _check_overlaps(res, bpb, keys, key_confidence)
