@@ -161,6 +161,11 @@ def _fit_majority(beats: np.ndarray, *, window: int = 32) -> tuple[float, float,
         return None
     spans = (beats[window:] - beats[:-window]) / window
     period = float(np.median(spans))
+    # Over a few hundred beats a 0.05% period error drifts a whole beat, so refine the period to the one where the
+    # most beats share a phase (a comb search within +-1.5% of the windowed estimate).
+    candidates = period * (1 + np.linspace(-0.015, 0.015, 3001))
+    coherence = np.abs(np.exp(2j * np.pi * beats[None, :] / candidates[:, None]).mean(axis=1))
+    period = float(candidates[int(np.argmax(coherence))])
     phases = np.angle(np.mean(np.exp(2j * np.pi * beats / period)))
     t0 = float(phases / (2 * np.pi) * period)
     on_grid = np.ones(beats.size, dtype=bool)
@@ -177,7 +182,8 @@ def _fit_majority(beats: np.ndarray, *, window: int = 32) -> tuple[float, float,
     return float(t0), float(period), share
 
 
-MAJORITY_SHARE = 0.8  # share of tracked beats that must sit on one constant grid to call the track fixed tempo
+START_TOLERANCE_S = 0.03
+MAJORITY_SHARE = 0.65  # share of tracked beats on one constant grid to call the track fixed tempo (a real tempo change scores ~0.5; half-time sections and beatless breaks pull steady tracks down to ~0.8)
 
 
 def _meter(beats: np.ndarray, downbeats: np.ndarray) -> int:
@@ -240,9 +246,10 @@ def build_grid(
     mode = force_mode or ("fixed" if steady else "variable")
 
     if mode == "fixed":
-        first_k = int(np.ceil((0.0 - t0) / period - 1e-9))
+        # A track that starts on the beat fits its first beat a few ms before 0 s; keep it (at 0) so bar 1 stays bar 1.
+        first_k = int(np.ceil((-START_TOLERANCE_S - t0) / period - 1e-9))
         last_k = int(np.floor((duration - t0) / period + 1e-9))
-        grid_beats = t0 + period * np.arange(first_k, last_k + 1)
+        grid_beats = np.maximum(t0 + period * np.arange(first_k, last_k + 1), 0.0)
         bpm = 60.0 / period
     else:
         notes.append("tempo drifts; warping follows detected beats")

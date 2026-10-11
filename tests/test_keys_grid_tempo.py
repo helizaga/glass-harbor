@@ -126,3 +126,10 @@ def test_real_tempo_change_stays_variable():
     second = first[-1] + np.cumsum(np.full(120, 60 / 132))
     grid = build_grid(np.concatenate([first, second]), np.concatenate([first, second])[::4], 120.0)
     assert grid.mode == "variable"
+
+
+def test_beat_a_hair_before_zero_stays_bar_one():
+    period = 60 / 175
+    beats = -0.006 + period * np.arange(1, 400)  # tracker misses the very first beat, fit lands 6 ms before 0 s
+    grid = build_grid(beats, beats[3::4], 140.0)
+    assert grid.beats[0] == 0.0 and grid.bar_time(1) == pytest.approx(0.0, abs=1e-9)

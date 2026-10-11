@@ -39,7 +39,8 @@
     "fills: crash 17, crash 57, crash 81, crash 105, crash 129, crash 145, swell into 57, swell into 81, swell into 105, swell into 145",
     "v3: crashes only on the two drops (Get Up has its own cymbals; crashes on chant entries masked the shouts), drums duck 6 dB under the vocal",
     "v4: half-time switch for bars 61-80 (Get Up's own kick/snare/hats) with a snare roll and impact back into the full beat at 81; Get Up's vocal answers Lil Bean (shout before drop 1, its breakdown chant, chops trading with yeah/bop in the build, its hook every 4 bars after the reprise); drums clipped 3 dB; master target follows Get Up up to -6 LUFS; gate, groove lock, and density on every vocal by default",
-    "bar 80: bass and melody out, only the half-time kit and snare roll into the slam at 81"
+    "bar 80: bass and melody out, only the half-time kit and snare roll into the slam at 81",
+    "v3: verse 1's last 8 bars (vocal bars 10-18) return on drop 2 at 129 and run into the chant reprise at 145, as in the original song; the back half had vocals on only 26 of 67 bars"
   ],
   "clips": [
     {
@@ -756,6 +757,14 @@
           "y-y-y-y-b-b-b-b-"
         ]
       }
+    },
+    {
+      "id": "verse1-reprise",
+      "source": "vox",
+      "stem": "vocals",
+      "from_bar": 10,
+      "bars": 8,
+      "at_bar": 129
     },
     {
       "id": "reprise",

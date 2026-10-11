@@ -61,3 +61,15 @@
 - Drums clipped 3 dB; master -6.2 LUFS (Get Up is -4.7; v1 was -7.3).
 - QA still reads bar 81 at 2.3 dB of contrast (the full drums returning mid-drop, not a breakdown drop) and flags
   the vocal at entry and FX bars (57, 80-81, 105, 129, 166, 178). Needs ears.
+
+## v3 and the set test
+
+- Verse 1's last 8 bars (vocal bars 10-18) return on drop 2 at 129 and run into the chant reprise at 145, as in
+  the original song: vocals now on 41 of the last 67 bars (was 26).
+- DJ import test: the rendered edit analyzes as a fixed 175.0 bpm grid with bar 1 at 0.0 s and drops at 17, 81,
+  129 (after two analyzer fixes: a tempo search for the steady-majority fit, and keeping a first beat that fits a
+  few ms before 0 s).
+- Set test (`mixes/ybgu-set`): Get Up -> edit -> Get Up, intros over outros with bass swaps on each incoming drop;
+  QA finds no beat-alignment problems through either transition.
+- The edit's drops sit 1.9 dB under Get Up's (-5.9 vs -4.0 LUFS): a DJ trims that, or the master can push harder
+  at the cost of more limiting on the vocal.
