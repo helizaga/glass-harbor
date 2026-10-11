@@ -216,6 +216,7 @@ document.addEventListener("keydown", (e) => {
 window.addEventListener("resize", resize);
 (async () => {
   session = await api("/api/session");
+  if (session.placeholder) $("text").placeholder = session.placeholder;  // servers can set their own example
   for (const tag of session.tags) { const o = document.createElement("option"); o.value = o.textContent = tag; $("tag").appendChild(o); }
   for (const id of ["runA", "runB"]) for (const r of session.runs) { const o = document.createElement("option"); o.value = o.textContent = r; $(id).appendChild(o); }
   $("runA").value = session.runs[session.runs.length - 1];
