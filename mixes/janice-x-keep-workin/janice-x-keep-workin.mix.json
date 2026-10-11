@@ -1,0 +1,1125 @@
+{
+  "version": 1,
+  "title": "Janice STFU x Keep Workin'",
+  "kind": "mashup",
+  "bpm": 127.0,
+  "beats_per_bar": 4,
+  "sources": {
+    "vox": {
+      "track": "janice-stfu",
+      "semitones": 0
+    },
+    "bed": {
+      "track": "keep-workin"
+    }
+  },
+  "clips": [
+    {
+      "id": "intro-drums",
+      "source": "bed",
+      "stem": "drums",
+      "from_bar": 5,
+      "bars": 8,
+      "loop": 2,
+      "at_bar": 1
+    },
+    {
+      "id": "outro-drums",
+      "source": "bed",
+      "stem": "drums",
+      "from_bar": 5,
+      "bars": 8,
+      "loop": 2,
+      "at_bar": 128.0
+    },
+    {
+      "id": "bed-drums",
+      "source": "bed",
+      "stem": "drums",
+      "from_bar": 1,
+      "bars": 111,
+      "at_bar": 17,
+      "automation": {
+        "gain_db": [
+          [
+            79.747,
+            0
+          ],
+          [
+            79.75,
+            -60
+          ],
+          [
+            79.998,
+            -60
+          ],
+          [
+            80.0,
+            0
+          ],
+          [
+            90.747,
+            0
+          ],
+          [
+            90.75,
+            -60
+          ],
+          [
+            90.998,
+            -60
+          ],
+          [
+            91.0,
+            0
+          ],
+          [
+            103,
+            0
+          ]
+        ],
+        "highpass_hz": [
+          [
+            72.0,
+            20
+          ],
+          [
+            79.75,
+            700
+          ],
+          [
+            79.998,
+            700
+          ],
+          [
+            80.0,
+            20
+          ],
+          [
+            83.0,
+            20
+          ],
+          [
+            90.75,
+            700
+          ],
+          [
+            90.998,
+            700
+          ],
+          [
+            91.0,
+            20
+          ]
+        ],
+        "arrange_db": [
+          [
+            45.996,
+            0.0
+          ],
+          [
+            46.0,
+            -60.0
+          ],
+          [
+            46.996,
+            -60.0
+          ],
+          [
+            47.0,
+            0.0
+          ]
+        ]
+      },
+      "punch": {
+        "attack_db": 3.0,
+        "parallel": 0.2
+      },
+      "duck": {
+        "under": "vocals",
+        "db": 4.0
+      }
+    },
+    {
+      "id": "bed-bass",
+      "source": "bed",
+      "stem": "bass",
+      "from_bar": 1,
+      "bars": 111,
+      "at_bar": 17,
+      "automation": {
+        "gain_db": [
+          [
+            79.747,
+            0
+          ],
+          [
+            79.75,
+            -60
+          ],
+          [
+            79.998,
+            -60
+          ],
+          [
+            80.0,
+            0
+          ],
+          [
+            90.747,
+            0
+          ],
+          [
+            90.75,
+            -60
+          ],
+          [
+            90.998,
+            -60
+          ],
+          [
+            91.0,
+            0
+          ],
+          [
+            103,
+            0
+          ]
+        ],
+        "highpass_hz": [
+          [
+            72.0,
+            20
+          ],
+          [
+            79.75,
+            700
+          ],
+          [
+            79.998,
+            700
+          ],
+          [
+            80.0,
+            20
+          ],
+          [
+            83.0,
+            20
+          ],
+          [
+            90.75,
+            700
+          ],
+          [
+            90.998,
+            700
+          ],
+          [
+            91.0,
+            20
+          ]
+        ],
+        "arrange_db": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            22.9688,
+            0.0
+          ],
+          [
+            23.0,
+            -60.0
+          ],
+          [
+            23.9688,
+            -60.0
+          ],
+          [
+            24.0,
+            0.0
+          ],
+          [
+            45.996,
+            0.0
+          ],
+          [
+            46.0,
+            -60.0
+          ],
+          [
+            46.996,
+            -60.0
+          ],
+          [
+            47.0,
+            -60.0
+          ],
+          [
+            47.9688,
+            -60.0
+          ],
+          [
+            48.0,
+            0.0
+          ],
+          [
+            78.9688,
+            0.0
+          ],
+          [
+            79.0,
+            -60.0
+          ],
+          [
+            79.9688,
+            -60.0
+          ],
+          [
+            80.0,
+            0.0
+          ],
+          [
+            89.9688,
+            0.0
+          ],
+          [
+            90.0,
+            -60.0
+          ],
+          [
+            90.9688,
+            -60.0
+          ],
+          [
+            91.0,
+            0.0
+          ]
+        ]
+      },
+      "follow_roots": [
+        "intro-verse",
+        "hook1",
+        "hook2",
+        "hook3"
+      ]
+    },
+    {
+      "id": "bed-other",
+      "source": "bed",
+      "stem": "other",
+      "from_bar": 1,
+      "bars": 111,
+      "at_bar": 17,
+      "automation": {
+        "gain_db": [
+          [
+            79.747,
+            0
+          ],
+          [
+            79.75,
+            -60
+          ],
+          [
+            79.998,
+            -60
+          ],
+          [
+            80.0,
+            0
+          ],
+          [
+            90.747,
+            0
+          ],
+          [
+            90.75,
+            -60
+          ],
+          [
+            90.998,
+            -60
+          ],
+          [
+            91.0,
+            0
+          ],
+          [
+            103,
+            0
+          ]
+        ],
+        "highpass_hz": [
+          [
+            72.0,
+            20
+          ],
+          [
+            79.75,
+            700
+          ],
+          [
+            79.998,
+            700
+          ],
+          [
+            80.0,
+            20
+          ],
+          [
+            83.0,
+            20
+          ],
+          [
+            90.75,
+            700
+          ],
+          [
+            90.998,
+            700
+          ],
+          [
+            91.0,
+            20
+          ]
+        ],
+        "width": [
+          [
+            0.0,
+            1.25
+          ],
+          [
+            7.9688,
+            1.25
+          ],
+          [
+            8.0,
+            0.7
+          ],
+          [
+            15.9688,
+            0.7
+          ],
+          [
+            16.0,
+            1.25
+          ],
+          [
+            22.9688,
+            1.25
+          ],
+          [
+            23.0,
+            0.7
+          ],
+          [
+            23.9688,
+            0.7
+          ],
+          [
+            24.0,
+            1.25
+          ],
+          [
+            39.7188,
+            1.25
+          ],
+          [
+            39.75,
+            0.7
+          ],
+          [
+            47.9688,
+            0.7
+          ],
+          [
+            48.0,
+            1.25
+          ],
+          [
+            78.9688,
+            1.25
+          ],
+          [
+            79.0,
+            0.7
+          ],
+          [
+            79.9688,
+            0.7
+          ],
+          [
+            80.0,
+            1.25
+          ],
+          [
+            88.7188,
+            1.25
+          ],
+          [
+            88.75,
+            0.7
+          ],
+          [
+            90.9688,
+            0.7
+          ],
+          [
+            91.0,
+            1.25
+          ]
+        ],
+        "arrange_db": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            7.9688,
+            0.0
+          ],
+          [
+            8.0,
+            -60.0
+          ],
+          [
+            15.9688,
+            -60.0
+          ],
+          [
+            16.0,
+            0.0
+          ],
+          [
+            22.9688,
+            0.0
+          ],
+          [
+            23.0,
+            -60.0
+          ],
+          [
+            23.9688,
+            -60.0
+          ],
+          [
+            24.0,
+            0.0
+          ],
+          [
+            39.7188,
+            0.0
+          ],
+          [
+            39.75,
+            -60.0
+          ],
+          [
+            45.996,
+            -60.0
+          ],
+          [
+            46.0,
+            -60.0
+          ],
+          [
+            46.996,
+            -60.0
+          ],
+          [
+            47.0,
+            -60.0
+          ],
+          [
+            47.9688,
+            -60.0
+          ],
+          [
+            48.0,
+            0.0
+          ],
+          [
+            78.9688,
+            0.0
+          ],
+          [
+            79.0,
+            -60.0
+          ],
+          [
+            79.9688,
+            -60.0
+          ],
+          [
+            80.0,
+            0.0
+          ],
+          [
+            88.7188,
+            0.0
+          ],
+          [
+            88.75,
+            -60.0
+          ],
+          [
+            90.9688,
+            -60.0
+          ],
+          [
+            91.0,
+            0.0
+          ]
+        ]
+      },
+      "duck": {
+        "under": "vocals",
+        "db": 5.0
+      },
+      "pump": {
+        "db": 3.0,
+        "release": 0.5
+      }
+    },
+    {
+      "id": "intro-verse",
+      "source": "vox",
+      "stem": "vocals",
+      "from_bar": 1,
+      "bars": 8,
+      "at_bar": 25,
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            110
+          ]
+        ]
+      }
+    },
+    {
+      "id": "chops-tease",
+      "source": "vox",
+      "stem": "vocals",
+      "at_bar": 33,
+      "bars": 8,
+      "chop": {
+        "slices": {
+          "j": {
+            "word": "janice",
+            "occurrence": 1
+          },
+          "h": {
+            "word": "hey",
+            "occurrence": 4
+          },
+          "b": {
+            "word": "baby",
+            "occurrence": 1
+          },
+          "k": {
+            "word": "janice",
+            "occurrence": 1,
+            "semitones": 5
+          },
+          "l": {
+            "word": "janice",
+            "occurrence": 1,
+            "semitones": 7
+          },
+          "m": {
+            "word": "janice",
+            "occurrence": 1,
+            "semitones": 12
+          },
+          "r": {
+            "word": "real",
+            "occurrence": 5
+          }
+        },
+        "pattern": [
+          "h---j-----------",
+          "........b-------",
+          "h---j-----------",
+          "........b---b---",
+          "h---j-----------",
+          "........b-------",
+          "j-------j-------",
+          "j---j---j-j-j-j-"
+        ]
+      },
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            200
+          ]
+        ]
+      },
+      "fx": {
+        "echo": {
+          "beats": 0.75,
+          "feedback": 0.35,
+          "mix": 0.25
+        }
+      },
+      "gain_db": 2.0
+    },
+    {
+      "id": "hook1",
+      "source": "vox",
+      "stem": "vocals",
+      "from_bar": 10,
+      "bars": 15.5,
+      "at_bar": 41,
+      "fade_out_beats": 1,
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            110
+          ]
+        ]
+      },
+      "chain": "hook",
+      "tune": 0.25
+    },
+    {
+      "id": "verse",
+      "source": "vox",
+      "stem": "vocals",
+      "from_bar": 34,
+      "bars": 8,
+      "at_bar": 57,
+      "pre_beats": 1,
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            110
+          ]
+        ]
+      }
+    },
+    {
+      "id": "hook2",
+      "source": "vox",
+      "stem": "vocals",
+      "from_bar": 42,
+      "bars": 15,
+      "at_bar": 65,
+      "fade_out_beats": 0.5,
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            110
+          ]
+        ]
+      },
+      "chain": "hook",
+      "tune": 0.25
+    },
+    {
+      "id": "chops-build",
+      "source": "vox",
+      "stem": "vocals",
+      "at_bar": 81,
+      "bars": 16,
+      "chop": {
+        "slices": {
+          "j": {
+            "word": "janice",
+            "occurrence": 1
+          },
+          "h": {
+            "word": "hey",
+            "occurrence": 4
+          },
+          "b": {
+            "word": "baby",
+            "occurrence": 1
+          },
+          "k": {
+            "word": "janice",
+            "occurrence": 1,
+            "semitones": 5
+          },
+          "l": {
+            "word": "janice",
+            "occurrence": 1,
+            "semitones": 7
+          },
+          "m": {
+            "word": "janice",
+            "occurrence": 1,
+            "semitones": 12
+          },
+          "r": {
+            "word": "real",
+            "occurrence": 5
+          }
+        },
+        "pattern": [
+          "j-------........",
+          "........b-------",
+          "j-------........",
+          "h---j---b-------",
+          "j-------........",
+          "........b---b---",
+          "j-------j-------",
+          "h---j---b---b---",
+          "j---j---j---j---",
+          "b---b---j---j---",
+          "j---j---j---j---",
+          "j-j-j-j-j-j-j-j-",
+          "j-j-j-j-k-k-k-k-",
+          "k-k-k-k-l-l-l-l-",
+          "jjjjkkkkllllmmmm",
+          "r-----------...."
+        ]
+      },
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            200
+          ],
+          [
+            12,
+            200
+          ],
+          [
+            16,
+            900
+          ]
+        ]
+      },
+      "fx": {
+        "echo": {
+          "beats": 0.75,
+          "feedback": 0.3,
+          "mix": 0.2
+        }
+      },
+      "gain_db": 2.0
+    },
+    {
+      "id": "for-real",
+      "source": "vox",
+      "stem": "vocals",
+      "from_bar": 88,
+      "bars": 8,
+      "at_bar": 97,
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            110
+          ]
+        ]
+      }
+    },
+    {
+      "id": "title-break",
+      "source": "vox",
+      "stem": "vocals",
+      "from_bar": 40,
+      "bars": 2,
+      "at_bar": 106,
+      "pre_beats": 1,
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            110
+          ]
+        ]
+      },
+      "fx": {
+        "reverb": {
+          "mix": 0.15,
+          "room": 0.5
+        }
+      }
+    },
+    {
+      "id": "hook3",
+      "source": "vox",
+      "stem": "vocals",
+      "from_bar": 10,
+      "bars": 15.5,
+      "at_bar": 108,
+      "fade_out_beats": 1,
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            110
+          ]
+        ]
+      },
+      "chain": "hook",
+      "tune": 0.25
+    },
+    {
+      "id": "tag",
+      "source": "vox",
+      "stem": "vocals",
+      "at_bar": 124,
+      "bars": 1,
+      "chop": {
+        "slices": {
+          "j": {
+            "word": "janice",
+            "occurrence": 1
+          },
+          "h": {
+            "word": "hey",
+            "occurrence": 4
+          },
+          "b": {
+            "word": "baby",
+            "occurrence": 1
+          },
+          "k": {
+            "word": "janice",
+            "occurrence": 1,
+            "semitones": 5
+          },
+          "l": {
+            "word": "janice",
+            "occurrence": 1,
+            "semitones": 7
+          },
+          "m": {
+            "word": "janice",
+            "occurrence": 1,
+            "semitones": 12
+          },
+          "r": {
+            "word": "real",
+            "occurrence": 5
+          }
+        },
+        "pattern": "r---------------"
+      },
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            300
+          ]
+        ]
+      },
+      "fx": {
+        "echo": {
+          "beats": 0.75,
+          "feedback": 0.55,
+          "mix": 0.45
+        }
+      },
+      "tail_beats": 12
+    },
+    {
+      "id": "riser-92",
+      "generate": "riser",
+      "at_bar": 100,
+      "bars": 7.75,
+      "gain_db": -9,
+      "duck": {
+        "under": "vocals",
+        "db": 8.0
+      }
+    },
+    {
+      "id": "impact-92",
+      "generate": "impact",
+      "at_bar": 108.0,
+      "bars": 2,
+      "gain_db": -5
+    },
+    {
+      "id": "vocal-riser-81",
+      "generate": "vocal_riser",
+      "source": "vox",
+      "word": "janice",
+      "occurrence": 1,
+      "at_bar": 89,
+      "bars": 7.75,
+      "gain_db": -9,
+      "duck": {
+        "under": "vocals",
+        "db": 8.0
+      }
+    },
+    {
+      "id": "impact-81",
+      "generate": "impact",
+      "at_bar": 97.0,
+      "bars": 2,
+      "gain_db": -5
+    },
+    {
+      "id": "roll-81",
+      "generate": "snare_roll",
+      "source": "bed",
+      "at_bar": 95,
+      "bars": 1.75,
+      "gain_db": -4,
+      "duck": {
+        "under": "vocals",
+        "db": 8.0
+      }
+    },
+    {
+      "id": "crash-25",
+      "generate": "crash",
+      "source": "bed",
+      "at_bar": 41,
+      "bars": 2,
+      "gain_db": -8,
+      "duck": {
+        "under": "vocals",
+        "db": 8.0
+      }
+    },
+    {
+      "id": "crash-49",
+      "generate": "crash",
+      "source": "bed",
+      "at_bar": 65,
+      "bars": 2,
+      "gain_db": -8,
+      "duck": {
+        "under": "vocals",
+        "db": 8.0
+      }
+    },
+    {
+      "id": "crash-81",
+      "generate": "crash",
+      "source": "bed",
+      "at_bar": 97.0,
+      "bars": 2,
+      "gain_db": -8,
+      "duck": {
+        "under": "vocals",
+        "db": 8.0
+      }
+    },
+    {
+      "id": "crash-92",
+      "generate": "crash",
+      "source": "bed",
+      "at_bar": 108,
+      "bars": 2,
+      "gain_db": -8,
+      "duck": {
+        "under": "vocals",
+        "db": 8.0
+      }
+    },
+    {
+      "id": "swell-25",
+      "generate": "reverse_swell",
+      "source": "vox",
+      "word": "call",
+      "occurrence": 1,
+      "at_bar": 40,
+      "bars": 1,
+      "gain_db": -8,
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            250
+          ]
+        ]
+      },
+      "duck": {
+        "under": "vocals",
+        "db": 8.0
+      }
+    },
+    {
+      "id": "swell-49",
+      "generate": "reverse_swell",
+      "source": "vox",
+      "word": "call",
+      "occurrence": 3,
+      "at_bar": 64,
+      "bars": 1,
+      "gain_db": -8,
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            250
+          ]
+        ]
+      },
+      "duck": {
+        "under": "vocals",
+        "db": 8.0
+      }
+    },
+    {
+      "id": "intro-bass",
+      "source": "bed",
+      "stem": "bass",
+      "from_bar": 5,
+      "bars": 8,
+      "loop": 1,
+      "at_bar": 9
+    },
+    {
+      "id": "outro-bass",
+      "source": "bed",
+      "stem": "bass",
+      "from_bar": 5,
+      "bars": 8,
+      "loop": 1,
+      "at_bar": 128.0
+    }
+  ],
+  "master": {
+    "reference": "keep-workin",
+    "ceiling_db": -1.0,
+    "glue": true,
+    "mono_bass_hz": 120,
+    "soft_clip": true
+  },
+  "notes": [
+    "bed = Keep Workin' instrumental end to end; vocals follow Janice STFU's lyric structure (chorus repeats 32 bars apart)",
+    "hooks land on the bed's full sections (25, 49, 92); chops fill the breakdowns (17-24, 65-80)",
+    "title line a cappella in the bed's 3-bar break (89-91) right before the bar-92 drop",
+    "keys: rap vocal (low tonality) over a low-confidence bed key; no pitch shift",
+    "drop at bar 92: 8-bar build on bed, riser, impact, 1 beat(s) of silence",
+    "drop at bar 81: 8-bar build on bed, riser, impact, 1 beat(s) of silence",
+    "v4: vocal chain (rap on verses, hook on choruses), word-safe edges, vocal rider, master matched to the Keep Workin' original (Matchering), mono bass < 120 Hz, soft clip + true-peak limiter",
+    "stem arrangement on bed: verses over drums + bass (melodic layer -60 dB), full beat under hooks, 1 drums-only bar before each hook, melodic layer pumps on the beat",
+    "fills: crash 25, crash 49, crash 81, crash 92, swell into 25, swell into 49, swell into 92",
+    "edit: mute at bar 47",
+    "edit: tape_stop at bar 64.5",
+    "DJ edges: 16-bar beat intro, 16-bar beat outro (looped from bar 5 of keep-workin)",
+    "v6: punch + width contrast, vocal riser into 92, snare roll into 81, crashes + swells, beat-out under the title punchline, tape stop into the breakdown, light hook tuning, 16-bar DJ intro/outro",
+    "bass follows the vocal's original chords under hook1, hook2, hook3, intro-verse (their sung notes sat a half-step off the beat's bassline)"
+  ],
+  "groove": {
+    "pump_fx": {
+      "db": 5.0,
+      "release": 0.6
+    }
+  },
+  "edits": [
+    {
+      "type": "tape_stop",
+      "at_bar": 80.5,
+      "beats": 2
+    }
+  ]
+}

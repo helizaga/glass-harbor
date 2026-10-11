@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "glass-harbor"
+version = "0.2.0"
+description = "Agent-first mashup and DJ-transition workspace: stems, beat grids, and declarative mix plans rendered to audio."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy>=1.26",
+  "scipy>=1.11",
+  "soundfile>=0.12",
+  "soxr>=0.3",
+  "librosa>=0.10",
+  "pyloudnorm>=0.1.1",
+  "pedalboard>=0.9.12",
+]
+
+[project.optional-dependencies]
+# Neural beat/downbeat tracking and stem separation. Large downloads (PyTorch, ONNX, model weights).
+ml = [
+  "torch>=2.2",
+  "torchaudio>=2.2",
+  "beat-this>=0.1",
+  "tqdm",
+  "einops",
+  "rotary-embedding-torch",
+  "audio-separator[cpu]>=0.30",
+  "nnAudio==0.3.3",  # S-KEY key model (vendored in glass_harbor/vendor/skey)
+  "requests",
+]
+# Local Whisper with word timings (Apple Silicon).
+lyrics = ["mlx-whisper>=0.4; sys_platform == 'darwin'", "faster-whisper>=1.1; sys_platform != 'darwin'"]
+# Reference mastering (match a released master's tone, width, loudness). GPL-3.0.
+master = ["matchering>=2.0.6"]
+# allin1 verse/chorus labels, pure-PyTorch fork that installs on Apple Silicon.
+structure = ["all-in-one-infer>=3.1", "matplotlib"]
+dev = ["pytest>=8"]
+
+[project.scripts]
+glass-harbor = "glass_harbor.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["glass_harbor*"]
+
+[tool.setuptools.package-data]
+glass_harbor = ["review.html", "vendor/skey/skey.pt", "vendor/skey/LICENSE"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

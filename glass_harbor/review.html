@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mix Review</title>
+<style>
+  :root {
+    --bg: #101214; --panel: #181b1f; --ink: #e8eaed; --muted: #9aa0a6; --line: #2a2f35;
+    --accent: #7cc4ff; --wave: #5f6b78; --played: #7cc4ff; --warn: #ffb86b; --ok: #7ee2a8; --bad: #ff7b7b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 16px; margin: 0 12px 0 0; }
+  select, button, input, textarea { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; font: inherit; }
+  button { cursor: pointer; }
+  button.primary { background: var(--accent); color: #0b1620; border-color: var(--accent); font-weight: 600; }
+  .muted { color: var(--muted); }
+  main { padding: 12px 16px 40px; }
+  #stage { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; user-select: none; }
+  canvas { display: block; width: 100%; }
+  #transport { display: flex; gap: 10px; align-items: center; margin: 10px 0; flex-wrap: wrap; }
+  #time { font-variant-numeric: tabular-nums; min-width: 190px; }
+  #composer { display: grid; grid-template-columns: 130px 1fr auto; gap: 8px; margin: 10px 0 16px; }
+  #composer textarea { min-height: 38px; resize: vertical; }
+  table { width: 100%; border-collapse: collapse; }
+  td, th { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; }
+  tr.resolved td { opacity: 0.45; }
+  .tag { display: inline-block; padding: 1px 8px; border-radius: 999px; background: #23303b; color: var(--accent); font-size: 12px; }
+  .row-actions button { padding: 2px 8px; font-size: 12px; }
+  #verdict { display: flex; gap: 8px; align-items: center; }
+  .hint { font-size: 12px; color: var(--muted); }
+  @media (max-width: 700px) { #composer { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Mix Review</h1>
+  <label>A <select id="runA"></select></label>
+  <label>B <select id="runB"></select></label>
+  <button id="toggle" title="Switch between A and B at the same position (T)">A/B: A</button>
+  <span class="muted" id="tempo"></span>
+</header>
+<main>
+  <div id="stage"><canvas id="canvas" height="260"></canvas></div>
+  <div id="transport">
+    <button id="play" class="primary">Play</button>
+    <span id="time">0:00.0 · bar 1</span>
+    <span class="hint">Click to seek · drag to select a range · Space play/pause · C comment at playhead · T toggle A/B</span>
+  </div>
+  <div id="composer">
+    <select id="tag"></select>
+    <textarea id="text" placeholder="What should change here? e.g. vocal comes in late, beat too loud, chop 'Janice' here"></textarea>
+    <button id="add" class="primary">Comment</button>
+  </div>
+  <div id="verdict">
+    <input id="verdictNote" placeholder="Overall note (optional)" size="40">
+    <button id="approve">Approve this render</button>
+    <button id="reject">Reject</button>
+    <span id="verdictState" class="muted"></span>
+  </div>
+  <h2 style="font-size:15px;margin-top:22px">Comments</h2>
+  <table>
+    <thead><tr><th>Bar</th><th>Time</th><th>Tag</th><th>Comment</th><th>Clips</th><th>Status</th><th></th></tr></thead>
+    <tbody id="comments"></tbody>
+  </table>
+</main>
+<audio id="audio" preload="auto"></audio>
+<script>
+const $ = (id) => document.getElementById(id);
+const audio = $("audio"), canvas = $("canvas"), ctx = canvas.getContext("2d");
+let session = null, runs = [], current = "A", data = {}, selection = null, dragStart = null;
+const LANE_H = 18, WAVE_H = 150, AXIS_H = 22;
+
+function fmt(t) { const m = Math.floor(t / 60), s = (t - m * 60).toFixed(1).padStart(4, "0"); return `${m}:${s}`; }
+function activeRun() { return current === "A" ? $("runA").value : $("runB").value; }
+function barAt(timeline, t) {
+  const bars = timeline.bars; if (!bars.length) return 1;
+  for (let i = 0; i < bars.length - 1; i++) if (t >= bars[i].t && t < bars[i + 1].t)
+    return bars[i].bar + (t - bars[i].t) / (bars[i + 1].t - bars[i].t);
+  return t < bars[0].t ? bars[0].bar : bars[bars.length - 1].bar;
+}
+async function api(path, opts) {
+  const res = await fetch(path, opts); const body = await res.json();
+  if (!res.ok) throw new Error(body.error || res.statusText); return body;
+}
+async function loadRun(stamp) {
+  if (!data[stamp]) data[stamp] = await api(`/api/run/${stamp}`);
+  return data[stamp];
+}
+function resize() {
+  const lanes = (data[activeRun()]?.timeline.clips || []).length;
+  canvas.height = AXIS_H + WAVE_H + Math.max(1, lanes) * LANE_H + 8;
+  canvas.width = canvas.clientWidth * devicePixelRatio;
+  canvas.height *= devicePixelRatio; canvas.style.height = canvas.height / devicePixelRatio + "px";
+  draw();
+}
+function draw() {
+  const run = data[activeRun()]; if (!run) return;
+  const W = canvas.width, dpr = devicePixelRatio, dur = run.timeline.duration;
+  const x = (t) => (t / dur) * W;
+  ctx.clearRect(0, 0, W, canvas.height);
+  ctx.font = `${11 * dpr}px -apple-system, sans-serif`;
+  // bar grid
+  for (const b of run.timeline.bars) {
+    const strong = (b.bar - 1) % 4 === 0;
+    ctx.fillStyle = strong ? "#2f3842" : "#1f252b";
+    ctx.fillRect(x(b.t), 0, dpr, canvas.height);
+    if ((b.bar - 1) % 8 === 0) { ctx.fillStyle = "#9aa0a6"; ctx.fillText(String(b.bar), x(b.t) + 3 * dpr, 14 * dpr); }
+  }
+  // selection
+  if (selection) { ctx.fillStyle = "rgba(124,196,255,0.15)"; ctx.fillRect(x(selection[0]), 0, x(selection[1]) - x(selection[0]), canvas.height); }
+  // waveform
+  const peaks = run.peaks, mid = (AXIS_H + WAVE_H / 2) * dpr, amp = (WAVE_H / 2 - 4) * dpr;
+  const played = audio.currentTime / dur * W;
+  for (let i = 0; i < peaks.length; i++) {
+    const px = (i / peaks.length) * W, h = Math.max(dpr, peaks[i] * amp);
+    ctx.fillStyle = px < played ? "#7cc4ff" : "#5f6b78";
+    ctx.fillRect(px, mid - h, Math.max(dpr, W / peaks.length - dpr * 0.3), 2 * h);
+  }
+  // clip lanes
+  const colors = ["#e39b5b", "#7ee2a8", "#c792ea", "#7cc4ff", "#ffcb6b", "#f78c6c", "#89ddff", "#c3e88d"];
+  run.timeline.clips.forEach((c, i) => {
+    const y = (AXIS_H + WAVE_H + i * LANE_H + 2) * dpr;
+    ctx.fillStyle = colors[i % colors.length] + "55";
+    ctx.fillRect(x(c.start), y, Math.max(2, x(c.end) - x(c.start)), (LANE_H - 4) * dpr);
+    ctx.fillStyle = "#e8eaed"; ctx.fillText(`${c.id} · ${c.stem}`, x(c.start) + 4 * dpr, y + 11 * dpr);
+  });
+  // comment markers
+  for (const cm of run.feedback.comments) {
+    ctx.fillStyle = cm.status === "open" ? "#ffb86b" : "#5f6b78";
+    ctx.fillRect(x(cm.time_s), AXIS_H * dpr, 2 * dpr, WAVE_H * dpr);
+  }
+  // playhead
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(x(audio.currentTime), 0, 2 * dpr, canvas.height);
+}
+function renderComments() {
+  const run = data[activeRun()]; const tbody = $("comments"); tbody.innerHTML = "";
+  const rows = [...run.feedback.comments].sort((a, b) => a.time_s - b.time_s);
+  for (const c of rows) {
+    const tr = document.createElement("tr"); if (c.status !== "open") tr.className = "resolved";
+    const range = c.end_bar && c.end_bar !== c.bar ? `${c.bar}–${c.end_bar}` : `${c.bar}`;
+    tr.innerHTML = `<td>${range}</td><td><a href="#" data-seek="${c.time_s}">${fmt(c.time_s)}</a></td>
+      <td><span class="tag"></span></td><td class="text"></td><td class="muted">${c.clips.join(", ")}</td>
+      <td>${c.status}${c.resolution ? `<div class="hint"></div>` : ""}</td>
+      <td class="row-actions"><button data-status="${c.status === "open" ? "resolved" : "open"}" data-id="${c.id}">${c.status === "open" ? "Resolve" : "Reopen"}</button>
+      <button data-delete="${c.id}">Delete</button></td>`;
+    tr.querySelector(".tag").textContent = c.tag; tr.querySelector(".text").textContent = c.text;
+    if (c.resolution) tr.querySelector(".hint").textContent = c.resolution;
+    tbody.appendChild(tr);
+  }
+  const v = run.feedback.verdict; $("verdictState").textContent = v ? `${v.verdict}d ${v.note ? "· " + v.note : ""}` : "";
+}
+async function switchTo(which, keepPosition = true) {
+  const pos = audio.currentTime, wasPlaying = !audio.paused;
+  current = which; $("toggle").textContent = `A/B: ${which}`;
+  const run = await loadRun(activeRun());
+  if (audio.dataset.stamp !== activeRun()) {
+    audio.src = `/audio/${activeRun()}`; audio.dataset.stamp = activeRun();
+    await new Promise((r) => audio.addEventListener("loadedmetadata", r, { once: true }));
+    if (keepPosition) audio.currentTime = Math.min(pos, run.timeline.duration - 0.05);
+    if (wasPlaying) audio.play();
+  }
+  $("title").textContent = run.timeline.title || session.slug; $("tempo").textContent = run.timeline.tempo;
+  resize(); renderComments();
+}
+function tick() {
+  const run = data[activeRun()];
+  if (run) $("time").textContent = `${fmt(audio.currentTime)} · bar ${barAt(run.timeline, audio.currentTime).toFixed(2)}`;
+  draw(); requestAnimationFrame(tick);
+}
+function timeFromEvent(e) {
+  const rect = canvas.getBoundingClientRect(); const run = data[activeRun()];
+  return Math.max(0, Math.min(run.timeline.duration, (e.clientX - rect.left) / rect.width * run.timeline.duration));
+}
+canvas.addEventListener("mousedown", (e) => { dragStart = timeFromEvent(e); selection = null; });
+canvas.addEventListener("mousemove", (e) => { if (dragStart !== null) { const t = timeFromEvent(e); if (Math.abs(t - dragStart) > 0.15) selection = [Math.min(t, dragStart), Math.max(t, dragStart)]; } });
+canvas.addEventListener("mouseup", (e) => { const t = timeFromEvent(e); if (!selection) audio.currentTime = t; else audio.currentTime = selection[0]; dragStart = null; });
+$("play").onclick = () => (audio.paused ? audio.play() : audio.pause());
+audio.addEventListener("play", () => ($("play").textContent = "Pause"));
+audio.addEventListener("pause", () => ($("play").textContent = "Play"));
+$("toggle").onclick = () => switchTo(current === "A" ? "B" : "A");
+$("runA").onchange = () => { if (current === "A") switchTo("A"); };
+$("runB").onchange = () => { if (current === "B") switchTo("B"); };
+async function addComment() {
+  const text = $("text").value.trim(); if (!text) { $("text").focus(); return; }
+  const body = selection ? { time_s: selection[0], end_s: selection[1] } : { time_s: audio.currentTime };
+  const stamp = activeRun();
+  data[stamp].feedback.comments.push(await api(`/api/run/${stamp}/comments`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...body, tag: $("tag").value, text }) }));
+  $("text").value = ""; selection = null; renderComments();
+}
+$("add").onclick = addComment;
+$("text").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) addComment(); });
+$("comments").addEventListener("click", async (e) => {
+  const stamp = activeRun(), t = e.target;
+  if (t.dataset.seek) { e.preventDefault(); audio.currentTime = parseFloat(t.dataset.seek); }
+  if (t.dataset.status) { await api(`/api/run/${stamp}/comments/${t.dataset.id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: t.dataset.status }) }); data[stamp] = null; await loadRun(stamp); renderComments(); }
+  if (t.dataset.delete) { await api(`/api/run/${stamp}/comments/${t.dataset.delete}`, { method: "DELETE" }); data[stamp] = null; await loadRun(stamp); renderComments(); }
+});
+async function verdict(kind) {
+  const stamp = activeRun();
+  await api(`/api/run/${stamp}/verdict`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ verdict: kind, note: $("verdictNote").value }) });
+  data[stamp] = null; await loadRun(stamp); renderComments();
+}
+$("approve").onclick = () => verdict("approve");
+$("reject").onclick = () => verdict("reject");
+document.addEventListener("keydown", (e) => {
+  if (["TEXTAREA", "INPUT", "SELECT"].includes(document.activeElement.tagName)) return;
+  if (e.code === "Space") { e.preventDefault(); $("play").click(); }
+  if (e.key === "c" || e.key === "C") { e.preventDefault(); $("text").focus(); }
+  if (e.key === "t" || e.key === "T") { e.preventDefault(); $("toggle").click(); }
+});
+window.addEventListener("resize", resize);
+(async () => {
+  session = await api("/api/session");
+  for (const tag of session.tags) { const o = document.createElement("option"); o.value = o.textContent = tag; $("tag").appendChild(o); }
+  for (const id of ["runA", "runB"]) for (const r of session.runs) { const o = document.createElement("option"); o.value = o.textContent = r; $(id).appendChild(o); }
+  $("runA").value = session.runs[session.runs.length - 1];
+  $("runB").value = session.runs[Math.max(0, session.runs.length - 2)];
+  await switchTo("A", false); tick();
+})().catch((err) => { document.body.insertAdjacentHTML("afterbegin", `<p style="color:#ff7b7b;padding:16px">${err.message}</p>`); });
+</script>
+</body>
+</html>

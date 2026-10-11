@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "title": "Set test: Get Up -> yeah bop x Get Up -> Get Up",
+  "kind": "set",
+  "bpm": 175.0,
+  "beats_per_bar": 4,
+  "sources": {
+    "t1": {
+      "track": "get-up"
+    },
+    "t2": {
+      "track": "ybgu-edit"
+    },
+    "t3": {
+      "track": "get-up"
+    }
+  },
+  "master": {
+    "lufs": -6.0,
+    "ceiling_db": -1.0
+  },
+  "notes": [
+    "DJ test of the edit's edges: its beatless intro rides Get Up's last section and its drop lands on Get Up's outro (set bar 49); the next track's intro rides the edit's outro and its drop lands as the edit ends (set bar 227). Bass swaps on each incoming drop."
+  ],
+  "clips": [
+    {
+      "id": "t1",
+      "source": "t1",
+      "stem": "mix",
+      "from_bar": 145,
+      "bars": 51,
+      "at_bar": 1,
+      "automation": {
+        "eq_low_db": [
+          [
+            47.99,
+            0
+          ],
+          [
+            48.0,
+            -40
+          ]
+        ]
+      }
+    },
+    {
+      "id": "t2",
+      "source": "t2",
+      "stem": "mix",
+      "from_bar": 1,
+      "bars": 195,
+      "at_bar": 33,
+      "automation": {
+        "eq_low_db": [
+          [
+            0,
+            -40
+          ],
+          [
+            15.99,
+            -40
+          ],
+          [
+            16.0,
+            0
+          ],
+          [
+            193.99,
+            0
+          ],
+          [
+            194.0,
+            -40
+          ]
+        ]
+      }
+    },
+    {
+      "id": "t3",
+      "source": "t3",
+      "stem": "mix",
+      "from_bar": 1,
+      "bars": 48,
+      "at_bar": 211
+    }
+  ]
+}
