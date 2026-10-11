@@ -364,6 +364,20 @@ def grid_deviation_ms(audio: np.ndarray, beat_times: list[float], *, max_beats: 
     return median, spread, coverage
 
 
+def clip_tail_beats(clip: ResolvedClip) -> float:
+    """Beats of effect tail (reverb, echo, delay throws) rendered past a clip's end. One policy for rendering and
+    for choosing which clips a bar-range preview needs."""
+    from glass_harbor import vocals
+
+    spec = clip.spec
+    if spec.get("generate") or clip.chop is not None:
+        default = 8 if spec.get("fx") else 0
+    else:
+        chain = spec.get("chain", vocals.default_chain(clip.stem, False))
+        default = 8 if spec.get("fx") else (4 if chain in ("rap", "hook") else 0)
+    return float(spec.get("tail_beats", default))
+
+
 def render_clip(res: Resolution, clip: ResolvedClip, source_audio: np.ndarray, loudness_offset_db: float,
                 timeline_offset: float, lyrics: dict[str, Any] | None = None) -> RenderedClip:
     from glass_harbor import vocals
@@ -465,8 +479,7 @@ def render_clip(res: Resolution, clip: ResolvedClip, source_audio: np.ndarray, l
         if peak > 0:
             processed = soft_clipper(processed, A.gain_to_db(peak) - float(spec["clip_db"]), knee=0.7)
             notes["clipped_db"] = float(spec["clip_db"])
-    chain_tail = 4 if chain in ("rap", "hook") else 0
-    tail_beats = float(spec.get("tail_beats", 8 if spec.get("fx") else chain_tail))
+    tail_beats = clip_tail_beats(clip)
     if tail_beats:
         processed = np.pad(processed, ((0, int(tail_beats * 60.0 / bpm_out * A.SR)), (0, 0)))
     if chain != "none":
@@ -795,7 +808,7 @@ def render_chop(res: Resolution, clip: ResolvedClip, source_audio: np.ndarray, l
     spec = clip.spec
     bpm_out = res.tempo.bpm_at(max(anchor, clip.out_end_beat - 1))
     processed = dry
-    tail_beats = float(spec.get("tail_beats", 8 if spec.get("fx") else 0))
+    tail_beats = clip_tail_beats(clip)
     if tail_beats:
         processed = np.pad(processed, ((0, int(tail_beats * 60.0 / bpm_out * A.SR)), (0, 0)))
     chain = spec.get("chain", vocals.default_chain(clip.stem, True))
@@ -867,7 +880,7 @@ def render_generated(res: Resolution, clip: ResolvedClip, timeline_offset: float
     else:
         dry = generators.generate(kind, seconds)
     audio = dry * A.db_to_gain(clip.gain_db)
-    tail_beats = float(clip.spec.get("tail_beats", 8 if clip.spec.get("fx") else 0))
+    tail_beats = clip_tail_beats(clip)
     if tail_beats:
         audio = np.pad(audio, ((0, int(tail_beats * 60.0 / res.tempo.bpm_at(clip.out_end_beat - 1) * A.SR)), (0, 0)))
     audio = _apply_mixer(res, clip, audio, start_time)
@@ -1006,7 +1019,8 @@ def render_plan(plan: dict[str, Any], out_dir: Path, *, start_bar: float | None 
     if start_bar is not None or end_bar is not None:
         lo = ((start_bar or 1) - 1) * bpb
         hi = (end_bar * bpb) if end_bar is not None else math.inf
-        clips = [c for c in clips if c.out_end_beat > lo and c.out_start_beat < hi]
+        # A clip that ends just before the window can still ring into it (reverb, echo, delay throws).
+        clips = [c for c in clips if c.out_end_beat + clip_tail_beats(c) > lo and c.out_start_beat < hi]
         if not clips:
             raise ValueError("No clips intersect the requested bar range.")
 

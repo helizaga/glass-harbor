@@ -172,3 +172,20 @@ def test_fresh_separation_drops_the_old_backing_vocals(workspace, tmp_path):
     A.save(backing, np.zeros((SR, 2), np.float32))
     library.copy_stem_file("song", "vocals", A.save(tmp_path / "new.flac", np.zeros((SR, 2), np.float32)))
     assert not backing.exists()
+
+
+def test_window_render_keeps_a_clip_whose_tail_rings_into_it(workspace, synth_files, tmp_path):
+    from glass_harbor import library
+    from glass_harbor.analyze import analyze_track
+    from glass_harbor.render import render_plan
+
+    paths = synth_files("w", 120, "Am", bars=8, seed=6, with_vocal=True)
+    library.add_track(paths["mix"], track_id="w", stems={"vocals": paths["vocals"]})
+    library.save_analysis("w", analyze_track(library.load_audio("w"), beat_backend="librosa"))
+    plan = {"version": 1, "kind": "mashup", "bpm": 120, "sources": {"v": {"track": "w"}},
+            "clips": [{"id": "bed", "source": "v", "from_bar": 1, "bars": 8, "at_bar": 1},
+                      {"id": "echoed", "source": "v", "stem": "vocals", "from_bar": 1, "bars": 2, "at_bar": 3,
+                       "word_safe": False, "fx": {"echo": {"beats": 0.75, "feedback": 0.5, "mix": 0.4}}}]}
+    report = render_plan(plan, tmp_path / "w", start_bar=5, end_bar=6, mp3=False, log=lambda m: None,
+                         use_cache=False)
+    assert "echoed" in {c["id"] for c in report["clips"]}  # ends at bar 5, its 8-beat tail runs into bar 5-6
