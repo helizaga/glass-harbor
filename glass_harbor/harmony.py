@@ -104,9 +104,11 @@ def harmonize(vocal: np.ndarray, bed: np.ndarray, *, max_shift: int = 2, strengt
     return out, fixes
 
 
-def clash_by_bar(vocal: np.ndarray, bed: np.ndarray, bar_spans: list[tuple[int, tuple[int, int]]]) -> list[dict]:
-    """Per bar with held sung notes: how much they rub against the bed's harmony (0 = on chord, 1 = semitone clash)."""
-    midi = _pitch_track(vocal)
+def clash_by_bar(vocal: np.ndarray, bed: np.ndarray, bar_spans: list[tuple[int, tuple[int, int]]], *,
+                 midi: np.ndarray | None = None) -> list[dict]:
+    """Per bar with held sung notes: how much they rub against the bed's harmony (0 = on chord, 1 = semitone clash).
+    ``midi`` reuses a pitch track of ``vocal`` that was already computed."""
+    midi = _pitch_track(vocal) if midi is None else midi
     chroma = _chroma(bed, midi.size)
     out = []
     for bar, (s0, s1) in bar_spans:

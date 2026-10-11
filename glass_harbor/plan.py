@@ -587,6 +587,12 @@ def resolve(plan: dict[str, Any]) -> Resolution:
         semitones += clip_semitones
         if "nudge_ms" in clip and not (_number(clip["nudge_ms"]) and abs(clip["nudge_ms"]) <= 60):
             res.add("error", where, "nudge_ms must be between -60 and 60")
+        follow = clip.get("follow_roots")
+        if follow is not None:
+            if stem != "bass":
+                res.add("error", where, "follow_roots only works on a bass stem clip")
+            elif not (isinstance(follow, bool) or (isinstance(follow, list) and all(isinstance(i, str) for i in follow))):
+                res.add("error", where, "follow_roots must be true/false or a list of vocal clip ids")
         punch = clip.get("punch")
         if punch is not None and not (isinstance(punch, dict) and 0 <= punch.get("attack_db", 3) <= 9
                                       and 0 <= punch.get("parallel", 0.3) <= 1):
@@ -653,6 +659,12 @@ def resolve(plan: dict[str, Any]) -> Resolution:
                 elif stem != "mix" and stem not in library.available_stems(track):
                     res.add("error", "master.reference", f"{track} has no {stem} stem yet")
 
+    vocal_ids = {c.id for c in res.clips if c.stem == "vocals" and c.chop is None}
+    for clip in res.clips:
+        follow = clip.spec.get("follow_roots")
+        if isinstance(follow, list) and set(follow) - vocal_ids:
+            res.add("warning", f"clip {clip.id}", f"follow_roots names unknown vocal clips: "
+                                                  f"{', '.join(sorted(set(follow) - vocal_ids))}")
     if res.ok and res.clips:
         _check_overlaps(res, bpb, keys, key_confidence)
     return res

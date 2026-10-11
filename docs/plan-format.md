@@ -72,9 +72,11 @@ overlaps, key clashes, audible stretch, silence).
 | `chain` | vocal processing: `rap` (default on vocal clips), `hook` (more plate + throws + detuned doubles), `dry` (default on chops: EQ, de-ess, compression only), `none` |
 | `doubles` / `octave` | override the hook doubles; `octave: true` adds an octave-down layer at -15 dB |
 | `tune` | light pitch correction toward the source key (0 = off, 1 = hard); only steady sung notes move |
+| `harmonize` | chord-aware correction: held sung notes that rub a half-step against the beat's chord move to the nearest chord note (default on `hook` clips only; retuning rap syllables sounds worse than the rub) |
 | `nudge_ms` | shift a clip earlier (-) or later (+) by up to 60 ms to sit in the pocket |
 | `semitones` | per-clip pitch shift on top of the source's (key lift: `mix edit <slug> lift --at-bar N`) |
 | `punch` | `{attack_db, parallel}`: transient shaping + parallel compression below 900 Hz (kick and snare body, not the hats) |
+| `follow_roots` | bass stem clips only: `true` or a list of vocal clip ids. Under those vocals the bass keeps its rhythm and pumping but plays the root notes the vocal was written over (read from the vocal track's own bass stem, else its instrumental or mix). `glass-harbor mix follow <slug>` decides which clips need it; new mashup scaffolds do this automatically |
 | `word_safe` | default `true` on vocal clips: edges move so no word is cut (lyrics), or to the nearest quiet point |
 | `ride` | default `true` on vocal clips: phrase-level gain riding (up to ±6 dB) to an even level |
 

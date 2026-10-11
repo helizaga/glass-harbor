@@ -95,6 +95,11 @@ intent in `<slug>.brief.md` (what came from analysis vs your musical inference).
   that use `tempo_ratio` or pick another bed.
 - Rap verses tolerate key mismatch; sung hooks and melodic ad-libs do not. Aim for Camelot distance <= 1 on any
   melodic part; shift the acapella at most ±2 semitones.
+- **Same key is not enough for sung parts**: the vocal was written over its own bassline. If the beat's bass sits
+  on other notes (a pedal, a slide), sung lines land a half-step off it and sound out of tune. Fix the beat, not
+  the singer: `mix follow <slug>` makes the bass play the vocal's original roots in the beat's rhythm (needs the
+  beat as stems and, ideally, `track separate <vocal-track> --stems bass`). QA reports `bass_clash` per vocal
+  clip; the vocal over its own bass measures 0-4%. Spoken rap rarely needs it.
 - Land vocal phrases on the bed's phrase lines (bars 1, 9, 17, 25, ...). Put the hook over the bed's
   highest-energy section; verses over mid-energy sections. Use `pre_beats` for pickups that start before the bar.
 - Give the beat room: 8 bars of bed before the first vocal, breathing bars between sections, a bed or
@@ -119,7 +124,7 @@ intent in `<slug>.brief.md` (what came from analysis vs your musical inference).
   tape stop into a breakdown (`mix edit tape_stop`). Every fill ducks under the vocal; never let a riser or swell
   run under a rapped line (check `vocal_presence` for the bars it covers).
 - **Hooks**: the `hook` chain adds detuned doubles; keep verses single and centred for contrast. `tune` (0.2-0.4)
-  only for sung hooks; rap barely moves. Use `nudge_ms` when a vocal sits ahead of or behind the groove.
+  only for sung hooks; never retune rap (chord-aware `harmonize` is on for `hook` clips only). Use `nudge_ms` when a vocal sits ahead of or behind the groove.
 - **Vocal chops** (`chop` clips, see `docs/plan-format.md`): the EDM move for builds, drops, and fills. Pick one or
   two short, punchy syllables (the title word, an ad-lib), slice them at 1/16-1/8 note lengths, and sequence them on
   a 16th-step pattern. Keep chops off the lead vocal's bars, high-pass them (~200 Hz), add a little tempo-synced

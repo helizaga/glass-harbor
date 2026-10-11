@@ -12,6 +12,7 @@ from glass_harbor import audio as A
 
 SOURCE_GRID_TOLERANCE_MS = 35.0
 WARP_TOLERANCE_MS = 15.0
+BASS_CLASH_PCT = 10.0  # the vocal over its own bass measures 0-4%
 
 
 def _bar_levels(audio: np.ndarray, plan: dict, report: dict) -> list[float]:
@@ -196,6 +197,12 @@ def check_run(run_dir: Path) -> dict[str, Any]:
     if rubs:
         flag("warning", f"bars {_spans(rubs)}", "held vocal notes rub against the beat's chord (a semitone off); "
              "check harmonize notes in render.json or shift the vocal")
+
+    for item in report.get("bass_clash", []):
+        if item["pct"] >= BASS_CLASH_PCT and item["sung_frames"] >= 40:
+            flag("warning", item["clip"], f"{item['pct']:.0f}% of the sung notes sit a half-step or tritone off the "
+                 "bass under them (the beat's bassline differs from the one the vocal was written over); "
+                 f"glass-harbor mix follow {Path(run_dir).parent.name} makes the bass follow the vocal")
 
     buried = [item["bar"] for item in report.get("vocal_presence", []) if item["db"] < -3.0]
     if buried:

@@ -822,6 +822,66 @@ def master(mix: np.ndarray, *, lufs: float, ceiling_db: float, soft_clip: bool =
                  "limiting_db": round(gain_db - (A.integrated_lufs(out) - measured), 2)}
 
 
+def _half_beat_samples(res: Resolution, clip: ResolvedClip, timeline_offset: float) -> list[tuple[int, int]]:
+    """Output sample windows of each half beat of a clip's source beats (one loop)."""
+    from glass_harbor.bassline import half_beats
+
+    beats = [clip.out_start_beat + i * clip.out_beats_per_src_beat for i in range(clip.src_beats + 1)]
+    times = [res.tempo.time_at(b) + timeline_offset for b in beats]
+    return [(int(round(a * A.SR)), int(round(b * A.SR))) for a, b in half_beats(times)]
+
+
+def follow_roots(res: Resolution, rendered: list[RenderedClip], timeline_offset: float, log: Log) -> None:
+    """Bass stem clips with ``follow_roots`` play, under each vocal, the root notes that vocal was written over
+    (read from the vocal track's own bass), in their own rhythm. See ``bassline.py``."""
+    from glass_harbor import bassline
+
+    vocal_clips = {r.clip.id: r for r in rendered if r.clip.stem == "vocals" and r.clip.chop is None
+                   and r.clip.loop == 1}
+    sources: dict[str, tuple[np.ndarray, str]] = {}
+    for r in rendered:
+        wanted = r.clip.spec.get("follow_roots")
+        if r.clip.stem != "bass" or not wanted:
+            continue
+        targets = list(vocal_clips.values()) if wanted is True else [vocal_clips[i] for i in wanted if i in vocal_clips]
+        spans, described = [], {}
+        end = r.start_sample + r.audio.shape[0]
+        for v in targets:
+            windows = _half_beat_samples(res, v.clip, timeline_offset)
+            if windows[-1][1] <= r.start_sample or windows[0][0] >= end:
+                continue
+            if v.clip.track not in sources:
+                sources[v.clip.track] = bassline.source_bass(v.clip.track)
+            audio, stem = sources[v.clip.track]
+            notes = bassline.vocal_roots(v.clip, audio)
+            spans.append(bassline.Span([(a - r.start_sample, b - r.start_sample) for a, b in windows], notes))
+            described[v.clip.id] = f"{bassline.describe(notes)} (from {v.clip.track}/{stem})"
+        if spans:
+            r.audio = bassline.follow(r.audio, spans)
+            r.notes = {**(r.notes or {}), "followed_roots": described}
+            log(f"{r.clip.id} follows the vocal's chords under {', '.join(described)}")
+
+
+def bass_clash(res: Resolution, rendered: list[RenderedClip], vocal_midi: np.ndarray, bass_bus: np.ndarray,
+               timeline_offset: float) -> list[dict[str, Any]]:
+    """Per vocal clip: share of sung frames a flat ninth or tritone above the bass note under them."""
+    from glass_harbor import bassline
+
+    clips = [r for r in rendered if r.clip.stem == "vocals" and r.clip.chop is None and r.clip.loop == 1]
+    per_clip = [[(a / A.SR, b / A.SR) for a, b in _half_beat_samples(res, r.clip, timeline_offset)] for r in clips]
+    flat = [w for windows in per_clip for w in windows]
+    if not flat or not np.any(bass_bus):
+        return []
+    notes = bassline.roots(bass_bus, flat)
+    out, i = [], 0
+    for r, windows in zip(clips, per_clip):
+        rate, frames = bassline.clash_rate(bassline.pitch_classes(vocal_midi, windows), notes[i:i + len(windows)])
+        i += len(windows)
+        if frames:
+            out.append({"clip": r.clip.id, "pct": round(100 * rate, 1), "sung_frames": frames})
+    return out
+
+
 def render_plan(plan: dict[str, Any], out_dir: Path, *, start_bar: float | None = None,
                 end_bar: float | None = None, write_clips: bool = False, mp3: bool = True,
                 log: Log = print, workers: int = 4, use_cache: bool = True) -> dict[str, Any]:
@@ -892,14 +952,16 @@ def render_plan(plan: dict[str, Any], out_dir: Path, *, start_bar: float | None 
     with ThreadPoolExecutor(max_workers=max(1, min(workers, len(clips)))) as pool:
         rendered = list(pool.map(render_one, clips))
 
+    follow_roots(res, rendered, timeline_offset, log)
     # Chord-aware pitch correction needs the beat under each vocal, so it runs once every clip exists.
     total_frames = max(r.start_sample + r.audio.shape[0] for r in rendered)
     bed_sum = np.zeros((total_frames, 2), dtype=np.float32)
     for r in rendered:
         if r.clip.stem not in ("vocals", "fx"):
             bed_sum[r.start_sample: r.start_sample + r.audio.shape[0]] += r.audio
+    # Sung hooks only by default: retuning short rap syllables sounds worse than the rub it fixes.
     harmonize_targets = [r for r in rendered if r.clip.stem == "vocals" and r.clip.chop is None
-                         and r.clip.spec.get("harmonize", True)]
+                         and r.clip.spec.get("harmonize", r.clip.spec.get("chain") == "hook")]
 
     def harmonize_one(r: RenderedClip) -> None:
         from glass_harbor.harmony import harmonize
@@ -931,12 +993,19 @@ def render_plan(plan: dict[str, Any], out_dir: Path, *, start_bar: float | None 
     for r in rendered:
         if r.clip.stem == "vocals" and r.clip.chop is None:
             vocal_sum[r.start_sample: r.start_sample + r.audio.shape[0]] += r.audio
-    pitch_clash = []
+    pitch_clash, vs_bass = [], []
     if np.any(vocal_sum):
-        from glass_harbor.harmony import clash_by_bar
+        from glass_harbor.harmony import _pitch_track, clash_by_bar
 
-        pitch_clash = clash_by_bar(vocal_sum, bed_sum[:total] if bed_sum.shape[0] >= total else
-                                   np.pad(bed_sum, ((0, total - bed_sum.shape[0]), (0, 0))), bar_spans)
+        bed_full = bed_sum[:total] if bed_sum.shape[0] >= total else np.pad(bed_sum, ((0, total - bed_sum.shape[0]),
+                                                                                      (0, 0)))
+        vocal_midi = _pitch_track(vocal_sum)
+        pitch_clash = clash_by_bar(vocal_sum, bed_full, bar_spans, midi=vocal_midi)
+        bass_bus = np.zeros((total, 2), dtype=np.float32)
+        for r in rendered:
+            if r.clip.stem == "bass":
+                bass_bus[r.start_sample: r.start_sample + r.audio.shape[0]] += r.audio[: total - r.start_sample]
+        vs_bass = bass_clash(res, rendered, vocal_midi, bass_bus if np.any(bass_bus) else bed_full, timeline_offset)
     for edit in plan.get("edits", []):
         if edit.get("type") == "tape_stop":
             from glass_harbor.fx import tape_stop
@@ -1008,6 +1077,7 @@ def render_plan(plan: dict[str, Any], out_dir: Path, *, start_bar: float | None 
         "issues": [i.to_dict() for i in res.issues],
         "vocal_presence": presence,
         "pitch_clash": pitch_clash,
+        "bass_clash": vs_bass,
         "clips": [
             {
                 "id": r.clip.id,

@@ -298,7 +298,13 @@
             0.0
           ]
         ]
-      }
+      },
+      "follow_roots": [
+        "intro-verse",
+        "hook1",
+        "hook2",
+        "hook3"
+      ]
     },
     {
       "id": "bed-other",
@@ -1100,7 +1106,8 @@
     "edit: mute at bar 47",
     "edit: tape_stop at bar 64.5",
     "DJ edges: 16-bar beat intro, 16-bar beat outro (looped from bar 5 of keep-workin)",
-    "v6: punch + width contrast, vocal riser into 92, snare roll into 81, crashes + swells, beat-out under the title punchline, tape stop into the breakdown, light hook tuning, 16-bar DJ intro/outro"
+    "v6: punch + width contrast, vocal riser into 92, snare roll into 81, crashes + swells, beat-out under the title punchline, tape stop into the breakdown, light hook tuning, 16-bar DJ intro/outro",
+    "bass follows the vocal's original chords under hook1, hook2, hook3, intro-verse (their sung notes sat a half-step off the beat's bassline)"
   ],
   "groove": {
     "pump_fx": {

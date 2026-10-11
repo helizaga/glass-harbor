@@ -547,6 +547,25 @@ def cmd_mix_edges(args: argparse.Namespace) -> int:
                       f"added a {args.intro_bars}-bar DJ intro and {args.outro_bars}-bar outro")
 
 
+def cmd_mix_follow(args: argparse.Namespace) -> int:
+    from glass_harbor.plan import load_plan, save_plan
+    from glass_harbor.scaffold import follow_vocal_roots
+
+    slug = require_slug(args.slug)
+    path = plan_path(slug)
+    plan, findings = follow_vocal_roots(load_plan(path), clip_ids=args.clips.split(",") if args.clips else None)
+    save_plan(path, plan)
+    lines = ["sung notes a half-step/tritone off the bass (own bass -> this beat's bass):"]
+    for f in findings:
+        lines.append(f"  {f['clip']:16s} {f['over_own_bass_pct']:5.1f}% -> {f['over_bed_bass_pct']:5.1f}% "
+                     f"({f['sung_frames']} sung frames)  {'FOLLOW' if f['follow'] else 'keep'}  "
+                     f"own: {f['own_roots']} | beat: {f['bed_roots']}")
+    if args.json:
+        _emit(args, {"findings": findings}, "")
+        return 0
+    return _validate_and_report(args, slug, prefix="\n".join(lines) + "\n")
+
+
 def cmd_mix_fills(args: argparse.Namespace) -> int:
     from glass_harbor.scaffold import add_fills
 
@@ -707,6 +726,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--outro-bars", type=int, default=16)
     p.add_argument("--verbose", action="store_true")
     p.set_defaults(func=cmd_mix_edges)
+
+    p = common(mix.add_parser("follow", help="make the bed's bass follow the chords each vocal was written over"))
+    p.add_argument("slug")
+    p.add_argument("--clips", help="comma-separated vocal clip ids to follow (default: decide from pitch clashes)")
+    p.add_argument("--verbose", action="store_true")
+    p.set_defaults(func=cmd_mix_follow)
 
     p = common(mix.add_parser("fills", help="crashes on hook entries and drops, reverse swells into hooks"))
     p.add_argument("slug")

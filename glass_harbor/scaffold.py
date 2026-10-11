@@ -408,6 +408,7 @@ def build_mashup(vocals: str, bed: str, *, semitones: int | None = None, intro_b
     edges = int(taste_default("dj_edge_bars"))
     if edges:
         plan = add_dj_edges(plan, intro_bars=edges, outro_bars=edges)
+    plan, _ = follow_vocal_roots(plan)
     return plan
 
 
@@ -561,6 +562,90 @@ def arrange_bed_stems(plan: dict[str, Any], *, bed_clip_id: str | None = None, v
         f"full beat under hooks, {drums_only_bars:g} drums-only bar before each hook"
         + (", melodic layer pumps on the beat" if pump else ""))
     return plan
+
+
+def _source_times(clip, out_beats: list[float]) -> list[float] | None:
+    """Source times of a clip at the given output beats (one loop period folded in), or None if outside it."""
+    span = clip.src_beats * clip.out_beats_per_src_beat
+    out = []
+    for beat in out_beats:
+        k = (beat - clip.out_start_beat) / clip.out_beats_per_src_beat
+        if not -1e-6 <= beat - clip.out_start_beat <= span * clip.loop + 1e-6:
+            return None
+        k = k % clip.src_beats if k < clip.src_beats * clip.loop - 1e-6 else clip.src_beats
+        out.append(float(np.interp(k, np.arange(clip.src_beats + 1), clip.src_beat_times)))
+    return out
+
+
+def follow_vocal_roots(plan: dict[str, Any], *, clip_ids: list[str] | None = None, min_rate: float = 0.08
+                       ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Decide where the bed's bass should follow the vocal's chords and set ``follow_roots`` on its bass clips.
+
+    For each vocal clip, compares the sung notes against the bass the vocal was written over and against the bed's
+    bass under it. A clip qualifies when at least ``min_rate`` of its sung notes sit a half-step or tritone off the
+    bed's bass and clearly more than over its own bass. ``clip_ids`` forces the choice. Returns (plan, per-clip
+    findings)."""
+    from glass_harbor import bassline
+    from glass_harbor.plan import resolve
+
+    res = resolve(plan)
+    if not res.ok:
+        raise ValueError("fix plan errors before following the vocal's chords")
+    vocals = [c for c in res.clips if c.stem == "vocals" and c.chop is None and c.loop == 1]
+    basses = [c for c in res.clips if c.stem == "bass"]
+    beds = basses or [c for c in res.clips if c.stem in ("instrumental", "mix")]
+    sources: dict[str, tuple[np.ndarray, str]] = {}
+
+    def low_end(track: str) -> tuple[np.ndarray, str]:
+        if track not in sources:
+            sources[track] = bassline.source_bass(track)
+        return sources[track]
+
+    findings = []
+    for v in vocals:
+        if not beds:
+            break
+        windows = bassline.half_beats(v.src_beat_times)
+        vocal_audio = library.load_audio(v.track, "vocals")
+        sung = bassline.sung(vocal_audio, windows)
+        own_audio, own_stem = low_end(v.track)
+        own = [None if n is None else n + v.semitones for n in bassline.roots(own_audio, windows)]
+        out_beats = [v.out_start_beat + i * v.out_beats_per_src_beat for i in range(v.src_beats + 1)]
+        bed = next((b for b in beds if _source_times(b, out_beats) is not None), None)
+        if bed is None:
+            continue
+        bed_audio, _ = low_end(bed.track)
+        bed_notes = [None if n is None else n + bed.semitones
+                     for n in bassline.roots(bed_audio, bassline.half_beats(_source_times(bed, out_beats)))]
+        own_rate, frames = bassline.clash_rate(sung, own)
+        bed_rate, _ = bassline.clash_rate(sung, bed_notes)
+        chosen = (v.id in clip_ids) if clip_ids is not None else (
+            frames >= 30 and bed_rate >= min_rate and bed_rate - own_rate >= 0.05)
+        findings.append({"clip": v.id, "sung_frames": frames, "over_own_bass_pct": round(100 * own_rate, 1),
+                         "over_bed_bass_pct": round(100 * bed_rate, 1), "follow": chosen,
+                         "own_roots": bassline.describe(own[:16]), "bed_roots": bassline.describe(bed_notes[:16]),
+                         "own_source": f"{v.track}/{own_stem}", "bed_clip": bed.id})
+    ids = [f["clip"] for f in findings if f["follow"]]
+    covered = set()
+    for b in basses:
+        overlapping = [i for i in ids if any(c.id == i and c.out_start_beat < b.out_end_beat
+                                             and c.out_end_beat > b.out_start_beat for c in vocals)]
+        spec = plan["clips"][b.index]
+        if overlapping:
+            spec["follow_roots"] = overlapping
+            covered.update(overlapping)
+        else:
+            spec.pop("follow_roots", None)
+    notes = plan.setdefault("notes", [])
+    notes[:] = [n for n in notes if not n.startswith("bass follows the vocal")]
+    if covered:
+        notes.append(f"bass follows the vocal's original chords under {', '.join(sorted(covered))} (their sung notes "
+                     "sat a half-step off the beat's bassline)")
+    missing = sorted(set(ids) - covered)
+    if missing:
+        notes.append(f"{', '.join(missing)} clash with the beat's bass but the bed has no bass stem clip; run "
+                     "glass-harbor mix arrange so the bass can follow the vocal")
+    return plan, findings
 
 
 # ---------------------------------------------------------------- DJ edges, fills, edits

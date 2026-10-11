@@ -60,6 +60,7 @@ Use a Python build with SSL (Homebrew); the pyenv 3.11.3 build on this machine l
 - `glass-harbor set order <ids...> [--start <id>]`
 - `glass-harbor mix new <slug> --kind mashup|transition|set ...`
 - `glass-harbor mix drop <slug> --at-bar N [--build-bars 8] [--silence-beats 1] [--clips ids]`
+- `glass-harbor mix follow <slug> [--clips ids]` (bass follows the chords each sung vocal was written over)
 - `glass-harbor mix validate <slug>`
 - `glass-harbor mix render <slug> [--start-bar N --end-bar M] [--clips] [--no-mp3]`
 - `glass-harbor mix check <slug> [--run <dir>]`
