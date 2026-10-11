@@ -148,6 +148,16 @@ def test_fills_and_edits(workspace):
         add_edit(plan, "lift", 20)
 
 
+def test_fills_mark_sections_not_every_chant(workspace):
+    plan = _mashup()
+    plan["clips"][2].update(bars=2)  # short chants at 17, 21, and 33
+    plan["clips"] += [{"id": f"chant{bar}", "source": "vox", "stem": "vocals", "from_bar": 9, "bars": 2,
+                       "at_bar": bar, "chain": "hook"} for bar in (21, 33)]
+    gens = {c["id"] for c in add_fills(plan)["clips"] if "generate" in c}
+    assert {"crash-17", "crash-33", "swell-17", "swell-33"} <= gens
+    assert "crash-21" not in gens and "swell-21" not in gens
+
+
 def test_stem_swap_set(workspace):
     for name in ("a", "b"):
         write_fake_track(name, bpm=124, key="Am", bars=64, stems=("vocals", "drums", "bass", "other"))

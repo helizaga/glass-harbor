@@ -83,3 +83,19 @@ def test_duck_validation(workspace, synth_files):
     plan = {"version": 1, "kind": "mashup", "bpm": 120, "sources": {"bed": {"track": "bed"}},
             "clips": [{"source": "bed", "from_bar": 1, "bars": 4, "at_bar": 1, "duck": {"under": 3, "db": 40}}]}
     assert not resolve(plan).ok
+
+
+def test_vocal_presence_ignores_gaps_between_shouts():
+    from types import SimpleNamespace
+
+    from glass_harbor.render import vocal_presence
+
+    sr = A.SR
+    t = np.arange(2 * sr) / sr
+    beat = (0.1 * np.sin(2 * np.pi * 2000 * t)).astype(np.float32)
+    shout = np.zeros_like(beat)
+    shout[: sr // 5] = 0.3 * np.sin(2 * np.pi * 1500 * t[: sr // 5])  # one 200 ms shout, then 1.8 s of gap
+    clip = lambda stem, audio: SimpleNamespace(clip=SimpleNamespace(stem=stem), start_sample=0,
+                                                audio=np.repeat(audio[:, None], 2, axis=1))
+    result = vocal_presence([clip("vocals", shout), clip("instrumental", beat)], 2 * sr, [(1, (0, 2 * sr))])
+    assert result[0]["db"] > 6  # the shout is ~10 dB over the beat while it sounds

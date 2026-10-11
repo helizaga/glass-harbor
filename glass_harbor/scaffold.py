@@ -732,8 +732,12 @@ def _first_word(res, clip, lyrics: dict[str, Any]) -> tuple[str, int] | None:
     return None
 
 
+FILL_GAP_BARS = 16  # a crash or swell marks a new section; on every short chant it turns into noise
+
+
 def add_fills(plan: dict[str, Any], *, crashes: bool = True, swells: bool = True) -> dict[str, Any]:
-    """Crash on every hook entry and drop, and a one-bar reverse swell of the hook's first word leading into it."""
+    """Crash on drops and on hook entries (at least ``FILL_GAP_BARS`` apart), and a one-bar reverse swell of the
+    hook's first word leading into each marked hook."""
     from glass_harbor.lyrics import load_lyrics
     from glass_harbor.plan import resolve
 
@@ -745,8 +749,12 @@ def add_fills(plan: dict[str, Any], *, crashes: bool = True, swells: bool = True
     existing = {(c.get("generate"), c.get("at_bar")) for c in plan["clips"]}
     added = []
     hooks = [c for c in res.clips if c.stem == "vocals" and c.chop is None and c.spec.get("chain") == "hook"]
-    targets = sorted({c.spec["at_bar"] for c in hooks} | {c.spec["at_bar"] for c in res.clips
-                                                          if c.spec.get("generate") == "impact"})
+    marked = sorted({c.spec["at_bar"] for c in res.clips if c.spec.get("generate") == "impact"})
+    for hook in sorted(hooks, key=lambda c: c.spec["at_bar"]):
+        if all(abs(hook.spec["at_bar"] - bar) >= FILL_GAP_BARS for bar in marked):
+            marked.append(hook.spec["at_bar"])
+    hooks = [c for c in hooks if c.spec["at_bar"] in marked]
+    targets = sorted(set(marked))
     for bar in targets:
         if crashes and drum_source and ("crash", bar) not in existing:
             plan["clips"].append({"id": f"crash-{bar:g}", "generate": "crash", "source": drum_source,
@@ -756,7 +764,7 @@ def add_fills(plan: dict[str, Any], *, crashes: bool = True, swells: bool = True
         lyrics = load_lyrics(hook.track)
         found = _first_word(res, hook, lyrics) if lyrics else None
         bar = hook.spec["at_bar"] - 1
-        if swells and found and bar >= 1 and ("reverse_swell", bar) not in existing:
+        if swells and found and len(found[0]) >= 2 and bar >= 1 and ("reverse_swell", bar) not in existing:
             plan["clips"].append({"id": f"swell-{hook.spec['at_bar']:g}", "generate": "reverse_swell",
                                   "source": hook.source, "word": found[0], "occurrence": found[1], "at_bar": bar,
                                   "bars": 1, "gain_db": -8, "automation": {"highpass_hz": [[0, 250]]},

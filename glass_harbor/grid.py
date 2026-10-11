@@ -151,6 +151,35 @@ def _fit_line(beats: np.ndarray, period: float) -> tuple[float, float, np.ndarra
     return float(t0), float(slope), indices, residuals[keep]
 
 
+def _fit_majority(beats: np.ndarray, *, window: int = 32) -> tuple[float, float, float] | None:
+    """Constant-tempo fit that trusts the steady majority of the track: electronic records are one fixed tempo, but
+    trackers drift through breakdowns and beatless intros, and those stretches pull a plain fit off. The period comes
+    from the median tempo of 32-beat windows; beats are numbered against that global grid (not one by one), so a
+    drifting stretch shows up as outliers instead of shifting everything after it. Returns (t0, period, share of
+    beats on the grid) or None when there are too few beats."""
+    if beats.size < 2 * window:
+        return None
+    spans = (beats[window:] - beats[:-window]) / window
+    period = float(np.median(spans))
+    phases = np.angle(np.mean(np.exp(2j * np.pi * beats / period)))
+    t0 = float(phases / (2 * np.pi) * period)
+    on_grid = np.ones(beats.size, dtype=bool)
+    for _ in range(4):
+        k = np.round((beats - t0) / period)
+        residuals = beats - (t0 + k * period)
+        on_grid = np.abs(residuals) < 0.06 * period
+        if on_grid.sum() < 8:
+            return None
+        t0, period = np.linalg.lstsq(np.stack([np.ones(on_grid.sum()), k[on_grid]], axis=1), beats[on_grid],
+                                     rcond=None)[0]
+    k = np.round((beats - t0) / period)
+    share = float(np.mean(np.abs(beats - (t0 + k * period)) < 0.06 * period))
+    return float(t0), float(period), share
+
+
+MAJORITY_SHARE = 0.8  # share of tracked beats that must sit on one constant grid to call the track fixed tempo
+
+
 def _meter(beats: np.ndarray, downbeats: np.ndarray) -> int:
     if downbeats.size < 3 or beats.size < 8:
         return 4
@@ -199,6 +228,15 @@ def build_grid(
     t0, period, _, residuals = _fit_line(beats, period)
     residual_rms = float(np.sqrt(np.mean(residuals**2))) if residuals.size else 0.0
     steady = residual_rms / period < STEADY_RESIDUAL_RATIO
+    if not steady and force_mode != "variable":
+        majority = _fit_majority(beats)
+        if majority is not None and majority[2] >= MAJORITY_SHARE:
+            t0, period, share = majority
+            k = np.round((beats - t0) / period)
+            off = beats - (t0 + k * period)
+            residual_rms = float(np.sqrt(np.mean(off[np.abs(off) < 0.06 * period] ** 2)))
+            steady = True
+            notes.append(f"fixed tempo: {share:.0%} of tracked beats sit on one grid (the tracker drifted elsewhere)")
     mode = force_mode or ("fixed" if steady else "variable")
 
     if mode == "fixed":

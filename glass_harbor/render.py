@@ -547,12 +547,20 @@ def vocal_presence(rendered: list["RenderedClip"], total: int, bar_starts: list[
     if not np.any(vocal):
         return []
     vocal_band, rest_band = _band(vocal), _band(rest)
+    block = int(0.05 * A.SR)
     out = []
     for bar, (s0, s1) in bar_starts:
-        v = float(np.sqrt(np.mean(vocal_band[s0:s1] ** 2))) if s1 > s0 else 0.0
-        if v < 1e-3:
+        n = (s1 - s0) // block
+        if n < 1:
             continue
-        b = float(np.sqrt(np.mean(rest_band[s0:s1] ** 2))) if s1 > s0 else 0.0
+        v_blocks = np.sqrt(np.mean(vocal_band[s0:s0 + n * block].reshape(n, block) ** 2, axis=1))
+        if v_blocks.max() < 1e-3:
+            continue
+        # Only while the vocal sounds: a chant bar is mostly gaps, and the beat in those gaps is not masking it.
+        active = v_blocks > max(1e-3, v_blocks.max() * 10 ** (-15 / 20))
+        r_blocks = np.sqrt(np.mean(rest_band[s0:s0 + n * block].reshape(n, block) ** 2, axis=1))
+        v = float(np.sqrt(np.mean(v_blocks[active] ** 2)))
+        b = float(np.sqrt(np.mean(r_blocks[active] ** 2)))
         out.append({"bar": bar, "db": round(20 * math.log10((v + 1e-9) / (b + 1e-9)), 1)})
     return out
 

@@ -106,3 +106,23 @@ def test_metrical_level_flip_is_normalized():
     assert grid.mode == "fixed"
     assert grid.bpm == pytest.approx(126, abs=0.05)
     assert any("metrical level" in note for note in grid.notes)
+
+
+def test_tracker_drift_in_a_breakdown_keeps_a_fixed_grid():
+    period = 60 / 175
+    grid_beats = np.arange(0, 120, period)
+    # Through a breakdown the tracker emits 49 beats across 50 real ones (each 2% late), then locks back on:
+    # one beat goes missing without any single interval looking wrong.
+    drifted = grid_beats[200] + np.arange(49) * period * 50 / 49
+    beats = np.concatenate([grid_beats[:200], drifted, grid_beats[250:]])
+    grid = build_grid(beats, beats[::4], 120.0)
+    assert grid.mode == "fixed" and abs(grid.bpm - 175) < 0.05
+    assert any("fixed tempo" in note for note in grid.notes)
+    assert np.abs(np.asarray(grid.beats) - grid_beats[300]).min() < 0.005  # back on the real beats after it
+
+
+def test_real_tempo_change_stays_variable():
+    first = np.arange(0, 60, 60 / 120)
+    second = first[-1] + np.cumsum(np.full(120, 60 / 132))
+    grid = build_grid(np.concatenate([first, second]), np.concatenate([first, second])[::4], 120.0)
+    assert grid.mode == "variable"
