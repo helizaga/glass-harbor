@@ -39,10 +39,25 @@ def make_handler(slug: str) -> type[BaseHTTPRequestHandler]:
             self.wfile.write(body)
 
         def _error(self, error: Exception) -> None:
-            status = HTTPStatus.NOT_FOUND if isinstance(error, (FileNotFoundError, KeyError)) else HTTPStatus.BAD_REQUEST
+            if isinstance(error, PermissionError):
+                status = HTTPStatus.FORBIDDEN
+            elif isinstance(error, (FileNotFoundError, KeyError)):
+                status = HTTPStatus.NOT_FOUND
+            else:
+                status = HTTPStatus.BAD_REQUEST
             self._json({"error": str(error)}, status)
 
+        def _check_host(self) -> None:
+            """Only this local server may be addressed (blocks DNS-rebinding pages in the browser)."""
+            port = self.server.server_address[1]
+            if self.headers.get("Host", "") not in (f"127.0.0.1:{port}", f"localhost:{port}"):
+                raise PermissionError("unexpected Host header")
+
         def _body(self) -> dict[str, Any]:
+            # A JSON content type forces a CORS preflight, which this server never answers, so other sites in
+            # the browser cannot post here.
+            if self.headers.get("Content-Type", "").split(";")[0].strip() != "application/json":
+                raise PermissionError("requests must be application/json")
             length = int(self.headers.get("Content-Length", "0") or 0)
             return json.loads(self.rfile.read(length) or b"{}")
 
@@ -82,6 +97,7 @@ def make_handler(slug: str) -> type[BaseHTTPRequestHandler]:
         def do_GET(self) -> None:  # noqa: N802
             path = unquote(self.path.split("?", 1)[0])
             try:
+                self._check_host()
                 if path in ("/", "/index.html"):
                     self.send_response(HTTPStatus.OK)
                     self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -109,6 +125,7 @@ def make_handler(slug: str) -> type[BaseHTTPRequestHandler]:
         def do_POST(self) -> None:  # noqa: N802
             path = unquote(self.path)
             try:
+                self._check_host()
                 body = self._body()
                 if m := re.fullmatch(r"/api/run/([^/]+)/comments", path):
                     run = _run_dir(slug, m.group(1))
@@ -129,6 +146,7 @@ def make_handler(slug: str) -> type[BaseHTTPRequestHandler]:
 
         def do_DELETE(self) -> None:  # noqa: N802
             try:
+                self._check_host()
                 if m := re.fullmatch(r"/api/run/([^/]+)/comments/([0-9a-f]+)", unquote(self.path)):
                     feedback.delete_comment(_run_dir(slug, m.group(1)), m.group(2))
                     self._json({"ok": True})

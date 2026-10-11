@@ -68,3 +68,18 @@ def test_generated_clips_render(workspace, synth_files, tmp_path):
 def test_skey_finds_synthetic_key_or_relative():
     key, prob, top = key_model.estimate_key(synth_track(120, parse_key("E"), 16)["mix"])
     assert key.camelot in ("12B", "12A") and prob > 0.3 and len(top) == 3
+
+
+def test_fast_separation_writes_only_requested_stems(workspace, monkeypatch, tmp_path):
+    from glass_harbor import library, separate
+
+    write_fake_track("song", bpm=120, key="Am", bars=8, stems=("vocals",))
+    before = library.stem_path("song", "vocals").read_bytes()
+    fake = {}
+    for name in ("vocals", "drums", "bass", "other"):
+        fake[name] = A.save(tmp_path / f"{name}.flac", np.full((A.SR, 2), 0.1, dtype=np.float32))
+    monkeypatch.setattr(separate, "_run_audio_separator", lambda *a, **k: fake)
+    produced = separate.separate_track("song", stems=["drums", "instrumental"], quality="fast", log=lambda m: None)
+    assert set(produced) == {"drums", "instrumental"}
+    assert library.stem_path("song", "vocals").read_bytes() == before  # the existing acapella is untouched
+    assert not library.stem_path("song", "bass").exists()

@@ -98,6 +98,10 @@ def test_transition_scaffold_blend_for_edm(workspace):
     res = resolve(plan)
     assert res.ok, [i.to_dict() for i in res.issues]
     assert any("16-bar blend" in note for note in plan["notes"])
+    incoming = next(c for c in plan["clips"] if c["source"] == "t2")
+    assert incoming["bars"] >= 16 + 8  # b keeps playing after the blend instead of fading with a
+    fade_start = incoming["automation"]["gain_db"][-2][0]
+    assert fade_start >= 16 + 8
     assert not any("two basslines" in i.message for i in res.issues)
     assert plan["tempo"][-1]["bpm"] == 126
 
@@ -137,3 +141,12 @@ def test_automation_is_anchored_at_at_bar_with_pickups(workspace):
     b = res.clips[1]
     assert b.anchor_beat == 16 and b.out_start_beat == 14
     assert not any("two basslines" in i.message for i in res.issues)
+
+
+def test_reference_stem_is_validated(workspace):
+    write_fake_track("song-a", bpm=124, key="Am", bars=32)
+    write_fake_track("song-b", bpm=124, key="Am", bars=32)
+    plan = _plan(master={"reference": {"track": "song-b", "stem": "drums"}})
+    assert any("no drums stem" in i.message for i in resolve(plan).issues)
+    plan = _plan(master={"reference": {"track": "song-b", "stem": "piano"}})
+    assert not resolve(plan).ok

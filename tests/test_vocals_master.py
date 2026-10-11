@@ -81,6 +81,7 @@ def test_master_with_soft_clip_hits_target():
 
 
 def test_reference_match_moves_tone_toward_reference():
+    pytest.importorskip("matchering")
     rng = np.random.default_rng(2)
     noise = rng.standard_normal((20 * SR, 2)).astype(np.float32) * 0.1
     from scipy.signal import butter, sosfiltfilt

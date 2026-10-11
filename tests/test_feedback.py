@@ -79,3 +79,35 @@ def test_review_server_api(rendered):
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_review_server_rejects_cross_site_requests(rendered):
+    import urllib.error
+
+    from glass_harbor.review import serve
+
+    server = serve("fb", port=0)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        simple = urllib.request.Request(f"{base}/api/run/{rendered.name}/comments", method="POST",
+                                        data=json.dumps({"time_s": 1, "text": "x"}).encode(),
+                                        headers={"Content-Type": "text/plain"})
+        with pytest.raises(urllib.error.HTTPError) as error:
+            urllib.request.urlopen(simple)
+        assert error.value.code == 403
+        rebound = urllib.request.Request(f"{base}/api/session", headers={"Host": "evil.example:80"})
+        with pytest.raises(urllib.error.HTTPError) as error:
+            urllib.request.urlopen(rebound)
+        assert error.value.code == 403
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_taste_set_and_add_need_values(workspace, capsys):
+    assert main(["taste", "set"]) == 2
+    assert main(["taste", "set", "hiphop_blend_bars"]) == 2
+    assert main(["taste", "add"]) == 2
+    assert feedback.load_taste()["preferences"] == []

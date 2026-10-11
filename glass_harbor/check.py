@@ -178,7 +178,8 @@ def check_run(run_dir: Path) -> dict[str, Any]:
         from glass_harbor import library
 
         ref_track = reference if isinstance(reference, str) else reference.get("track")
-        reference_balance = tonal_balance(library.load_audio(ref_track))
+        ref_stem = "mix" if isinstance(reference, str) else reference.get("stem", "mix")
+        reference_balance = tonal_balance(library.load_audio(ref_track, ref_stem))
         for name, value in mix_balance.items():
             diff = value - reference_balance[name]
             if abs(diff) > 3.0:

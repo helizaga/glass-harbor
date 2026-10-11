@@ -104,7 +104,7 @@ A clip with a `chop` object triggers short slices of one stem on a step pattern 
 | field | meaning |
 |---|---|
 | `slices` | single-character names -> `bar`, `beat` (1-based, fractional ok: 2.5 = the "and" of 2), `beats` (length), optional `semitones` (on top of the source shift) and `reverse`; or `{"word": "janice", "occurrence": 1}` to cut an exact word from the lyrics (`glass-harbor track lyrics <id>` first) |
-| `pattern` | one string per bar (cycled to fill `bars`): a slice name triggers it, `-` holds, `.` is a rest; spaces and `|` are ignored |
+| `pattern` | one string per bar (cycled to fill `bars`): a slice name triggers it, `-` holds, `.` is a rest; spaces and `\|` are ignored |
 | `step` | beats per pattern character (default `0.25` = 16th notes; `0.5` = 8ths) |
 
 Each hit is warped to the output tempo, pitched, optionally reversed, faded at the edges (no clicks), and choked by

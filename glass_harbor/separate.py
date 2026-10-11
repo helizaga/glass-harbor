@@ -109,13 +109,16 @@ def _separate_fast(track_id: str, wanted: set[str], tmp_dir: Path, log: Log) -> 
     outputs = _run_audio_separator(library.audio_path(track_id), tmp_dir / "fast", **spec)
     produced: dict[str, dict] = {}
     for name in ("vocals", "drums", "bass", "other"):
-        library.copy_stem_file(track_id, name, outputs[name])
-        produced[name] = {"quality": "fast", **spec}
-    parts = [A.load(outputs[name]) for name in ("drums", "bass", "other")]
-    frames = min(part.shape[0] for part in parts)
-    A.save(library.stem_path(track_id, "instrumental"), sum(part[:frames] for part in parts), subtype="PCM_24")
-    produced["instrumental"] = {"quality": "fast", "derived": "drums + bass + other", **spec}
-    return {name: info for name, info in produced.items() if name in wanted}
+        if name in wanted:  # never overwrite stems the caller did not ask for (e.g. a cleaned acapella)
+            library.copy_stem_file(track_id, name, outputs[name])
+            produced[name] = {"quality": "fast", **spec}
+    if "instrumental" in wanted:
+        parts = [A.load(outputs[name]) for name in ("drums", "bass", "other")]
+        frames = min(part.shape[0] for part in parts)
+        library.copy_stem_file(track_id, "instrumental", outputs["drums"])  # resets raw/cleaned state
+        A.save(library.stem_path(track_id, "instrumental"), sum(part[:frames] for part in parts), subtype="PCM_24")
+        produced["instrumental"] = {"quality": "fast", "derived": "drums + bass + other", **spec}
+    return produced
 
 
 def separate_local(track_id: str, wanted: set[str], quality: str, log: Log) -> dict[str, dict]:

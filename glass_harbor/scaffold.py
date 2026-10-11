@@ -280,10 +280,12 @@ def build_transition(a: str, b: str, *, style: str = "auto", pre_bars: int = 16,
     ratio_b = _ratio_for(float(analysis_a["bpm"]), bpm_b)
     chosen = choose_style(float(analysis_a["bpm"]), bpm_b * ratio_b, style)
     length = blend_bars or _blend_length(float(analysis_a["bpm"]), bpm_b * ratio_b)
-    exit_bar = outro_bar(analysis_a, length if chosen == "blend" else 0)
+    exit_bar = outro_bar(analysis_a, length if chosen in ("blend", "stems") else 0)
     entry = max(1, exit_bar - pre_bars)
+    # The incoming track plays its blend, then at least 8 bars alone before the closing fade.
+    outro = length + 8 if chosen in ("blend", "stems") else 0
     plan = build_set([a, b], styles=[chosen], play_bars=pre_bars, blend_bars=blend_bars, first_entry=entry,
-                     first_exit=exit_bar, title=title, outro_bars=0)
+                     first_exit=exit_bar, title=title, outro_bars=outro)
     plan["kind"] = "transition"
     return plan
 

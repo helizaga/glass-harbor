@@ -450,7 +450,11 @@ def cmd_taste(args: argparse.Namespace) -> int:
     from glass_harbor import feedback
 
     taste = feedback.load_taste()
+    if args.action in ("set", "add") and not args.value:
+        raise ValueError(f"taste {args.action} needs a value ({'name=value' if args.action == 'set' else 'a preference'})")
     if args.action == "set":
+        if "=" not in args.value:
+            raise ValueError("taste set expects name=value")
         name, _, value = args.value.partition("=")
         if name not in feedback.TASTE_DEFAULTS:
             raise ValueError(f"unknown default {name!r}; known: {', '.join(feedback.TASTE_DEFAULTS)}")

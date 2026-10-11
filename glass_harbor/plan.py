@@ -646,6 +646,12 @@ def resolve(plan: dict[str, Any]) -> Resolution:
                 res.add("error", "master.reference", "reference must be a track id or {track, stem}")
             elif not (library.track_dir(track) / "track.json").exists():
                 res.add("error", "master.reference", f"reference track {track!r} is not in the library")
+            else:
+                stem = ref.get("stem", "mix") if isinstance(ref, dict) else "mix"
+                if stem not in STEMS:
+                    res.add("error", "master.reference", f"reference stem must be one of {', '.join(STEMS)}")
+                elif stem != "mix" and stem not in library.available_stems(track):
+                    res.add("error", "master.reference", f"{track} has no {stem} stem yet")
 
     if res.ok and res.clips:
         _check_overlaps(res, bpb, keys, key_confidence)
