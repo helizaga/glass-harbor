@@ -81,6 +81,11 @@ glass-harbor mix new <slug> --kind transition --tracks <a> <b> [--style blend|cu
 glass-harbor mix new <slug> --kind set --tracks <a> <b> <c> [--styles blend,echo] [--play-bars 32]
 ```
 
+Mashup scaffolds are structure-aware when the acapella has lyrics and the beat has energy/drop analysis:
+choruses (the most repeated lyric line) land on the beat's drops and full sections and never straddle a drop,
+verses fill 8-bar phrases, chops fill low-energy breakdowns, a short title line goes a cappella into a near-silent
+break before a drop, and drops get builds. Without that structure they fall back to back-to-back phrases.
+
 The scaffold is a starting point. Edit `mixes/<slug>/<slug>.mix.json` (format: `docs/plan-format.md`) and record
 intent in `<slug>.brief.md` (what came from analysis vs your musical inference).
 

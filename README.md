@@ -35,9 +35,14 @@ brew install ffmpeg rubberband
 .venv/bin/glass-harbor doctor
 ```
 
+Exact, tested versions (macOS arm64, Python 3.11) are pinned in `requirements.lock`:
+`.venv/bin/pip install -r requirements.lock && .venv/bin/pip install -e . --no-deps`. On Windows/Linux the
+`lyrics` extra installs faster-whisper instead of the Apple Silicon build.
+
 First use downloads model weights into `~/.cache` (beat tracker ~80 MB, two ~200 MB BS-RoFormer models, de-reverb,
 Whisper large-v3-turbo ~1.6 GB, and ~1.7 GB more for `--quality best`). On an M1 Pro: separation ~4 min per stem
-pass, Whisper ~1 min, allin1 ~2 min, a 3.5-minute mashup renders in about a minute.
+pass, Whisper ~1 min, allin1 ~2 min. A full mashup render takes about a minute; clips are rendered in parallel
+and cached in `runs/<slug>/.clip-cache`, so a re-render after a small edit only redoes what changed.
 
 ## Quick start: acapella over a beat
 

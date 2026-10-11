@@ -192,6 +192,11 @@ def check_run(run_dir: Path) -> dict[str, Any]:
         if edges.get("words_cut"):
             flag("warning", clip["id"], f"{edges['words_cut']} word(s) still cut at the clip edges")
 
+    rubs = [item["bar"] for item in report.get("pitch_clash", []) if item["clash"] > 0.3 and item["sung_s"] >= 0.2]
+    if rubs:
+        flag("warning", f"bars {_spans(rubs)}", "held vocal notes rub against the beat's chord (a semitone off); "
+             "check harmonize notes in render.json or shift the vocal")
+
     buried = [item["bar"] for item in report.get("vocal_presence", []) if item["db"] < -3.0]
     if buried:
         spans = _spans(buried)

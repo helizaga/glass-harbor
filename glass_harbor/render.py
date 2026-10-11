@@ -40,6 +40,85 @@ class RenderedClip:
     warp_jitter_ms: float | None
     notes: dict[str, Any] | None = None
 
+    @property
+    def dry_frames(self) -> int:
+        return int(self.notes.get("_dry_frames", self.dry.shape[0])) if self.notes else int(self.dry.shape[0])
+
+
+_CODE_HASH: str | None = None
+
+
+def _code_hash() -> str:
+    """Changes whenever the rendering code changes, so stale cached clips are never reused."""
+    global _CODE_HASH
+    if _CODE_HASH is None:
+        import hashlib
+
+        digest = hashlib.sha256()
+        here = Path(__file__).parent
+        for name in ("render.py", "vocals.py", "drums.py", "fx.py", "spectral.py", "plan.py", "tempo.py", "grid.py"):
+            digest.update((here / name).read_bytes())
+        _CODE_HASH = digest.hexdigest()[:16]
+    return _CODE_HASH
+
+
+class ClipCache:
+    """Rendered clips keyed by everything that shapes them: the clip and source spec, the source files, the tempo
+    map, the groove settings, and the rendering code. An edit to one clip re-renders only that clip."""
+
+    def __init__(self, folder: Path, plan: dict[str, Any], timeline_offset: float):
+        self.folder = folder
+        self.plan = plan
+        self.base = {"code": _code_hash(), "tempo": plan.get("tempo"), "bpm": plan.get("bpm"),
+                     "bpb": plan.get("beats_per_bar", 4), "groove": plan.get("groove"),
+                     "offset": round(timeline_offset, 6)}
+
+    def _files(self, clip: ResolvedClip) -> list[Any]:
+        if not clip.track:
+            src = (self.plan.get("sources") or {}).get(clip.spec.get("source", ""), {})
+            track = src.get("track")
+        else:
+            track = clip.track
+        if not track:
+            return []
+        stats = []
+        folder = library.track_dir(track)
+        for path in sorted(folder.glob("**/*")):
+            if path.is_file() and path.suffix in (".flac", ".json"):
+                st = path.stat()
+                stats.append([str(path.relative_to(folder)), st.st_size, st.st_mtime_ns])
+        return stats
+
+    def key(self, clip: ResolvedClip, offset_db: float) -> str:
+        import hashlib
+
+        source = (self.plan.get("sources") or {}).get(clip.spec.get("source", ""), {})
+        payload = {**self.base, "clip": clip.spec, "source": source, "offset_db": round(offset_db, 4),
+                   "files": self._files(clip)}
+        return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()[:32]
+
+    def load(self, clip: ResolvedClip, offset_db: float) -> RenderedClip | None:
+        key = self.key(clip, offset_db)
+        meta_path, audio_path = self.folder / f"{key}.json", self.folder / f"{key}.npy"
+        if not (meta_path.exists() and audio_path.exists()):
+            return None
+        meta = json.loads(meta_path.read_text())
+        return RenderedClip(clip=clip, start_sample=int(meta["start_sample"]), audio=np.load(audio_path),
+                            dry=np.zeros((0, 2), dtype=np.float32), target_beats=[],
+                            source_offset_ms=meta["source_offset_ms"], warp_offset_ms=meta["warp_offset_ms"],
+                            warp_jitter_ms=meta["warp_jitter_ms"], notes={**(meta.get("notes") or {}),
+                                                                         "_dry_frames": meta["dry_frames"]})
+
+    def store(self, clip: ResolvedClip, offset_db: float, rendered: RenderedClip) -> None:
+        self.folder.mkdir(parents=True, exist_ok=True)
+        key = self.key(clip, offset_db)
+        np.save(self.folder / f"{key}.npy", rendered.audio)
+        notes = {k: v for k, v in (rendered.notes or {}).items() if not k.startswith("_")}
+        (self.folder / f"{key}.json").write_text(json.dumps({
+            "start_sample": rendered.start_sample, "dry_frames": rendered.dry_frames,
+            "source_offset_ms": rendered.source_offset_ms, "warp_offset_ms": rendered.warp_offset_ms,
+            "warp_jitter_ms": rendered.warp_jitter_ms, "notes": notes}))
+
 
 def _segment(audio: np.ndarray, start: float, end: float) -> np.ndarray:
     """Slice [start, end) seconds with zero padding outside the track."""
@@ -248,8 +327,13 @@ def _onset_env(audio: np.ndarray) -> tuple[np.ndarray, float]:
     return env, hop / 22050
 
 
-def grid_deviation_ms(audio: np.ndarray, beat_times: list[float]) -> tuple[float | None, float | None, float]:
-    """Median and spread of (strong onset - expected beat) in ms; None if the material has no clear beat onsets."""
+def grid_deviation_ms(audio: np.ndarray, beat_times: list[float], *, max_beats: int = 48
+                      ) -> tuple[float | None, float | None, float]:
+    """Median and spread of (strong onset - expected beat) in ms; None if the material has no clear beat onsets.
+    Only the first ``max_beats`` beats are checked: plenty to catch an offset grid, a fraction of the cost."""
+    beat_times = list(beat_times)[:max_beats]
+    if beat_times:
+        audio = audio[: int((beat_times[-1] + 1.0) * A.SR)]
     if audio.shape[0] < A.SR:
         return None, None, 0.0
     env, frame_seconds = _onset_env(audio)
@@ -570,10 +654,10 @@ def _true_peak_envelope(mix: np.ndarray) -> np.ndarray:
     """Per-sample peak including inter-sample overs (4x oversampling), so the ceiling holds as true peak."""
     from scipy.signal import resample_poly
 
-    over = np.abs(resample_poly(mix, 4, 1, axis=0)).max(axis=1)
+    over = np.abs(resample_poly(mix, 2, 1, axis=0)).max(axis=1)
     frames = mix.shape[0]
-    over = np.pad(over, (0, max(0, frames * 4 - over.size)))[: frames * 4]
-    return np.maximum(over.reshape(frames, 4).max(axis=1), np.abs(mix).max(axis=1))
+    over = np.pad(over, (0, max(0, frames * 2 - over.size)))[: frames * 2]
+    return np.maximum(over.reshape(frames, 2).max(axis=1), np.abs(mix).max(axis=1)) * 1.02  # 2x under-reads ~0.2 dB
 
 
 def limit(mix: np.ndarray, ceiling_db: float, *, release_ms: float = 80.0, lookahead_ms: float = 3.0) -> np.ndarray:
@@ -740,7 +824,7 @@ def master(mix: np.ndarray, *, lufs: float, ceiling_db: float, soft_clip: bool =
 
 def render_plan(plan: dict[str, Any], out_dir: Path, *, start_bar: float | None = None,
                 end_bar: float | None = None, write_clips: bool = False, mp3: bool = True,
-                log: Log = print) -> dict[str, Any]:
+                log: Log = print, workers: int = 4, use_cache: bool = True) -> dict[str, Any]:
     res = resolve(plan)
     if not res.ok:
         errors = "\n".join(f"- {i.where}: {i.message}" for i in res.issues if i.level == "error")
@@ -761,36 +845,74 @@ def render_plan(plan: dict[str, Any], out_dir: Path, *, start_bar: float | None 
 
     cache: dict[tuple[str, str], np.ndarray] = {}
     lyrics_cache: dict[str, Any] = {}
-    rendered: list[RenderedClip] = []
+    from concurrent.futures import ThreadPoolExecutor
+
+    from glass_harbor.lyrics import load_lyrics
+
+    def offset_for(clip: ResolvedClip) -> float:
+        if not match_loudness or not clip.track:
+            return 0.0
+        track_lufs = float(res.analyses[clip.track].get("loudness_lufs", A.REFERENCE_LUFS))
+        if not math.isfinite(track_lufs):
+            return 0.0
+        return float(np.clip(A.REFERENCE_LUFS - track_lufs, -LOUDNESS_MATCH_LIMIT_DB, LOUDNESS_MATCH_LIMIT_DB))
+
+    # Load shared inputs up front (threads only read them).
     for clip in clips:
+        if clip.track and not clip.spec.get("generate") and (clip.track, clip.stem) not in cache:
+            cache[(clip.track, clip.stem)] = library.load_audio(clip.track, clip.stem)
+        if clip.stem == "vocals" and clip.track not in lyrics_cache:
+            lyrics_cache[clip.track] = load_lyrics(clip.track)
+
+    clip_cache = ClipCache(out_dir.parent / ".clip-cache", plan, timeline_offset) if use_cache else None
+
+    def render_one(clip: ResolvedClip) -> RenderedClip:
+        if clip_cache is not None:
+            hit = clip_cache.load(clip, offset_for(clip))
+            if hit is not None:
+                log(f"cached {clip.id}")
+                return hit
         if clip.spec.get("generate"):
             log(f"rendering {clip.id}: generated {clip.spec['generate']} -> bars {clip.spec['at_bar']}+{clip.spec['bars']}")
-            rendered.append(render_generated(res, clip, timeline_offset))
-            continue
-        key = (clip.track, clip.stem)
-        if key not in cache:
-            cache[key] = library.load_audio(clip.track, clip.stem)
-        offset_db = 0.0
-        if match_loudness:
-            track_lufs = float(res.analyses[clip.track].get("loudness_lufs", A.REFERENCE_LUFS))
-            if math.isfinite(track_lufs):
-                offset_db = float(np.clip(A.REFERENCE_LUFS - track_lufs, -LOUDNESS_MATCH_LIMIT_DB,
-                                          LOUDNESS_MATCH_LIMIT_DB))
-        if clip.chop is not None:
+            result = render_generated(res, clip, timeline_offset)
+        elif clip.chop is not None:
             log(f"rendering {clip.id}: {len(clip.chop['slices'])} chop slices from {clip.track}/{clip.stem}"
                 f" -> bars {clip.spec['at_bar']}+{clip.spec['bars']}")
-            rendered.append(render_chop(res, clip, cache[key], offset_db, timeline_offset))
-            continue
-        log(f"rendering {clip.id}: {clip.track}/{clip.stem} bars {clip.spec['from_bar']}+{clip.spec['bars']}"
-            f" -> bar {clip.spec['at_bar']} ({clip.stretch_pct:+.1f}% stretch, {clip.semitones:+d} st)")
-        lyrics = None
-        if clip.stem == "vocals":
-            if clip.track not in lyrics_cache:
-                from glass_harbor.lyrics import load_lyrics
+            result = render_chop(res, clip, cache[(clip.track, clip.stem)], offset_for(clip), timeline_offset)
+        else:
+            log(f"rendering {clip.id}: {clip.track}/{clip.stem} bars {clip.spec['from_bar']}+{clip.spec['bars']}"
+                f" -> bar {clip.spec['at_bar']} ({clip.stretch_pct:+.1f}% stretch, {clip.semitones:+d} st)")
+            lyrics = lyrics_cache.get(clip.track) if clip.stem == "vocals" else None
+            result = render_clip(res, clip, cache[(clip.track, clip.stem)], offset_for(clip), timeline_offset,
+                                 lyrics)
+        if clip_cache is not None:
+            clip_cache.store(clip, offset_for(clip), result)
+        return result
 
-                lyrics_cache[clip.track] = load_lyrics(clip.track)
-            lyrics = lyrics_cache[clip.track]
-        rendered.append(render_clip(res, clip, cache[key], offset_db, timeline_offset, lyrics))
+    with ThreadPoolExecutor(max_workers=max(1, min(workers, len(clips)))) as pool:
+        rendered = list(pool.map(render_one, clips))
+
+    # Chord-aware pitch correction needs the beat under each vocal, so it runs once every clip exists.
+    total_frames = max(r.start_sample + r.audio.shape[0] for r in rendered)
+    bed_sum = np.zeros((total_frames, 2), dtype=np.float32)
+    for r in rendered:
+        if r.clip.stem not in ("vocals", "fx"):
+            bed_sum[r.start_sample: r.start_sample + r.audio.shape[0]] += r.audio
+    harmonize_targets = [r for r in rendered if r.clip.stem == "vocals" and r.clip.chop is None
+                         and r.clip.spec.get("harmonize", True)]
+
+    def harmonize_one(r: RenderedClip) -> None:
+        from glass_harbor.harmony import harmonize
+
+        segment = bed_sum[r.start_sample: r.start_sample + r.audio.shape[0]]
+        r.audio, fixes = harmonize(r.audio, segment)
+        if fixes:
+            r.notes = {**(r.notes or {}), "harmonized": fixes}
+            log(f"harmonized {len(fixes)} held note(s) in {r.clip.id}")
+
+    if np.any(bed_sum) and harmonize_targets:
+        with ThreadPoolExecutor(max_workers=max(1, min(workers, len(harmonize_targets)))) as pool:
+            list(pool.map(harmonize_one, harmonize_targets))
 
     apply_ducking(rendered)
     total = max(r.start_sample + r.audio.shape[0] for r in rendered)
@@ -805,6 +927,16 @@ def render_plan(plan: dict[str, Any], out_dir: Path, *, start_bar: float | None 
         if 0 <= s0 < total:
             bar_spans.append((bar, (s0, min(s1, total))))
     presence = vocal_presence(rendered, total, bar_spans)
+    vocal_sum = np.zeros((total, 2), dtype=np.float32)
+    for r in rendered:
+        if r.clip.stem == "vocals" and r.clip.chop is None:
+            vocal_sum[r.start_sample: r.start_sample + r.audio.shape[0]] += r.audio
+    pitch_clash = []
+    if np.any(vocal_sum):
+        from glass_harbor.harmony import clash_by_bar
+
+        pitch_clash = clash_by_bar(vocal_sum, bed_sum[:total] if bed_sum.shape[0] >= total else
+                                   np.pad(bed_sum, ((0, total - bed_sum.shape[0]), (0, 0))), bar_spans)
     for edit in plan.get("edits", []):
         if edit.get("type") == "tape_stop":
             from glass_harbor.fx import tape_stop
@@ -875,19 +1007,21 @@ def render_plan(plan: dict[str, Any], out_dir: Path, *, start_bar: float | None 
         "stream_master": stream_stats,
         "issues": [i.to_dict() for i in res.issues],
         "vocal_presence": presence,
+        "pitch_clash": pitch_clash,
         "clips": [
             {
                 "id": r.clip.id,
                 "track": r.clip.track,
                 "stem": r.clip.stem,
                 "start_s": round(r.start_sample / A.SR - crop_start / A.SR, 4),
-                "length_s": round(r.dry.shape[0] / A.SR, 4),
+                "length_s": round(r.dry_frames / A.SR, 4),
                 "stretch_pct": round(r.clip.stretch_pct, 2),
                 "semitones": r.clip.semitones,
                 "source_grid_offset_ms": None if r.source_offset_ms is None else round(r.source_offset_ms, 1),
                 "warp_offset_ms": None if r.warp_offset_ms is None else round(r.warp_offset_ms, 1),
                 "warp_jitter_ms": None if r.warp_jitter_ms is None else round(r.warp_jitter_ms, 1),
-                **({"notes": r.notes} if r.notes else {}),
+                **({"notes": {k: v for k, v in r.notes.items() if not k.startswith("_")}}
+                   if r.notes and any(not k.startswith("_") for k in r.notes) else {}),
             }
             for r in rendered
         ],

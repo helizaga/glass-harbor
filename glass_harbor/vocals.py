@@ -232,7 +232,7 @@ def tune(vocal: np.ndarray, key_tonic: int, key_mode: str, strength: float) -> t
         return vocal, 0.0
     sr = 22050
     y = librosa.resample(A.mono(vocal), orig_sr=A.SR, target_sr=sr)
-    hop = 256
+    hop = 512
     f0, voiced, prob = librosa.pyin(y, fmin=70, fmax=900, sr=sr, frame_length=2048, hop_length=hop)
     steps = [0, 2, 3, 5, 7, 8, 10] if key_mode == "minor" else [0, 2, 4, 5, 7, 9, 11]
     scale = np.array([(key_tonic + s) % 12 for s in steps])

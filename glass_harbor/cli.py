@@ -161,8 +161,8 @@ def cmd_track_lyrics(args: argparse.Namespace) -> int:
     log = _log(args)
     lyrics = None if args.force else load_lyrics(args.id)
     if lyrics is None:
-        log(f"transcribing {args.id} with {args.model} (first run downloads the model)")
-        lyrics = transcribe(args.id, model=args.model)
+        log(f"transcribing {args.id} (first run downloads the model)")
+        lyrics = transcribe(args.id, model=args.model, backend=args.backend)
     update_analysis(args.id, lyrics)
     grid = Grid.from_dict(library.load_analysis(args.id)["grid"])
     lines = bar_lines(lyrics, grid)
@@ -621,7 +621,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = common(track.add_parser("lyrics", help="transcribe vocals with word timings (local Whisper), find hooks"))
     p.add_argument("id")
-    p.add_argument("--model", default="mlx-community/whisper-large-v3-turbo")
+    p.add_argument("--model", help="default: whisper-large-v3-turbo for the chosen backend")
+    p.add_argument("--backend", choices=("mlx", "faster"), help="default: mlx on Apple Silicon, else faster-whisper")
     p.add_argument("--force", action="store_true")
     p.set_defaults(func=cmd_track_lyrics)
 

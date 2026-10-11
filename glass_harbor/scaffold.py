@@ -304,11 +304,12 @@ def build_mashup(vocals: str, bed: str, *, semitones: int | None = None, intro_b
     if not phrases:
         raise ValueError(f"No vocal phrases detected in {vocals}; check the vocals stem.")
 
+    smart = smart_arrangement(vocals, bed, vox, beat, ratio, library.load_meta(vocals).get("title", vocals))
     clips: list[dict[str, Any]] = []
     at_bar = 1 + intro_bars
     used = 0
     last_end = None
-    for phrase in phrases:
+    for phrase in ([] if smart else phrases):
         start = _phrase_floor(phrase["start_bar"])
         length = int(math.ceil((phrase["start_bar"] + phrase["bars"] - start) / 4.0) * 4)
         length = min(length, 16)
@@ -332,8 +333,14 @@ def build_mashup(vocals: str, bed: str, *, semitones: int | None = None, intro_b
         used += out_len
         last_end = start + length
 
+    drop_builds: list[tuple[int, float]] = []
+    if smart:
+        clips, drop_builds, smart_notes = smart
+        at_bar = max(c["at_bar"] + c["bars"] * (ratio if "chop" not in c else 1) for c in clips)
     total_bars = at_bar - 1 + outro_bars
     bed_bars = _bar_count(beat)
+    if smart:
+        total_bars = bed_bars  # the draft follows the beat's own structure end to end
     bed_clips: list[dict[str, Any]] = []
     if bed_bars >= total_bars:
         bed_clips.append({"id": "bed", "source": "bed", "stem": bed_stem, "from_bar": 1, "bars": total_bars,
@@ -356,7 +363,8 @@ def build_mashup(vocals: str, bed: str, *, semitones: int | None = None, intro_b
 
     hook_starts = [o["start_bar"] for h in vox.get("hooks", []) for o in h.get("occurrences", [])]
     for clip in clips:
-        if any(clip["from_bar"] <= bar < clip["from_bar"] + clip["bars"] for bar in hook_starts):
+        if "from_bar" in clip and "chain" not in clip and any(
+                clip["from_bar"] <= bar < clip["from_bar"] + clip["bars"] for bar in hook_starts):
             clip["chain"] = "hook"
 
     vox_source: dict[str, Any] = {"track": vocals, "semitones": shift}
@@ -379,10 +387,23 @@ def build_mashup(vocals: str, bed: str, *, semitones: int | None = None, intro_b
             "vocal phrases were placed back to back from the source; reorder or swap for the strongest hook",
         ],
     }
+    if smart:
+        plan["notes"] = [plan["notes"][0], *smart_notes]
     if edm:
         plan["groove"] = {"pump_fx": {"db": 5.0, "release": 0.6}}
     if {"drums", "bass", "other"} <= set(library.available_stems(bed)) and len(bed_clips) == 1:
         plan = arrange_bed_stems(plan, pump={"db": 3.0, "release": 0.5} if edm else None)
+    has_drums = "drums" in library.available_stems(bed)
+    for bar, spotlight in drop_builds:
+        try:
+            # A title-line spotlight owns the break: no snare roll under it, and the riser ends where it starts.
+            plan = add_drop(plan, bar, build_bars=8, roll=has_drums and not spotlight)
+        except ValueError:
+            continue  # no room for a build here (too close to the start)
+        if spotlight:
+            for clip in plan["clips"]:
+                if clip.get("id") == f"riser-{bar:g}":
+                    clip["bars"] = round(max(1.0, bar - spotlight - clip["at_bar"]), 4)
     plan = add_fills(plan)
     edges = int(taste_default("dj_edge_bars"))
     if edges:
@@ -449,7 +470,8 @@ def add_drop(plan: dict[str, Any], at_bar: float, *, build_bars: float = 8, clip
                               "gain_db": -5})
     plan.setdefault("notes", []).append(
         f"drop at bar {at_bar:g}: {build_bars:g}-bar build on {', '.join(t.id for t in targets)}"
-        f"{', ' + str(riser) + ' riser' if riser else ''}{', snare roll' if roll else ''}{', impact' if impact else ''}, "
+        f"{(', vocal riser' if isinstance(riser, str) else ', riser') if riser else ''}{', snare roll' if roll else ''}"
+        f"{', impact' if impact else ''}, "
         f"{silence_beats:g} beat(s) of silence")
     return plan
 
@@ -709,3 +731,164 @@ def add_edit(plan: dict[str, Any], kind: str, at_bar: float, *, beats: float = 1
         raise ValueError("edit must be mute, stutter, tape_stop, or lift")
     plan.setdefault("notes", []).append(f"edit: {kind} at bar {at_bar:g}")
     return plan
+
+
+# ---------------------------------------------------------------- structure-aware mashup drafts
+
+TEASE = ["h---j-----------", "........b-------", "h---j-----------", "........b---b---",
+         "h---j-----------", "........b-------", "j-------j-------", "j---j---j-j-j-j-"]
+BUILD = ["j---j---j---j---", "b---b---j---j---", "j---j---j---j---", "j-j-j-j-j-j-j-j-",
+         "j-j-j-j-k-k-k-k-", "k-k-k-k-l-l-l-l-", "jjjjkkkkllllmmmm", "j-----------...."]
+
+
+def _vocal_material(vox: dict[str, Any], lyrics: dict[str, Any] | None, title: str) -> dict[str, Any] | None:
+    """Chorus blocks (from the most repeated line), 8-bar verse chunks, a title line, and chop words."""
+    from glass_harbor.grid import Grid
+    from glass_harbor.lyrics import _normalize, hooks
+
+    if not lyrics:
+        return None
+    grid = Grid.from_dict(vox["grid"])
+    found = [h for h in hooks(lyrics, grid) if h["occurrences"] and len(h["text"].split()) >= 3]
+    if not found:
+        return None
+    starts = sorted(int(math.floor(o["start_bar"])) for o in found[0]["occurrences"])
+    choruses = []
+    for i, start in enumerate(starts):
+        nxt = starts[i + 1] if i + 1 < len(starts) else grid.bar_count + 1
+        length = 16 if nxt - start >= 16 else 8
+        if start + length <= grid.bar_count + 1 and all(abs(start - c[0]) >= 8 for c in choruses):
+            choruses.append((start, length))
+    covered = {b for start, length in choruses for b in range(start, start + length)}
+    verses = []
+    for phrase in vox.get("stems", {}).get("vocals", {}).get("phrases", []):
+        bar = phrase["start_bar"]
+        end = phrase["start_bar"] + phrase["bars"]
+        while bar + 8 <= end + 2 and bar + 8 <= grid.bar_count + 1:
+            if not covered & set(range(bar, bar + 8)) and all(abs(bar - v) >= 8 for v in verses):
+                verses.append(bar)
+            bar += 8
+    verses.sort()
+    title_words = [w for w in (_normalize(t) for t in title.split()) if len(w) >= 4]
+    line = None
+    for seg in lyrics["segments"]:
+        words = {_normalize(w["word"]) for w in seg["words"]}
+        span = grid.bar_at_time(seg["end"]) - grid.bar_at_time(seg["start"])
+        if title_words and words & set(title_words) and span <= 3.0 and (line is None or span < line[2]):
+            line = (grid.bar_at_time(seg["start"]), grid.bar_at_time(seg["end"]), span)
+    counts: dict[str, int] = {}
+    for seg in lyrics["segments"]:
+        for w in seg["words"]:
+            text = _normalize(w["word"])
+            if 3 <= len(text) <= 7:
+                counts[text] = counts.get(text, 0) + 1
+    chop_word = next((w for w in title_words if counts.get(w)), None) or max(counts, key=counts.get, default=None)
+    filler = next((w for w, _ in sorted(counts.items(), key=lambda kv: -kv[1]) if w != chop_word), None)
+    first_hook_word = _normalize(found[0]["text"].split()[0]) if found else None
+    return {"choruses": choruses, "verses": verses, "title_line": line, "chop_word": chop_word,
+            "filler_word": filler or chop_word, "hook_word": first_hook_word}
+
+
+def smart_arrangement(vocals: str, bed: str, vox: dict[str, Any], beat: dict[str, Any], ratio: float,
+                      title: str) -> tuple[list[dict[str, Any]], list[tuple[int, float]], list[str]] | None:
+    """Place vocal material on the beat's structure. Returns (vocal clips, drop bars to build, notes) or None
+    when there is not enough structure to work with (the caller falls back to back-to-back placement)."""
+    from glass_harbor.lyrics import load_lyrics
+
+    material = _vocal_material(vox, load_lyrics(vocals), title)
+    levels = beat.get("bar_db") or []
+    if material is None or not material["choruses"] or len(levels) < 32 or ratio != 1:
+        return None
+    bars = len(levels)
+    median = float(np.median(levels))
+    full = [v >= median - 2.5 for v in levels]
+    low = [v <= median - 4.0 for v in levels]
+    silent = [v <= median - 12.0 for v in levels]
+
+    def share(mask: list[bool], start: int, length: int) -> float:
+        window = mask[start - 1: start - 1 + length]
+        return sum(window) / max(1, len(window))
+
+    drops = [d for d in beat.get("drops", []) if d >= 9]
+    clips: list[dict[str, Any]] = []
+    notes: list[str] = []
+    builds: list[tuple[int, float]] = []
+    chorus_i = verse_i = chops_i = 0
+    last_hook = False
+    last_chops = -99
+    cursor = 9
+    outro = 8
+    while cursor + 8 <= bars + 1 - outro:
+        next_drop = next((d for d in drops if d >= cursor), None)
+        if next_drop is not None and next_drop - cursor < 8:
+            gap = next_drop - cursor
+            line = material["title_line"]
+            spotlight = 0
+            quiet_run = 0  # silent bars right before the drop
+            while quiet_run < gap and silent[next_drop - 2 - quiet_run]:
+                quiet_run += 1
+            if quiet_run and line and math.ceil(line[1]) - math.ceil(line[0]) <= quiet_run:
+                from_bar = math.ceil(line[0])
+                pre = math.ceil((from_bar - line[0]) * 4)
+                length = max(1, math.ceil(line[1]) - from_bar)
+                clips.append({"id": "title-break", "source": "vox", "stem": "vocals", "from_bar": from_bar,
+                              "bars": length, "at_bar": next_drop - length, **({"pre_beats": pre} if pre else {}),
+                              "fx": {"reverb": {"mix": 0.15, "room": 0.5}}})
+                notes.append(f"title line a cappella in the break before the bar-{next_drop} drop")
+                spotlight = length + pre / 4
+            cursor = next_drop
+            if not last_hook and cursor + 16 <= bars + 1:
+                start, length = material["choruses"][chorus_i % len(material["choruses"])]
+                clips.append({"id": f"hook{chorus_i + 1}", "source": "vox", "stem": "vocals", "from_bar": start,
+                              "bars": length, "at_bar": cursor, "chain": "hook"})
+                builds.append((cursor, spotlight))
+                chorus_i += 1
+                cursor += length
+                last_hook = True
+            continue
+        straddles = next_drop is not None and cursor < next_drop < cursor + 16
+        if not last_hook and not straddles and share(full, cursor, 16) >= 0.75 and cursor + 16 <= bars + 1 - outro + 8:
+            start, length = material["choruses"][chorus_i % len(material["choruses"])]
+            clips.append({"id": f"hook{chorus_i + 1}", "source": "vox", "stem": "vocals", "from_bar": start,
+                          "bars": length, "at_bar": cursor, "chain": "hook"})
+            chorus_i += 1
+            cursor += length
+            last_hook = True
+        elif share(low, cursor, 8) >= 0.6 and material["chop_word"] and cursor - last_chops >= 16:
+            build = next_drop is not None and next_drop - (cursor + 8) < 8
+            slices = {"j": {"word": material["chop_word"], "occurrence": 1},
+                      "b": {"word": material["filler_word"], "occurrence": 1},
+                      "h": {"word": material["hook_word"] or material["chop_word"], "occurrence": 1},
+                      "k": {"word": material["chop_word"], "occurrence": 1, "semitones": 5},
+                      "l": {"word": material["chop_word"], "occurrence": 1, "semitones": 7},
+                      "m": {"word": material["chop_word"], "occurrence": 1, "semitones": 12}}
+            chops_i += 1
+            clips.append({"id": f"chops{chops_i}", "source": "vox", "stem": "vocals",
+                          "at_bar": cursor, "bars": 8, "gain_db": 2.0,
+                          "chop": {"slices": slices, "pattern": BUILD if build else TEASE},
+                          "automation": {"highpass_hz": [[0, 200]]},
+                          "fx": {"echo": {"beats": 0.75, "feedback": 0.3, "mix": 0.2}}})
+            last_chops = cursor
+            cursor += 8
+            last_hook = False
+        elif verse_i < len(material["verses"]):
+            clips.append({"id": f"verse{verse_i + 1}", "source": "vox", "stem": "vocals",
+                          "from_bar": material["verses"][verse_i], "bars": 8, "at_bar": cursor})
+            verse_i += 1
+            cursor += 8
+            last_hook = False
+        else:
+            cursor += 8  # let the beat play
+            last_hook = False
+    if chorus_i == 0:
+        return None
+    for clip in clips:
+        if clip.get("stem") == "vocals" and "chop" not in clip:
+            clip.setdefault("automation", {"highpass_hz": [[0, float(taste_default("vocal_highpass_hz"))]]})
+    # Drop the chop slices whose word is missing (e.g. no filler word) so the plan validates.
+    for clip in clips:
+        if "chop" in clip:
+            clip["chop"]["slices"] = {k: v for k, v in clip["chop"]["slices"].items() if v["word"]}
+    notes.append(f"structure-aware draft: {chorus_i} chorus(es) on the beat's drops/full sections, {verse_i} verse "
+                 f"chunk(s), chops in low-energy stretches")
+    return clips, builds, notes

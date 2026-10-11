@@ -184,7 +184,7 @@ def _check_vocal_options(res: Resolution, where: str, clip: dict[str, Any]) -> N
 
     if "chain" in clip and clip["chain"] not in CHAINS:
         res.add("error", where, f"chain must be one of {', '.join(CHAINS)}")
-    for flag in ("word_safe", "ride", "doubles", "octave"):
+    for flag in ("word_safe", "ride", "doubles", "octave", "harmonize"):
         if flag in clip and not isinstance(clip[flag], bool):
             res.add("error", where, f"{flag} must be true or false")
     if "tune" in clip and not (_number(clip["tune"]) and 0 <= clip["tune"] <= 1):

@@ -56,27 +56,69 @@ def _refine_onsets(words: list[dict[str, Any]], vocal: np.ndarray) -> None:
             word["start"] = round(min(peak * frame_s, word["end"] - 0.02), 3)
 
 
-def transcribe(track_id: str, *, model: str = DEFAULT_MODEL, language: str | None = "en") -> dict[str, Any]:
+FASTER_WHISPER_MODEL = "large-v3-turbo"
+
+
+def whisper_backend() -> str | None:
+    """mlx-whisper on Apple Silicon, faster-whisper (CTranslate2) on Windows/Linux, else None."""
+    import importlib.util
+
+    if importlib.util.find_spec("mlx_whisper"):
+        return "mlx"
+    if importlib.util.find_spec("faster_whisper"):
+        return "faster"
+    return None
+
+
+def _segments_mlx(signal: np.ndarray, model: str, language: str | None) -> list[dict[str, Any]]:
     import mlx_whisper
+
+    result = mlx_whisper.transcribe(signal, path_or_hf_repo=model, word_timestamps=True, language=language,
+                                    condition_on_previous_text=False, hallucination_silence_threshold=2.0,
+                                    verbose=None)
+    return [{"text": seg["text"], "words": [{"word": w["word"], "start": w["start"], "end": w["end"],
+                                             "probability": w.get("probability", 0.0)} for w in seg.get("words", [])]}
+            for seg in result.get("segments", [])]
+
+
+def _segments_faster(signal: np.ndarray, model: str, language: str | None) -> list[dict[str, Any]]:
+    from faster_whisper import WhisperModel
+
+    try:
+        import torch
+
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    except ImportError:
+        device = "cpu"
+    whisper = WhisperModel(model, device=device, compute_type="float16" if device == "cuda" else "int8")
+    segments, _ = whisper.transcribe(signal, language=language, word_timestamps=True,
+                                     condition_on_previous_text=False, hallucination_silence_threshold=2.0)
+    return [{"text": seg.text, "words": [{"word": w.word, "start": w.start, "end": w.end,
+                                          "probability": w.probability} for w in (seg.words or [])]}
+            for seg in segments]
+
+
+def transcribe(track_id: str, *, model: str | None = None, language: str | None = "en",
+               backend: str | None = None) -> dict[str, Any]:
     import soxr
 
+    backend = backend or whisper_backend()
+    if backend is None:
+        raise RuntimeError("lyrics need mlx-whisper (Apple Silicon) or faster-whisper: pip install -e '.[lyrics]'")
     stems = library.available_stems(track_id)
     stem = "vocals" if "vocals" in stems else "mix"
     vocal = library.load_audio(track_id, stem)
     signal = soxr.resample(A.mono(vocal), A.SR, WHISPER_SR).astype(np.float32)
-    result = mlx_whisper.transcribe(
-        signal,
-        path_or_hf_repo=model,
-        word_timestamps=True,
-        language=language,
-        condition_on_previous_text=False,
-        hallucination_silence_threshold=2.0,
-        verbose=None,
-    )
+    if backend == "mlx":
+        model = model or DEFAULT_MODEL
+        raw = _segments_mlx(signal, model, language)
+    else:
+        model = model or FASTER_WHISPER_MODEL
+        raw = _segments_faster(signal, model, language)
     segments = []
-    for seg in result.get("segments", []):
+    for seg in raw:
         words = [{"word": w["word"].strip(), "start": round(float(w["start"]), 3), "end": round(float(w["end"]), 3),
-                  "prob": round(float(w.get("probability", 0.0)), 3)} for w in seg.get("words", []) if w["word"].strip()]
+                  "prob": round(float(w.get("probability") or 0.0), 3)} for w in seg["words"] if w["word"].strip()]
         if not words:
             continue
         segments.append({"start": words[0]["start"], "end": words[-1]["end"], "text": seg["text"].strip(),
@@ -84,7 +126,7 @@ def transcribe(track_id: str, *, model: str = DEFAULT_MODEL, language: str | Non
     _refine_onsets([w for s in segments for w in s["words"]], vocal)
     for seg in segments:
         seg["start"] = seg["words"][0]["start"]
-    data = {"model": model, "stem": stem, "language": result.get("language"), "segments": segments}
+    data = {"model": model, "backend": backend, "stem": stem, "language": language, "segments": segments}
     lyrics_path(track_id).write_text(json.dumps(data, indent=1) + "\n")
     return data
 

@@ -32,7 +32,7 @@ ml = [
   "requests",
 ]
 # Local Whisper with word timings (Apple Silicon).
-lyrics = ["mlx-whisper>=0.4; sys_platform == 'darwin'"]
+lyrics = ["mlx-whisper>=0.4; sys_platform == 'darwin'", "faster-whisper>=1.1; sys_platform != 'darwin'"]
 # Reference mastering (match a released master's tone, width, loudness). GPL-3.0.
 master = ["matchering>=2.0.6"]
 # allin1 verse/chorus labels, pure-PyTorch fork that installs on Apple Silicon.
