@@ -197,16 +197,17 @@ def _deess(signal: np.ndarray, max_cut_db: float = 6.0) -> np.ndarray:
 
 
 def apply_chain(vocal: np.ndarray, preset: str, *, beat_seconds: float,
-                throw_regions: list[tuple[float, float]] | None = None) -> np.ndarray:
-    """Process a (tail-padded) vocal. Level in = level out, so plan gains keep their meaning."""
+                throw_regions: list[tuple[float, float]] | None = None, split: bool = False):
+    """Process a (tail-padded) vocal. Level in = level out, so plan gains keep their meaning.
+    With ``split=True`` returns (dry, wet) so the reverb/delay returns can be pumped separately."""
     import pedalboard
 
     if preset == "none":
-        return vocal
+        return (vocal, np.zeros_like(vocal)) if split else vocal
     settings = PRESETS[preset]
     level = _active_rms_db(vocal)
     if level <= -100:
-        return vocal
+        return (vocal, np.zeros_like(vocal)) if split else vocal
     trim = A.db_to_gain(NOMINAL_DB - level)
     x = vocal * trim
 
@@ -229,13 +230,13 @@ def apply_chain(vocal: np.ndarray, preset: str, *, beat_seconds: float,
         x = (1 - settings.saturation) * x + settings.saturation * wet
     x = x * A.db_to_gain(level - _active_rms_db(x))  # back to the input level
 
-    out = x.copy()
+    wet = np.zeros_like(x)
     send_filters = [pedalboard.HighpassFilter(cutoff_frequency_hz=250.0), pedalboard.LowpassFilter(cutoff_frequency_hz=9000.0)]
     if settings.reverb_mix:
         plate = pedalboard.Pedalboard([*send_filters, pedalboard.Delay(delay_seconds=0.025, feedback=0.0, mix=1.0),
                                        pedalboard.Reverb(room_size=0.35, damping=0.6, wet_level=1.0, dry_level=0.0,
                                                          width=1.0)])
-        out = out + settings.reverb_mix * plate(x.T, A.SR).T
+        wet = wet + settings.reverb_mix * plate(x.T, A.SR).T
     if settings.throws and throw_regions:
         throw_in = np.zeros_like(x)
         for start, end in throw_regions:
@@ -243,8 +244,10 @@ def apply_chain(vocal: np.ndarray, preset: str, *, beat_seconds: float,
         echo = pedalboard.Pedalboard([pedalboard.HighpassFilter(cutoff_frequency_hz=300.0),
                                       pedalboard.LowpassFilter(cutoff_frequency_hz=6000.0),
                                       pedalboard.Delay(delay_seconds=0.75 * beat_seconds, feedback=0.38, mix=1.0)])
-        out = out + settings.throw_mix * echo(throw_in.T, A.SR).T
-    return np.ascontiguousarray(out, dtype=np.float32)
+        wet = wet + settings.throw_mix * echo(throw_in.T, A.SR).T
+    dry = np.ascontiguousarray(x, dtype=np.float32)
+    wet = np.ascontiguousarray(wet, dtype=np.float32)
+    return (dry, wet) if split else dry + wet
 
 
 def default_chain(stem: str, is_chop: bool) -> str:

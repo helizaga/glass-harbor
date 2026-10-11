@@ -96,6 +96,16 @@ intent in `<slug>.brief.md` (what came from analysis vs your musical inference).
 - High-pass the acapella at 100-120 Hz to remove separation rumble. Prefer the bed's `instrumental` stem over its
   full mix unless the bed is already an instrumental.
 - Never stack two lead vocals unless it is a deliberate call-and-response.
+- **Build the beat from stems** for mashups: `track separate <bed> --stems drums,bass,other`, then
+  `mix arrange <slug>` (scaffolds do it automatically). Verses over drums + bass, choruses and drops over the full
+  beat, a drums-only bar before each chorus. Mark choruses with `"chain": "hook"` (scaffolds use the lyrics' repeated
+  lines); a vocal that enters on a drop always gets the full beat.
+- **Make room, don't just turn down**: spectral ducking (default) cuts the beat only where it competes with the
+  vocal; percussive beds also need the drums ducked (`mix arrange` sets 4 dB). Check `vocal_presence` per section in
+  `render.json`: aim for roughly +7 dB or more in the 1-4 kHz band.
+- **Groove**: on house/EDM beds, pump the melodic layer (`pump`, ~3 dB) and the vocal reverb/echo returns
+  (`groove.pump_fx`, ~5 dB) so they breathe with the kick.
+- **Master against the release**: mashup scaffolds set `master.reference` to the bed's original track.
 - **Vocal chops** (`chop` clips, see `docs/plan-format.md`): the EDM move for builds, drops, and fills. Pick one or
   two short, punchy syllables (the title word, an ad-lib), slice them at 1/16-1/8 note lengths, and sequence them on
   a 16th-step pattern. Keep chops off the lead vocal's bars, high-pass them (~200 Hz), add a little tempo-synced

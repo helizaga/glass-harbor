@@ -24,7 +24,7 @@ TASTE_DEFAULTS: dict[str, Any] = {
     "edm_blend_bars": 16,
     "hiphop_blend_bars": 8,
     "vocal_highpass_hz": 110,
-    "duck_db": 3.0,
+    "duck_db": 5.0,  # spectral ducking: the most it cuts, only where the vocal competes
 }
 
 

@@ -141,6 +141,17 @@ def _beat_of_time(res: Resolution, seconds: np.ndarray, lo_beat: float, hi_beat:
     return np.interp(seconds, times, beats)
 
 
+def _pump_gain(res: Resolution, start_time: float, frames: int, spec: dict[str, Any],
+               lo_beat: float, hi_beat: float) -> np.ndarray:
+    from glass_harbor.spectral import pump_curve
+
+    step = 32
+    times = start_time + np.arange(0, frames, step) / A.SR
+    beats = _beat_of_time(res, times, lo_beat - 8, hi_beat + 16)
+    coarse = pump_curve(beats, db=float(spec.get("db", 4.0)), release=float(spec.get("release", 0.5)))
+    return np.interp(np.arange(frames), np.arange(0, frames, step), coarse).astype(np.float32)
+
+
 def _apply_mixer(res: Resolution, clip: ResolvedClip, audio: np.ndarray, clip_start_time: float) -> np.ndarray:
     """DJ-mixer channel strip: HP/LP filters, 3-band EQ, gain automation, then echo/reverb sends."""
     import pedalboard
@@ -191,9 +202,11 @@ def _apply_mixer(res: Resolution, clip: ResolvedClip, audio: np.ndarray, clip_st
                 out[start: start + BLOCK] = board(audio[start: start + BLOCK].T, A.SR, reset=False).T
             audio = out
 
-    if "gain_db" in automation:
+    for lane in ("gain_db", "arrange_db"):
+        if lane not in automation:
+            continue
         sample_bars = np.interp(np.arange(n), np.arange(0, n, BLOCK) + BLOCK / 2, block_bars)
-        points = automation["gain_db"]
+        points = automation[lane]
         xs = np.array([p[0] for p in points], dtype=float)
         ys = np.array([p[1] for p in points], dtype=float)
         audio = audio * (10.0 ** (np.interp(sample_bars, xs, ys) / 20.0))[:, None]
@@ -212,6 +225,9 @@ def _apply_mixer(res: Resolution, clip: ResolvedClip, audio: np.ndarray, clip_st
                                          dry_level=1.0 - 0.5 * mix, width=1.0))
     if plugins:
         audio = pedalboard.Pedalboard(plugins)(audio.T, A.SR).T
+    if clip.spec.get("pump"):
+        audio = audio * _pump_gain(res, clip_start_time, audio.shape[0], clip.spec["pump"], clip.out_start_beat,
+                                   clip.out_end_beat)[:, None]
     return np.ascontiguousarray(audio, dtype=np.float32)
 
 
@@ -327,7 +343,13 @@ def render_clip(res: Resolution, clip: ResolvedClip, source_audio: np.ndarray, l
     if chain != "none":
         window = (edges.start, edges.end) if edges is not None else (src_bounds[0], src_bounds[-1])
         throws = vocals.throw_regions_from_words(lyrics["segments"], to_clip_time, window) if lyrics else []
-        processed = vocals.apply_chain(processed, chain, beat_seconds=60.0 / bpm_out, throw_regions=throws)
+        dry_part, wet_part = vocals.apply_chain(processed, chain, beat_seconds=60.0 / bpm_out, throw_regions=throws,
+                                                split=True)
+        pump_fx = (res.plan.get("groove") or {}).get("pump_fx")
+        if pump_fx and np.any(wet_part):
+            wet_part = wet_part * _pump_gain(res, start_time, wet_part.shape[0], pump_fx, out_start, out_end)[:, None]
+            notes["pumped_fx"] = True
+        processed = dry_part + wet_part
         notes["chain"] = chain
         notes["throws"] = len(throws)
     audio = processed * A.db_to_gain(clip.gain_db + loudness_offset_db)
@@ -393,8 +415,14 @@ def apply_ducking(rendered: list["RenderedClip"]) -> None:
             lo, hi = max(0, offset), min(n, offset + mono.size)
             if hi > lo:
                 side[lo:hi] += mono[lo - offset: hi - offset]
-        amount = _envelope_amount(side)
         mid_db = float(spec.get("db", 3.0))
+        if spec.get("mode", "spectral") == "spectral":
+            from glass_harbor.spectral import spectral_duck
+
+            bed.audio = spectral_duck(bed.audio, np.repeat(side[:, None], 2, axis=1), max_db=mid_db,
+                                      level_db=float(spec.get("level_db", 1.0)))
+            continue
+        amount = _envelope_amount(side)
         level_db = float(spec.get("level_db", mid_db * 0.35))
         mid = _band(bed.audio)
         cut = (1.0 - 10.0 ** (-mid_db * amount / 20.0))[:, None]

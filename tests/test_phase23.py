@@ -62,7 +62,7 @@ def test_ducking_dips_bed_mids_and_presence_is_reported(workspace, synth_files, 
     clips = [{"id": "bed", "source": "bed", "stem": "instrumental", "from_bar": 1, "bars": 8, "at_bar": 1},
              {"id": "v", "source": "vox", "stem": "vocals", "from_bar": 1, "bars": 4, "at_bar": 3}]
     dry = render_plan({**base, "clips": clips}, tmp_path / "dry", mp3=False, write_clips=True, log=lambda m: None)
-    clips[0]["duck"] = {"under": "vocals", "db": 9}
+    clips[0]["duck"] = {"under": "vocals", "db": 9, "mode": "band"}  # spectral mode: tests/test_space.py
     ducked = render_plan({**base, "clips": clips}, tmp_path / "ducked", mp3=False, write_clips=True,
                          log=lambda m: None)
     assert ducked["vocal_presence"] and dry["vocal_presence"]

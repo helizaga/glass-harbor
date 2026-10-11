@@ -131,9 +131,24 @@ word of each lyric line. QA flags any word still cut at a clip edge.
 
 ## Ducking
 
-`"duck": {"under": "vocals", "db": 3}` on a bed clip dips its 1-4 kHz band by `db` (and its level by about a
-third of that) whenever any vocal clip plays, with a fast attack and a 250 ms release. `"under"` can also be a list
-of clip ids.
+`"duck": {"under": "vocals", "db": 5}` on a bed clip makes room for the vocal. The default `mode: "spectral"`
+works like Trackspacer: in each STFT bin of the bed's mid (centre) channel it cuts up to `db` where the vocal is as
+loud as the bed (scaling to nothing 12 dB below), between 150 Hz and 8 kHz, so the low end and the stereo sides are
+untouched; `level_db` (default 1) adds a small broadband dip. `mode: "band"` is the older fixed 1-4 kHz dip.
+`"under"` can also be a list of clip ids.
+
+## Stem arrangement and pumping
+
+`glass-harbor mix arrange <slug>` (needs `track separate <bed> --stems drums,bass,other`) replaces the bed clip with
+`<bed>-drums`, `<bed>-bass`, and `<bed>-other` clips and writes their `arrange_db` lanes (a second gain lane,
+independent of fades): verses play over drums + bass (melodic layer at `--verse-other-db`, default -60), choruses
+and any vocal entering on a drop get the full beat, and the bar before each chorus is drums only. The melodic layer
+gets spectral ducking (5 dB) and pumping; the drums get a lighter spectral duck (4 dB). New mashup scaffolds do this
+automatically when the bed has those stems.
+
+`"pump": {"db": 3, "release": 0.5}` on any clip dips it on every output beat and recovers over `release` beats
+(grid-locked, a short attack so it never clicks). `"groove": {"pump_fx": {"db": 5, "release": 0.6}}` at the plan
+level pumps only the vocal chains' reverb and delay returns, keeping the dry vocal steady.
 
 ## Renders
 

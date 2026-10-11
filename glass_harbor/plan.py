@@ -22,6 +22,7 @@ KINDS = ("mashup", "transition", "set")
 STEMS = ("mix",) + library.STEM_NAMES
 AUTOMATABLE = {
     "gain_db": 0.0,
+    "arrange_db": 0.0,  # a second gain lane for stem arrangement (mutes/strips), independent of fades
     "highpass_hz": 20.0,
     "lowpass_hz": 20000.0,
     "eq_low_db": 0.0,
@@ -197,6 +198,16 @@ def _check_duck(res: Resolution, where: str, duck: Any) -> None:
     for key in ("db", "level_db"):
         if key in duck and not (_number(duck[key]) and 0 <= duck[key] <= 12):
             res.add("error", where, f"duck.{key} must be between 0 and 12 dB")
+    if duck.get("mode", "spectral") not in ("spectral", "band"):
+        res.add("error", where, "duck.mode must be spectral or band")
+
+
+def _check_pump(res: Resolution, where: str, pump: Any) -> None:
+    if pump is None:
+        return
+    if not isinstance(pump, dict) or not (_number(pump.get("db", 4)) and 0 < pump.get("db", 4) <= 12) or not (
+            _number(pump.get("release", 0.5)) and 0.1 <= pump.get("release", 0.5) <= 1.0):
+        res.add("error", where, "pump must be {db: 0-12, release: 0.1-1.0 beats}")
 
 
 def _active_value(clip: ResolvedClip, param: str, out_beat: float, bpb: int) -> float:
@@ -206,7 +217,7 @@ def _active_value(clip: ResolvedClip, param: str, out_beat: float, bpb: int) -> 
 
 
 def _bass_killed(clip: ResolvedClip, out_beat: float, bpb: int) -> bool:
-    gain = clip.gain_db + _active_value(clip, "gain_db", out_beat, bpb)
+    gain = clip.gain_db + _active_value(clip, "gain_db", out_beat, bpb) + _active_value(clip, "arrange_db", out_beat, bpb)
     return (
         _active_value(clip, "eq_low_db", out_beat, bpb) <= KILL_DB
         or _active_value(clip, "highpass_hz", out_beat, bpb) >= 150
@@ -218,7 +229,8 @@ def _bass_killed(clip: ResolvedClip, out_beat: float, bpb: int) -> bool:
 def _vocal_active(res: Resolution, clip: ResolvedClip, out_beat: float, bpb: int) -> bool:
     if clip.stem not in VOCAL_STEMS:
         return False
-    if clip.spec.get("gain_db", 0) + _active_value(clip, "gain_db", out_beat, bpb) <= -20:
+    if (clip.spec.get("gain_db", 0) + _active_value(clip, "gain_db", out_beat, bpb)
+            + _active_value(clip, "arrange_db", out_beat, bpb)) <= -20:
         return False
     if clip.chop is not None:
         return True
@@ -515,6 +527,7 @@ def resolve(plan: dict[str, Any]) -> Resolution:
         _check_automation(res, where, clip.get("automation"))
         _check_fx(res, where, clip.get("fx"))
         _check_duck(res, where, clip.get("duck"))
+        _check_pump(res, where, clip.get("pump"))
         _check_vocal_options(res, where, clip)
 
         grid = res.grids[source_name]
@@ -565,6 +578,13 @@ def resolve(plan: dict[str, Any]) -> Resolution:
             gain_db=float(source.get("gain_db", 0)) + float(clip.get("gain_db", 0)),
             stretch_pct=stretch_pct,
         ))
+
+    groove = plan.get("groove")
+    if groove is not None:
+        if not isinstance(groove, dict):
+            res.add("error", "groove", "groove must be an object")
+        else:
+            _check_pump(res, "groove.pump_fx", groove.get("pump_fx"))
 
     master = plan.get("master", {})
     if not isinstance(master, dict):

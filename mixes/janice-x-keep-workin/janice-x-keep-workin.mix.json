@@ -15,16 +15,12 @@
   },
   "clips": [
     {
-      "id": "bed",
+      "id": "bed-drums",
       "source": "bed",
-      "stem": "instrumental",
+      "stem": "drums",
       "from_bar": 1,
       "bars": 111,
       "at_bar": 1,
-      "duck": {
-        "under": "vocals",
-        "db": 3
-      },
       "automation": {
         "gain_db": [
           [
@@ -102,6 +98,346 @@
             20
           ]
         ]
+      },
+      "duck": {
+        "under": "vocals",
+        "db": 4.0
+      }
+    },
+    {
+      "id": "bed-bass",
+      "source": "bed",
+      "stem": "bass",
+      "from_bar": 1,
+      "bars": 111,
+      "at_bar": 1,
+      "automation": {
+        "gain_db": [
+          [
+            79.747,
+            0
+          ],
+          [
+            79.75,
+            -60
+          ],
+          [
+            79.998,
+            -60
+          ],
+          [
+            80.0,
+            0
+          ],
+          [
+            90.747,
+            0
+          ],
+          [
+            90.75,
+            -60
+          ],
+          [
+            90.998,
+            -60
+          ],
+          [
+            91.0,
+            0
+          ],
+          [
+            103,
+            0
+          ],
+          [
+            111,
+            -40
+          ]
+        ],
+        "highpass_hz": [
+          [
+            72.0,
+            20
+          ],
+          [
+            79.75,
+            700
+          ],
+          [
+            79.998,
+            700
+          ],
+          [
+            80.0,
+            20
+          ],
+          [
+            83.0,
+            20
+          ],
+          [
+            90.75,
+            700
+          ],
+          [
+            90.998,
+            700
+          ],
+          [
+            91.0,
+            20
+          ]
+        ],
+        "arrange_db": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            22.9688,
+            0.0
+          ],
+          [
+            23.0,
+            -60.0
+          ],
+          [
+            23.9688,
+            -60.0
+          ],
+          [
+            24.0,
+            0.0
+          ],
+          [
+            46.9688,
+            0.0
+          ],
+          [
+            47.0,
+            -60.0
+          ],
+          [
+            47.9688,
+            -60.0
+          ],
+          [
+            48.0,
+            0.0
+          ],
+          [
+            78.9688,
+            0.0
+          ],
+          [
+            79.0,
+            -60.0
+          ],
+          [
+            79.9688,
+            -60.0
+          ],
+          [
+            80.0,
+            0.0
+          ],
+          [
+            89.9688,
+            0.0
+          ],
+          [
+            90.0,
+            -60.0
+          ],
+          [
+            90.9688,
+            -60.0
+          ],
+          [
+            91.0,
+            0.0
+          ]
+        ]
+      }
+    },
+    {
+      "id": "bed-other",
+      "source": "bed",
+      "stem": "other",
+      "from_bar": 1,
+      "bars": 111,
+      "at_bar": 1,
+      "automation": {
+        "gain_db": [
+          [
+            79.747,
+            0
+          ],
+          [
+            79.75,
+            -60
+          ],
+          [
+            79.998,
+            -60
+          ],
+          [
+            80.0,
+            0
+          ],
+          [
+            90.747,
+            0
+          ],
+          [
+            90.75,
+            -60
+          ],
+          [
+            90.998,
+            -60
+          ],
+          [
+            91.0,
+            0
+          ],
+          [
+            103,
+            0
+          ],
+          [
+            111,
+            -40
+          ]
+        ],
+        "highpass_hz": [
+          [
+            72.0,
+            20
+          ],
+          [
+            79.75,
+            700
+          ],
+          [
+            79.998,
+            700
+          ],
+          [
+            80.0,
+            20
+          ],
+          [
+            83.0,
+            20
+          ],
+          [
+            90.75,
+            700
+          ],
+          [
+            90.998,
+            700
+          ],
+          [
+            91.0,
+            20
+          ]
+        ],
+        "arrange_db": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            7.9688,
+            0.0
+          ],
+          [
+            8.0,
+            -60.0
+          ],
+          [
+            15.9688,
+            -60.0
+          ],
+          [
+            16.0,
+            0.0
+          ],
+          [
+            22.9688,
+            0.0
+          ],
+          [
+            23.0,
+            -60.0
+          ],
+          [
+            23.9688,
+            -60.0
+          ],
+          [
+            24.0,
+            0.0
+          ],
+          [
+            39.7188,
+            0.0
+          ],
+          [
+            39.75,
+            -60.0
+          ],
+          [
+            47.9688,
+            -60.0
+          ],
+          [
+            48.0,
+            0.0
+          ],
+          [
+            78.9688,
+            0.0
+          ],
+          [
+            79.0,
+            -60.0
+          ],
+          [
+            79.9688,
+            -60.0
+          ],
+          [
+            80.0,
+            0.0
+          ],
+          [
+            88.7188,
+            0.0
+          ],
+          [
+            88.75,
+            -60.0
+          ],
+          [
+            90.9688,
+            -60.0
+          ],
+          [
+            91.0,
+            0.0
+          ]
+        ]
+      },
+      "duck": {
+        "under": "vocals",
+        "db": 5.0
+      },
+      "pump": {
+        "db": 3.0,
+        "release": 0.5
       }
     },
     {
@@ -484,6 +820,13 @@
     "keys: rap vocal (low tonality) over a low-confidence bed key; no pitch shift",
     "drop at bar 92: 8-bar build on bed, riser, impact, 1 beat(s) of silence",
     "drop at bar 81: 8-bar build on bed, riser, impact, 1 beat(s) of silence",
-    "v4: vocal chain (rap on verses, hook on choruses), word-safe edges, vocal rider, master matched to the Keep Workin' original (Matchering), mono bass < 120 Hz, soft clip + true-peak limiter"
-  ]
+    "v4: vocal chain (rap on verses, hook on choruses), word-safe edges, vocal rider, master matched to the Keep Workin' original (Matchering), mono bass < 120 Hz, soft clip + true-peak limiter",
+    "stem arrangement on bed: verses over drums + bass (melodic layer -60 dB), full beat under hooks, 1 drums-only bar before each hook, melodic layer pumps on the beat"
+  ],
+  "groove": {
+    "pump_fx": {
+      "db": 5.0,
+      "release": 0.6
+    }
+  }
 }

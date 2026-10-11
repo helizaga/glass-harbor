@@ -10,9 +10,12 @@ These encode DJ conventions so the agent starts from something musical and then 
 
 from __future__ import annotations
 
+import json
 import math
 from dataclasses import dataclass, field
 from typing import Any
+
+import numpy as np
 
 from glass_harbor import compat, library
 from glass_harbor.compat import tempo_options
@@ -315,10 +318,16 @@ def build_mashup(vocals: str, bed: str, *, semitones: int | None = None, intro_b
                           "automation": {"gain_db": [[loops * loop_len - outro_bars, 0], [loops * loop_len, -40]]},
                           "duck": {"under": "vocals", "db": float(taste_default("duck_db"))}})
 
+    hook_starts = [o["start_bar"] for h in vox.get("hooks", []) for o in h.get("occurrences", [])]
+    for clip in clips:
+        if any(clip["from_bar"] <= bar < clip["from_bar"] + clip["bars"] for bar in hook_starts):
+            clip["chain"] = "hook"
+
     vox_source: dict[str, Any] = {"track": vocals, "semitones": shift}
     if ratio != 1:
         vox_source["tempo_ratio"] = ratio
-    return {
+    edm = _is_edm(float(beat["bpm"]))
+    plan = {
         "version": 1,
         "title": title or f"{vocals} x {bed}",
         "kind": "mashup",
@@ -326,13 +335,19 @@ def build_mashup(vocals: str, bed: str, *, semitones: int | None = None, intro_b
         "beats_per_bar": 4,
         "sources": {"vox": vox_source, "bed": {"track": bed}},
         "clips": bed_clips + clips,
-        "master": {"lufs": float(taste_default("master_lufs")), "ceiling_db": -1.0},
+        # Master against the bed's own release so the mashup sits next to it in a set.
+        "master": {"reference": bed, "ceiling_db": -1.0},
         "notes": [
             f"fit: {fit.relation}, {fit.key_a} over {fit.key_b}, {fit.stretch_pct:+.1f}% stretch on vocals, "
             f"score {fit.score}",
             "vocal phrases were placed back to back from the source; reorder or swap for the strongest hook",
         ],
     }
+    if edm:
+        plan["groove"] = {"pump_fx": {"db": 5.0, "release": 0.6}}
+    if {"drums", "bass", "other"} <= set(library.available_stems(bed)) and len(bed_clips) == 1:
+        plan = arrange_bed_stems(plan, pump={"db": 3.0, "release": 0.5} if edm else None)
+    return plan
 
 
 def _merge_points(existing: list[list[float]] | None, start: float, end: float,
@@ -380,4 +395,85 @@ def add_drop(plan: dict[str, Any], at_bar: float, *, build_bars: float = 8, clip
     plan.setdefault("notes", []).append(
         f"drop at bar {at_bar:g}: {build_bars:g}-bar build on {', '.join(t.id for t in targets)}"
         f"{', riser' if riser else ''}{', impact' if impact else ''}, {silence_beats:g} beat(s) of silence")
+    return plan
+
+
+def _levels_to_points(levels: list[float], bpb: int, ramp_beats: float = 0.125) -> list[list[float]]:
+    """Per-beat target levels -> automation points (bar offsets) with short ramps at each change."""
+    points = [[0.0, levels[0]]]
+    for k in range(1, len(levels)):
+        if levels[k] != levels[k - 1]:
+            points.append([round((k - ramp_beats) / bpb, 4), levels[k - 1]])
+            points.append([round(k / bpb, 4), levels[k]])
+    return points
+
+
+def arrange_bed_stems(plan: dict[str, Any], *, bed_clip_id: str | None = None, verse_other_db: float = -60.0,
+                      drums_only_bars: float = 1, pump: dict[str, float] | None = None,
+                      duck_drums_db: float = 4.0) -> dict[str, Any]:
+    """Replace one bed clip with drums / bass / other clips and arrange them around the vocal: verses over drums +
+    bass (the melodic layer stripped by ``verse_other_db``), choruses over the full beat, and a drums-only bar
+    before each chorus. Ducking moves to the melodic layer; optional grid pumping on it too."""
+    from glass_harbor.plan import resolve
+
+    res = resolve(plan)
+    if not res.ok:
+        raise ValueError("fix plan errors before arranging stems")
+    bpb = res.beats_per_bar
+    beds = [c for c in res.clips if c.stem in ("instrumental", "mix") and (bed_clip_id is None or c.id == bed_clip_id)]
+    if not beds:
+        raise ValueError("no instrumental/mix bed clip to arrange")
+    bed = beds[0]
+    missing = {"drums", "bass", "other"} - set(library.available_stems(bed.track))
+    if missing:
+        raise ValueError(f"{bed.track} needs {', '.join(sorted(missing))} stems: glass-harbor track separate "
+                         f"{bed.track} --stems drums,bass,other")
+    spec = plan["clips"][bed.index]
+    beats = int(round(bed.out_end_beat - bed.anchor_beat))
+    other = [0.0] * beats
+    bass = [0.0] * beats
+    hooks, verses = [], []
+    # A drop always hits with the full beat: a vocal entering on an impact is treated like a hook.
+    impacts = [c.anchor_beat for c in res.clips if c.spec.get("generate") == "impact"]
+    for clip in res.clips:
+        if clip.stem != "vocals" or clip.chop is not None:
+            continue
+        span = (clip.out_start_beat - bed.anchor_beat, clip.out_end_beat - bed.anchor_beat)
+        on_drop = any(abs(clip.anchor_beat - at) <= 1 for at in impacts)
+        (hooks if clip.spec.get("chain") == "hook" or on_drop else verses).append(span)
+    for a, b in verses:
+        for k in range(max(0, int(np.floor(a))), min(beats, int(np.ceil(b)))):
+            other[k] = verse_other_db
+    for a, _ in hooks:
+        start = int(round(a))
+        for k in range(max(0, start - int(drums_only_bars * bpb)), min(beats, start)):
+            if not any(h0 <= k < h1 for h0, h1 in hooks):
+                other[k] = bass[k] = -60.0
+    clips = []
+    for stem in ("drums", "bass", "other"):
+        clip = json.loads(json.dumps(spec))
+        clip["id"] = f"{spec.get('id', 'bed')}-{stem}"
+        clip["stem"] = stem
+        clip.pop("duck", None)
+        automation = clip.setdefault("automation", {})
+        if stem == "bass" and any(bass):
+            automation["arrange_db"] = _levels_to_points(bass, bpb)
+        if stem == "drums" and duck_drums_db:
+            # Hats, shakers, and snare share the vocal's presence range (percussive house especially); duck only
+            # where they actually compete, so the kick and the groove keep their punch.
+            clip["duck"] = {"under": "vocals", "db": duck_drums_db}
+        if stem == "other":
+            if any(other):
+                automation["arrange_db"] = _levels_to_points(other, bpb)
+            clip["duck"] = spec.get("duck") or {"under": "vocals", "db": float(taste_default("duck_db"))}
+            if pump:
+                clip["pump"] = pump
+        if not automation:
+            clip.pop("automation")
+        clips.append(clip)
+    plan["clips"][bed.index:bed.index + 1] = clips
+    plan.setdefault("notes", []).append(
+        f"stem arrangement on {spec.get('id', 'bed')}: verses over drums + bass (melodic layer {verse_other_db:g} dB), "
+        f"full beat under hooks, {drums_only_bars:g} drums-only bar before each hook"
+        + (", melodic layer pumps on the beat" if pump else ""))
     return plan

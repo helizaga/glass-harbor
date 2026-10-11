@@ -513,6 +513,19 @@ def cmd_mix_video(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_mix_arrange(args: argparse.Namespace) -> int:
+    from glass_harbor.plan import load_plan, save_plan
+    from glass_harbor.scaffold import arrange_bed_stems
+
+    slug = require_slug(args.slug)
+    path = plan_path(slug)
+    pump = None if args.no_pump else {"db": args.pump_db, "release": 0.5}
+    plan = arrange_bed_stems(load_plan(path), bed_clip_id=args.bed, verse_other_db=args.verse_other_db,
+                             drums_only_bars=args.drums_only_bars, pump=pump, duck_drums_db=args.duck_drums_db)
+    save_plan(path, plan)
+    return _validate_and_report(args, slug, prefix="arranged the bed from stems\n")
+
+
 def cmd_mix_list(args: argparse.Namespace) -> int:
     root = mixes_dir()
     slugs = sorted(p.name for p in root.iterdir() if (p / f"{p.name}.mix.json").exists()) if root.exists() else []
@@ -634,6 +647,17 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-impact", action="store_true")
     p.add_argument("--verbose", action="store_true")
     p.set_defaults(func=cmd_mix_drop)
+
+    p = common(mix.add_parser("arrange", help="split the bed into drums/bass/other and arrange around the vocal"))
+    p.add_argument("slug")
+    p.add_argument("--bed", help="bed clip id (default: the first instrumental/mix clip)")
+    p.add_argument("--verse-other-db", type=float, default=-60.0, help="melodic layer under verses (-60 = off)")
+    p.add_argument("--drums-only-bars", type=float, default=1)
+    p.add_argument("--pump-db", type=float, default=3.0)
+    p.add_argument("--duck-drums-db", type=float, default=4.0, help="spectral duck on the drums under vocals (0 = off)")
+    p.add_argument("--no-pump", action="store_true")
+    p.add_argument("--verbose", action="store_true")
+    p.set_defaults(func=cmd_mix_arrange)
 
     p = mix.add_parser("review", help="open the local review page (play, A/B, comment on time ranges)")
     p.add_argument("slug")
