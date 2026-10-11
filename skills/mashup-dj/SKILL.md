@@ -76,6 +76,13 @@ glass-harbor match <track> --role next            # what blends well after this 
 
 ## 4. Scaffold, then make it musical
 
+Start with `glass-harbor auto <vocal> <bed>` unless the user wants a specific arrangement: it runs steps 1-4 and
+the render/QA loop. Its draft rules: choruses on drops when the song has real choruses; otherwise the song's own
+order with verse 1 on the beat's first full section, a pause for each breakdown and a chopped-chant build into the
+next drop; a verse reprise when the back half is thin; the beat's own shouts answering where the acapella is
+silent; a half-time switch for one verse run on DnB beds; no extra DJ intro when the beat already has one. Fix
+rounds lift buried vocals, strip the bar before a flat drop, and make the bass follow clashing sung notes.
+
 ```sh
 glass-harbor mix new <slug> --kind mashup --vocals <a> --bed <b>
 glass-harbor mix new <slug> --kind transition --tracks <a> <b> [--style blend|cut|echo|filter]

@@ -358,3 +358,24 @@ def analyze_track(
             entry["phrases"] = vocal_phrases(stem_db)
         result["stems"][name] = entry
     return result
+
+
+def analyze_library_track(track_id: str, *, backend: str = "auto", log=print,
+                          sections: str | None = None) -> dict[str, Any]:
+    """Analyze a library track with all its stems and save it (lyric phrases and hooks are kept)."""
+    from glass_harbor import library
+    from glass_harbor.lyrics import load_lyrics, update_analysis
+
+    audio = library.load_audio(track_id)
+    stems = {name: library.load_audio(track_id, name) for name in library.available_stems(track_id)}
+    if sections is None:  # keep whatever section backend the track was analyzed with last time
+        previous = library.load_analysis(track_id) if library.analysis_path(track_id).exists() else {}
+        sections = previous.get("sections_backend", "novelty")
+    log(f"analyzing {track_id} ({', '.join(stems) or 'no stems'}; sections: {sections})")
+    analysis = analyze_track(audio, beat_backend=backend, stems=stems, sections_backend=sections,
+                             source_path=library.audio_path(track_id))
+    library.save_analysis(track_id, analysis)
+    lyrics = load_lyrics(track_id)
+    if lyrics is not None:
+        analysis = update_analysis(track_id, lyrics)
+    return analysis

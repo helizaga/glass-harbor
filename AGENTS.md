@@ -20,6 +20,11 @@
   brief.
 
 ## Canonical workflow
+The default for a new mashup is one command: `glass-harbor auto <vocal file or id> <beat file or id>`. It ingests,
+separates, transcribes, drafts (structure, stems, drops, fills, call and response, half-time switch, bass that
+follows the vocal), renders, and runs QA fix rounds, then writes the brief. Hand the user `mix-phone.m4a` and the
+brief; step in with the manual steps below only to change what the draft decided or when the user asks.
+
 1. Turn the request into a slug and a brief; list the tracks and the intended moment (energy, setting).
    Read `taste.json` (defaults, preferences, past verdicts) before planning. When suggesting songs, follow
    "Choosing songs" in the skill (Beatport + kworb first, 1001Tracklists to check a pairing is proven, not overdone).
@@ -51,6 +56,7 @@ Use a Python build with SSL (Homebrew); the pyenv 3.11.3 build on this machine l
 
 ## Commands
 - `glass-harbor doctor`
+- `glass-harbor auto <vocal> <bed> [--slug] [--title] [--rounds 2]` (files or track ids; the whole pipeline)
 - `glass-harbor track add <files...> [--id] [--stem name=path] [--separate stems] [--quality fast|balanced|best] [--sections novelty|allin1]`
 - `glass-harbor track analyze <ids...>|--all [--force] [--beats auto|beat_this|librosa] [--sections novelty|allin1]`
 - `glass-harbor track separate <id> [--stems vocals,instrumental,drums,bass,other] [--quality ...]`

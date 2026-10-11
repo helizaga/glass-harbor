@@ -80,23 +80,9 @@ def _summary(track_id: str) -> dict[str, Any]:
 
 
 def _analyze(track_id: str, backend: str, log, sections: str | None = None) -> dict[str, Any]:
-    from glass_harbor.analyze import analyze_track
+    from glass_harbor.analyze import analyze_library_track
 
-    audio = library.load_audio(track_id)
-    stems = {name: library.load_audio(track_id, name) for name in library.available_stems(track_id)}
-    if sections is None:  # keep whatever section backend the track was analyzed with last time
-        previous = library.load_analysis(track_id) if library.analysis_path(track_id).exists() else {}
-        sections = previous.get("sections_backend", "novelty")
-    log(f"analyzing {track_id} ({', '.join(stems) or 'no stems'}; sections: {sections})")
-    analysis = analyze_track(audio, beat_backend=backend, stems=stems, sections_backend=sections,
-                             source_path=library.audio_path(track_id))
-    library.save_analysis(track_id, analysis)
-    from glass_harbor.lyrics import load_lyrics, update_analysis
-
-    lyrics = load_lyrics(track_id)
-    if lyrics is not None:
-        analysis = update_analysis(track_id, lyrics)
-    return analysis
+    return analyze_library_track(track_id, backend=backend, log=log, sections=sections)
 
 
 def cmd_track_add(args: argparse.Namespace) -> int:
@@ -566,6 +552,19 @@ def cmd_mix_follow(args: argparse.Namespace) -> int:
     return _validate_and_report(args, slug, prefix="\n".join(lines) + "\n")
 
 
+def cmd_mix_listen(args: argparse.Namespace) -> int:
+    from glass_harbor.listen import listen_run
+
+    run = _run_for(require_slug(args.slug), args.run)
+    result = listen_run(run, log=_log(args))
+    lines = [f"{run.name}: Whisper made out {result['overall_recall']:.0%} of the lyrics in the finished mix"
+             if result["overall_recall"] is not None else f"{run.name}: no lyrics to check"]
+    lines += [f"  {c['clip']:18s} {c['heard']:>3}/{c['expected']:<3} {c['recall']:.0%}"
+              + ("  <- masked" if c["clip"] in result["weak"] else "") for c in result["clips"]]
+    _emit(args, result, "\n".join(lines))
+    return 0
+
+
 def cmd_mix_fills(args: argparse.Namespace) -> int:
     from glass_harbor.scaffold import add_fills
 
@@ -590,6 +589,21 @@ def cmd_mix_list(args: argparse.Namespace) -> int:
 
 
 # ---------------------------------------------------------------- parser
+
+def cmd_auto(args: argparse.Namespace) -> int:
+    from glass_harbor.auto import run_auto
+
+    result = run_auto(args.vocal, args.bed, slug=args.slug, title=args.title or "", rounds=args.rounds,
+                      log=_log(args))
+    lines = [f"{result['slug']}: {result['verdict']}",
+             f"  send to a phone: {result['phone']}", f"  full quality:    {result['mp3']}",
+             f"  plan: {result['plan']}", f"  brief: {result['brief']}"]
+    lines += [f"  fix round {i + 1}: {'; '.join(r) if r else 'nothing left to fix'}"
+              for i, r in enumerate(result["rounds"])]
+    lines += [f"  {f['level']}: {f['where']}: {f['message']}" for f in result["flags"]]
+    _emit(args, result, "\n".join(lines))
+    return 0
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="glass-harbor", description=__doc__)
@@ -733,6 +747,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--verbose", action="store_true")
     p.set_defaults(func=cmd_mix_follow)
 
+    p = common(mix.add_parser("listen", help="Whisper listens to a render: which vocal clips' words survive the beat"))
+    p.add_argument("slug")
+    p.add_argument("--run", help="run folder name (default: latest)")
+    p.set_defaults(func=cmd_mix_listen)
+
     p = common(mix.add_parser("fills", help="crashes on hook entries and drops, reverse swells into hooks"))
     p.add_argument("slug")
     p.add_argument("--no-crashes", action="store_true")
@@ -802,6 +821,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--start-bar", type=float, help="cut a short clip starting at this bar")
     p.add_argument("--end-bar", type=float)
     p.set_defaults(func=cmd_mix_video)
+
+    p = common(sub.add_parser("auto", help="two audio files (or track ids) in, a finished mashup out: separate, "
+                                           "draft, render, and fix what QA finds"))
+    p.add_argument("vocal", help="the song whose vocal you want (audio file or track id)")
+    p.add_argument("bed", help="the song whose beat you want (audio file or track id)")
+    p.add_argument("--slug", help="mix name (default: <vocal>-x-<bed>)")
+    p.add_argument("--title")
+    p.add_argument("--rounds", type=int, default=2, help="QA fix rounds after the first render (default 2)")
+    p.set_defaults(func=cmd_auto)
 
     p = common(sub.add_parser("taste", help="your mixing defaults and preferences (read by scaffolds and agents)"))
     p.add_argument("action", nargs="?", choices=("show", "set", "add"), default="show")

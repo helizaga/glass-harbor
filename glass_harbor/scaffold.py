@@ -305,6 +305,18 @@ def build_mashup(vocals: str, bed: str, *, semitones: int | None = None, intro_b
         raise ValueError(f"No vocal phrases detected in {vocals}; check the vocals stem.")
 
     smart = smart_arrangement(vocals, bed, vox, beat, ratio, library.load_meta(vocals).get("title", vocals))
+    song_ordered = False
+    if smart is None:
+        # Chant-built rap songs: keep the song's own order on the beat's structure.
+        from glass_harbor import arrange
+        from glass_harbor.lyrics import load_lyrics
+
+        ordered = arrange.song_order(vocals, beat, ratio, load_lyrics(vocals))
+        if ordered is not None:
+            song_clips, resumes, song_notes = ordered
+            drop_bars = sorted({d for d in beat.get("drops", []) if d >= 9} | set(resumes))
+            smart = (song_clips, [(d, 0.0) for d in drop_bars], song_notes)
+            song_ordered = True
     clips: list[dict[str, Any]] = []
     at_bar = 1 + intro_bars
     used = 0
@@ -392,8 +404,13 @@ def build_mashup(vocals: str, bed: str, *, semitones: int | None = None, intro_b
     if edm:
         plan["groove"] = {"pump_fx": {"db": 5.0, "release": 0.6}}
     if {"drums", "bass", "other"} <= set(library.available_stems(bed)) and len(bed_clips) == 1:
+        dnb = float(beat["bpm"]) >= 160
         plan = arrange_bed_stems(plan, pump={"db": 3.0, "release": 0.5} if edm else None,
-                                 drum_clip_db=3.0 if edm else 0.0)
+                                 drum_clip_db=3.0 if edm else 0.0,
+                                 # a DnB drop loses its identity without its melodic layer: lower it, don't strip it
+                                 verse_other_db=-6.0 if dnb else -60.0,
+                                 # chant hooks every few bars would turn a drums-only bar into constant dropouts
+                                 drums_only_bars=0 if song_ordered else 1)
     has_drums = "drums" in library.available_stems(bed)
     for bar, spotlight in drop_builds:
         try:
@@ -405,10 +422,20 @@ def build_mashup(vocals: str, bed: str, *, semitones: int | None = None, intro_b
             for clip in plan["clips"]:
                 if clip.get("id") == f"riser-{bar:g}":
                     clip["bars"] = round(max(1.0, bar - spotlight - clip["at_bar"]), 4)
+    from glass_harbor import arrange
+
+    if smart:
+        plan = arrange.add_reprise(plan, beat)
+        plan = arrange.add_bed_answers(plan, bed)
+        plan = arrange.add_halftime_switch(plan)
     plan = add_fills(plan)
     edges = int(taste_default("dj_edge_bars"))
     if edges:
-        plan = add_dj_edges(plan, intro_bars=edges, outro_bars=edges)
+        own_intro = arrange.own_intro_bars(beat)
+        intro = 0 if own_intro >= 16 else edges
+        if intro == 0:
+            plan.setdefault("notes", []).append(f"no extra DJ intro: the beat opens with {own_intro} bars of its own")
+        plan = add_dj_edges(plan, intro_bars=intro, outro_bars=edges)
     plan, _ = follow_vocal_roots(plan)
     return plan
 
@@ -671,6 +698,18 @@ def _bed_clips(res) -> list:
     return [c for c in res.clips if c.stem not in ("vocals", "fx") and c.chop is None]
 
 
+def _quiet_tail_bars(analysis: dict[str, Any]) -> int:
+    """Bars at the very end that are far quieter than the track (a fade-out or a tail)."""
+    levels = analysis.get("bar_db") or []
+    if len(levels) < 16:
+        return 0
+    median = float(np.median(levels))
+    bars = 0
+    while bars < len(levels) // 4 and levels[-1 - bars] < median - 10:
+        bars += 1
+    return bars
+
+
 def add_dj_edges(plan: dict[str, Any], *, intro_bars: int = 16, outro_bars: int = 16) -> dict[str, Any]:
     """DJ-friendly edit: a beat-only intro (drums, then bass halfway) and outro (bass out halfway) so a DJ can
     mix the edit in and out. Everything else moves later by ``intro_bars``; end-of-bed fades are replaced by the
@@ -691,6 +730,16 @@ def add_dj_edges(plan: dict[str, Any], *, intro_bars: int = 16, outro_bars: int 
     parts = [("drums", 0.0), ("bass", 0.5)] if {"drums", "bass"} <= set(stems) else [(bed.stem, 0.0)]
     loop_len = 8 if intro_bars % 8 == 0 and outro_bars % 8 == 0 else 4
 
+    # A bed that fades out on its own would leave near-silence before the looped outro: end it before the fade.
+    tail = _quiet_tail_bars(analysis)
+    bed_end = _bar_count(analysis) + 1
+    if tail and outro_bars:
+        for clip in plan["clips"]:
+            if clip.get("source") == bed.source and "from_bar" in clip and clip.get("loop", 1) == 1 \
+                    and clip["from_bar"] + clip["bars"] > bed_end - tail and clip["from_bar"] < bed_end - tail:
+                clip["bars"] = bed_end - tail - clip["from_bar"]
+        plan.setdefault("notes", []).append(f"the beat's own {tail}-bar fade-out is cut; the DJ outro follows on")
+        res = resolve(plan)
     last_bar = max(1 + c.out_end_beat / res.beats_per_bar for c in res.clips if c.stem != "fx")
     for clip in plan["clips"]:
         clip["at_bar"] = clip["at_bar"] + intro_bars
