@@ -25,6 +25,7 @@ TASTE_DEFAULTS: dict[str, Any] = {
     "hiphop_blend_bars": 8,
     "vocal_highpass_hz": 110,
     "duck_db": 5.0,  # spectral ducking: the most it cuts, only where the vocal competes
+    "dj_edge_bars": 16,  # beat-only intro/outro on new mashups so DJs can mix them (0 = off)
 }
 
 

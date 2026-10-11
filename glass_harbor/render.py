@@ -202,6 +202,14 @@ def _apply_mixer(res: Resolution, clip: ResolvedClip, audio: np.ndarray, clip_st
                 out[start: start + BLOCK] = board(audio[start: start + BLOCK].T, A.SR, reset=False).T
             audio = out
 
+    if "width" in automation:
+        sample_bars = np.interp(np.arange(n), np.arange(0, n, BLOCK) + BLOCK / 2, block_bars)
+        xs = np.array([p[0] for p in automation["width"]], dtype=float)
+        ys = np.array([p[1] for p in automation["width"]], dtype=float)
+        width = np.interp(sample_bars, xs, ys)
+        mid = (audio[:, 0] + audio[:, 1]) / 2
+        side = (audio[:, 0] - audio[:, 1]) / 2 * width
+        audio = np.stack([mid + side, mid - side], axis=1)
     for lane in ("gain_db", "arrange_db"):
         if lane not in automation:
             continue
@@ -334,8 +342,18 @@ def render_clip(res: Resolution, clip: ResolvedClip, source_audio: np.ndarray, l
     if is_vocal and spec.get("ride", True):
         processed, notes["ride_max_db"] = vocals.ride(processed)
         notes["ride_max_db"] = round(notes["ride_max_db"], 1)
+    if is_vocal and float(spec.get("tune", 0)) > 0:
+        key = res.analyses[clip.track]["key"]
+        processed, cents = vocals.tune(processed, (int(key["tonic"]) + clip.semitones) % 12, key["mode"],
+                                       float(spec["tune"]))
+        notes["tune_cents"] = round(cents, 1)
     processed = _fade(processed, float(spec.get("fade_in_beats", 0)) * 60.0 / bpm_in,
                       float(spec.get("fade_out_beats", 0)) * 60.0 / bpm_out)
+    if spec.get("punch") and not is_vocal:
+        from glass_harbor.drums import punch
+
+        processed = punch(processed, attack_db=float(spec["punch"].get("attack_db", 3.0)),
+                          parallel=float(spec["punch"].get("parallel", 0.3)))
     chain_tail = 4 if chain in ("rap", "hook") else 0
     tail_beats = float(spec.get("tail_beats", 8 if spec.get("fx") else chain_tail))
     if tail_beats:
@@ -344,7 +362,8 @@ def render_clip(res: Resolution, clip: ResolvedClip, source_audio: np.ndarray, l
         window = (edges.start, edges.end) if edges is not None else (src_bounds[0], src_bounds[-1])
         throws = vocals.throw_regions_from_words(lyrics["segments"], to_clip_time, window) if lyrics else []
         dry_part, wet_part = vocals.apply_chain(processed, chain, beat_seconds=60.0 / bpm_out, throw_regions=throws,
-                                                split=True)
+                                                split=True, doubles=spec.get("doubles"),
+                                                octave=bool(spec.get("octave", False)))
         pump_fx = (res.plan.get("groove") or {}).get("pump_fx")
         if pump_fx and np.any(wet_part):
             wet_part = wet_part * _pump_gain(res, start_time, wet_part.shape[0], pump_fx, out_start, out_end)[:, None]
@@ -358,9 +377,12 @@ def render_clip(res: Resolution, clip: ResolvedClip, source_audio: np.ndarray, l
     source_dev, _, _ = grid_deviation_ms(segment, list(src_bounds[:src_beats] - src_bounds[0]))
     warp_dev, jitter, _ = grid_deviation_ms(dry, target_beats)
     warp_offset = None if warp_dev is None or source_dev is None else warp_dev - source_dev
+    nudge = float(spec.get("nudge_ms", 0.0)) / 1000.0
+    if nudge:
+        notes["nudge_ms"] = spec["nudge_ms"]
     return RenderedClip(
         clip=clip,
-        start_sample=int(round((start_time + timeline_offset) * A.SR)),
+        start_sample=max(0, int(round((start_time + timeline_offset + nudge) * A.SR))),
         audio=audio,
         dry=dry,
         target_beats=target_beats,
@@ -510,6 +532,40 @@ def soft_clipper(mix: np.ndarray, threshold_db: float, knee: float = 0.6) -> np.
     return (np.sign(mix) * shaped).astype(np.float32)
 
 
+def tame_harshness(mix: np.ndarray, *, max_cut_db: float = 3.0) -> np.ndarray:
+    """Dynamic cut of 2-5 kHz only in moments where that band jumps above its usual share of the mix
+    (vocal + hats piling up), at most ``max_cut_db``."""
+    from scipy.signal import butter, sosfiltfilt
+
+    band = sosfiltfilt(butter(2, [2000, 5000], btype="bandpass", fs=A.SR, output="sos"), mix, axis=0).astype(np.float32)
+    hop = 1024
+    frames = mix.shape[0] // hop
+    if frames < 8:
+        return mix
+    full = np.sqrt(np.mean(A.mono(mix)[: frames * hop].reshape(frames, hop) ** 2, axis=1)) + 1e-9
+    part = np.sqrt(np.mean(A.mono(band)[: frames * hop].reshape(frames, hop) ** 2, axis=1)) + 1e-9
+    share = 20 * np.log10(part / full)
+    loud = full > np.percentile(full, 25)
+    typical = float(np.median(share[loud])) if loud.any() else float(np.median(share))
+    excess = np.clip(share - (typical + 2.0), 0.0, max_cut_db * 2) / 2
+    smooth = np.convolve(excess, np.hanning(9) / np.hanning(9).sum(), mode="same")
+    cut_db = np.interp(np.arange(mix.shape[0]), np.arange(frames) * hop + hop / 2, smooth)
+    cut = 1 - 10 ** (-np.minimum(cut_db, max_cut_db) / 20)
+    return (mix - band * cut[:, None]).astype(np.float32)
+
+
+def small_speaker_bass(mix: np.ndarray, cutoff: float = 120.0, amount: float = 0.25) -> np.ndarray:
+    """Add upper harmonics of the bass (saturation above the bass band) so the bassline reads on phones/laptops."""
+    from scipy.signal import butter, sosfiltfilt
+
+    low = sosfiltfilt(butter(4, cutoff, btype="lowpass", fs=A.SR, output="sos"), mix, axis=0)
+    peak = float(np.max(np.abs(low))) or 1.0
+    harmonics = np.tanh(3.0 * low / peak) * peak
+    harmonics = sosfiltfilt(butter(2, [cutoff * 1.5, cutoff * 6], btype="bandpass", fs=A.SR, output="sos"),
+                            harmonics, axis=0)
+    return (mix + amount * harmonics).astype(np.float32)
+
+
 def _true_peak_envelope(mix: np.ndarray) -> np.ndarray:
     """Per-sample peak including inter-sample overs (4x oversampling), so the ceiling holds as true peak."""
     from scipy.signal import resample_poly
@@ -595,12 +651,50 @@ def render_chop(res: Resolution, clip: ResolvedClip, source_audio: np.ndarray, l
                         dry=dry, target_beats=[], source_offset_ms=None, warp_offset_ms=None, warp_jitter_ms=None)
 
 
+def _generate_from_source(res: Resolution, clip: ResolvedClip, kind: str, seconds: float) -> np.ndarray:
+    """Fills built from the song's own audio: snare rolls and crashes from the drum stem, vocal risers and reverse
+    swells from a lyric word."""
+    from glass_harbor import drums as kit
+    from glass_harbor import fx as generators
+
+    source = clip.spec["source"]
+    track = res.plan["sources"][source]["track"]
+    grid = res.grids[source]
+    frames = int(round(seconds * A.SR))
+    if kind in ("snare_roll", "crash"):
+        stem = "drums" if "drums" in library.available_stems(track) else "mix"
+        kit_audio = library.load_audio(track, stem)
+        if kind == "snare_roll":
+            hit = kit.find_snare(kit_audio, grid)
+            if hit is None:
+                snare = generators.impact(0.2) * 0.4
+            else:
+                snare = _segment(kit_audio, hit.start, hit.start + hit.length)
+                snare = _fade(snare, 0.001, 0.03)
+            return kit.snare_roll(snare, seconds, 60.0 / res.tempo.bpm_at(clip.anchor_beat))
+        hit = kit.find_crash(kit_audio, grid)
+        crash = kit.synth_crash() if hit is None else _fade(_segment(kit_audio, hit.start, hit.start + 2.5), 0.001, 0.8)
+        return _fit_length(crash, frames)
+    from glass_harbor.lyrics import find_word, load_lyrics
+
+    word = find_word(load_lyrics(track), str(clip.spec["word"]), int(clip.spec.get("occurrence", 1)))
+    vocal = library.load_audio(track, "vocals")
+    piece = _fade(_segment(vocal, max(0.0, word["start"] - 0.01), word["end"] + 0.06), 0.003, 0.02)
+    if kind == "vocal_riser":
+        return generators.vocal_riser(piece, seconds)
+    return generators.reverse_swell(piece, seconds)
+
+
 def render_generated(res: Resolution, clip: ResolvedClip, timeline_offset: float) -> RenderedClip:
     from glass_harbor import fx as generators
 
     start_time = res.tempo.time_at(clip.anchor_beat)
     seconds = res.tempo.time_at(clip.anchor_beat + clip.out_beats) - start_time
-    dry = generators.generate(clip.spec["generate"], seconds)
+    kind = clip.spec["generate"]
+    if kind in generators.SOURCE_TYPES:
+        dry = _generate_from_source(res, clip, kind, seconds)
+    else:
+        dry = generators.generate(kind, seconds)
     audio = dry * A.db_to_gain(clip.gain_db)
     tail_beats = float(clip.spec.get("tail_beats", 8 if clip.spec.get("fx") else 0))
     if tail_beats:
@@ -711,6 +805,14 @@ def render_plan(plan: dict[str, Any], out_dir: Path, *, start_bar: float | None 
         if 0 <= s0 < total:
             bar_spans.append((bar, (s0, min(s1, total))))
     presence = vocal_presence(rendered, total, bar_spans)
+    for edit in plan.get("edits", []):
+        if edit.get("type") == "tape_stop":
+            from glass_harbor.fx import tape_stop
+
+            a = int(round((res.tempo.time_at((edit["at_bar"] - 1) * bpb) + timeline_offset) * A.SR))
+            b = int(round((res.tempo.time_at((edit["at_bar"] - 1) * bpb + edit["beats"]) + timeline_offset) * A.SR))
+            if 0 <= a < b <= mix.shape[0]:
+                mix[a:b] = tape_stop(mix[a:b])
     if master_spec.get("glue", True):
         mix = glue(mix)
     reference = _reference(master_spec)
@@ -720,6 +822,8 @@ def render_plan(plan: dict[str, Any], out_dir: Path, *, start_bar: float | None 
     mono_hz = float(master_spec.get("mono_bass_hz", 120))
     if mono_hz:
         mix = mono_bass(mix, mono_hz)
+    if master_spec.get("tame_harshness", True):
+        mix = tame_harshness(mix)
 
     crop_start = 0
     if start_bar is not None or end_bar is not None:
@@ -728,6 +832,7 @@ def render_plan(plan: dict[str, Any], out_dir: Path, *, start_bar: float | None 
         crop_end = total if end_bar is None else min(total, int(round(
             (res.tempo.time_at(end_bar * bpb) + timeline_offset) * A.SR)))
         mix = mix[crop_start:crop_end]
+    premaster = mix
 
     target_lufs = master_spec.get("lufs")
     if target_lufs is None:
@@ -743,6 +848,13 @@ def render_plan(plan: dict[str, Any], out_dir: Path, *, start_bar: float | None 
     out_dir.mkdir(parents=True, exist_ok=True)
     wav_path = A.save(out_dir / "mix.wav", mastered, subtype="PCM_24")
     mp3_path = A.encode_mp3(wav_path, out_dir / "mix.mp3") if mp3 else None
+    stream_stats = None
+    if master_spec.get("stream_version", True):
+        # Streaming/phone master: -14 LUFS (what Spotify/YouTube normalize to), bass harmonics for small speakers.
+        streamed, stream_stats = master(small_speaker_bass(premaster), lufs=-14.0, ceiling_db=-1.0, soft_clip=False)
+        stream_wav = A.save(out_dir / "mix-stream.wav", streamed, subtype="PCM_24")
+        if mp3:
+            A.encode_mp3(stream_wav, out_dir / "mix-stream.mp3")
     if write_clips:
         clip_dir = out_dir / "clips"
         for n, r in enumerate(rendered, start=1):
@@ -760,6 +872,7 @@ def render_plan(plan: dict[str, Any], out_dir: Path, *, start_bar: float | None 
         "duration_s": round(mastered.shape[0] / A.SR, 3),
         "files": {"wav": wav_path.name, "mp3": mp3_path.name if mp3_path else None},
         "master": master_stats,
+        "stream_master": stream_stats,
         "issues": [i.to_dict() for i in res.issues],
         "vocal_presence": presence,
         "clips": [

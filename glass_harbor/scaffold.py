@@ -22,8 +22,9 @@ from glass_harbor.compat import tempo_options
 from glass_harbor.feedback import taste_default
 
 EDM_MIN_BPM = 115.0
+FILL_DUCK = {"under": "vocals", "db": 8.0}  # fills never mask the vocal
 BLEND_MAX_STRETCH = 6.0
-STYLES = ("auto", "blend", "cut", "echo", "filter")
+STYLES = ("auto", "blend", "cut", "echo", "filter", "stems")
 
 
 def _phrase_floor(bar: int, size: int = 4) -> int:
@@ -132,7 +133,16 @@ def build_set(track_ids: list[str], *, styles: list[str] | None = None, play_bar
 
     chosen = [choose_style(a.native_bpm, b.native_bpm, s) for a, b, s in zip(tracks, tracks[1:], styles)]
     lengths = [blend_bars or _blend_length(a.native_bpm, b.native_bpm)
-               if style == "blend" else 0 for a, b, style in zip(tracks, tracks[1:], chosen)]
+               if style in ("blend", "stems") else 0 for a, b, style in zip(tracks, tracks[1:], chosen)]
+    for a, b, style in zip(tracks, tracks[1:], chosen):
+        if style == "stems":
+            need = {a.track: {"bass", "other", "vocals"}, b.track: {"drums", "bass", "other"}}
+            for track_id, stems in need.items():
+                missing = stems - set(library.available_stems(track_id))
+                if missing:
+                    raise ValueError(f"stem-swap needs {', '.join(sorted(missing))} for {track_id}")
+            if b.ratio != 1:
+                raise ValueError("stem-swap needs the two tracks at the same metrical level (no half/double time)")
 
     tempo: list[dict[str, Any]] = [{"bar": 1, "bpm": round(tracks[0].native_bpm, 2)}]
     notes: list[str] = []
@@ -150,7 +160,7 @@ def build_set(track_ids: list[str], *, styles: list[str] | None = None, play_bar
             boundaries = [s["start_bar"] for s in _sections(a.analysis)
                           if abs(s["start_bar"] - target) <= 8 and s["start_bar"] > a.entry + 4]
             a.exit = _phrase_floor(min(boundaries, key=lambda bar: abs(bar - target)) if boundaries else target)
-        room = int(math.ceil(length / a.ratio)) if style == "blend" else 0
+        room = int(math.ceil(length / a.ratio)) if style in ("blend", "stems") else 0
         if a.exit + room > bars_a + 1:
             a.exit = _phrase_floor(max(a.entry + 4, bars_a + 1 - room))
         out_exit = a.out_start + (a.exit - a.entry) * a.ratio
@@ -158,7 +168,13 @@ def build_set(track_ids: list[str], *, styles: list[str] | None = None, play_bar
         b.out_start = out_exit
         offset = (a.exit - a.entry) * a.ratio  # where a's out-transition starts, in a's clip bars
 
-        if style == "blend":
+        if style == "stems":
+            if abs(b.native_bpm - a.native_bpm) > 0.05:
+                _add_tempo(tempo, {"bar": out_exit + length, "bpm": round(a.native_bpm, 2)})
+                _add_tempo(tempo, {"bar": out_exit + length + 8, "bpm": round(b.native_bpm, 2), "ramp": True})
+            notes.append(f"{a.track} -> {b.track}: {length}-bar stem swap from output bar {out_exit:g} (drums, then "
+                         f"bass at {out_exit + length / 2:g}, then melody at {out_exit + 3 * length / 4:g})")
+        elif style == "blend":
             half = length / 2
             _add_points(a, "eq_low_db", [[offset + half - 0.0625, 0], [offset + half, -40]])
             _add_points(a, "highpass_hz", [[offset + half, 20], [offset + length, 700]])
@@ -193,17 +209,35 @@ def build_set(track_ids: list[str], *, styles: list[str] | None = None, play_bar
             length = track.exit - track.entry - 1
         else:
             length = track.exit - track.entry
+        style_in = chosen[i - 1] if i else None
+        lead = lengths[i - 1] if style_in == "stems" else 0
+        if lead:
+            # The incoming track's first bars are played as stems (see below); the full mix starts after them.
+            length -= lead
         clip: dict[str, Any] = {
             "id": track.source,
             "source": track.source,
             "stem": "mix",
-            "from_bar": track.entry,
+            "from_bar": track.entry + lead,
             "bars": length,
-            "at_bar": track.out_start,
+            "at_bar": track.out_start + lead,
         }
         if track.automation:
             clip["automation"] = track.automation
         clips.append(clip)
+        if style_out == "stems":
+            nxt = tracks[i + 1]
+            swap = lengths[i]
+            at = track.out_start + (track.exit - track.entry) * track.ratio
+            plan_out = [("vocals", 0, swap / 2), ("bass", 0, swap / 2), ("other", 0, 3 * swap / 4)]
+            plan_in = [("drums", 0, swap), ("bass", swap / 2, swap), ("other", 3 * swap / 4, swap)]
+            for stem, a0, a1 in plan_out:
+                clips.append({"id": f"{track.source}-{stem}-out", "source": track.source, "stem": stem,
+                              "from_bar": track.exit + a0, "bars": a1 - a0, "at_bar": at + a0, "fade_out_beats": 1,
+                              **({"chain": "none", "word_safe": False} if stem == "vocals" else {})})
+            for stem, a0, a1 in plan_in:
+                clips.append({"id": f"{nxt.source}-{stem}-in", "source": nxt.source, "stem": stem,
+                              "from_bar": nxt.entry + a0, "bars": a1 - a0, "at_bar": at + a0})
         if style_out == "echo":
             clips.append({
                 "id": f"{track.source}-echo",
@@ -347,6 +381,10 @@ def build_mashup(vocals: str, bed: str, *, semitones: int | None = None, intro_b
         plan["groove"] = {"pump_fx": {"db": 5.0, "release": 0.6}}
     if {"drums", "bass", "other"} <= set(library.available_stems(bed)) and len(bed_clips) == 1:
         plan = arrange_bed_stems(plan, pump={"db": 3.0, "release": 0.5} if edm else None)
+    plan = add_fills(plan)
+    edges = int(taste_default("dj_edge_bars"))
+    if edges:
+        plan = add_dj_edges(plan, intro_bars=edges, outro_bars=edges)
     return plan
 
 
@@ -357,7 +395,8 @@ def _merge_points(existing: list[list[float]] | None, start: float, end: float,
 
 
 def add_drop(plan: dict[str, Any], at_bar: float, *, build_bars: float = 8, clip_ids: list[str] | None = None,
-             riser: bool = True, impact: bool = True, silence_beats: float = 1.0) -> dict[str, Any]:
+             riser: bool | str = True, impact: bool = True, silence_beats: float = 1.0,
+             roll: bool = False) -> dict[str, Any]:
     """Build -> silence -> drop at ``at_bar``: high-pass sweep on the beds, a beat of silence, a generated riser
     that ends on the downbeat, and an impact on the one."""
     from glass_harbor.plan import resolve
@@ -386,15 +425,30 @@ def add_drop(plan: dict[str, Any], at_bar: float, *, build_bars: float = 8, clip
             automation["gain_db"] = _merge_points(automation.get("gain_db"), e0 - gap - 0.01, e0, [
                 [round(e0 - gap - 0.003, 4), 0], [round(e0 - gap, 4), -60], [round(e0 - 0.002, 4), -60],
                 [round(e0, 4), 0]])
-    if riser:
+    riser_bars = build_bars - gap if silence_beats else build_bars
+    if isinstance(riser, str) and riser.startswith("vocal:"):
+        word = riser.split(":", 1)[1]
+        vox = next((c for c in res.clips if c.stem == "vocals"), None)
+        if vox is None:
+            raise ValueError("a vocal riser needs a vocal source in the plan")
+        plan["clips"].append({"id": f"vocal-riser-{at_bar:g}", "generate": "vocal_riser", "source": vox.source,
+                              "word": word, "at_bar": start_bar, "bars": riser_bars, "gain_db": -9, "duck": FILL_DUCK})
+    elif riser:
         plan["clips"].append({"id": f"riser-{at_bar:g}", "generate": "riser", "at_bar": start_bar,
-                              "bars": build_bars - gap if silence_beats else build_bars, "gain_db": -9})
+                              "bars": riser_bars, "gain_db": -9, "duck": FILL_DUCK})
+    if roll:
+        drum_source = targets[0].source
+        roll_bars = min(2.0, build_bars)
+        plan["clips"].append({"id": f"roll-{at_bar:g}", "generate": "snare_roll", "source": drum_source,
+                              "at_bar": at_bar - roll_bars, "bars": roll_bars - gap if silence_beats else roll_bars,
+                              "gain_db": -4, "duck": FILL_DUCK})
     if impact:
         plan["clips"].append({"id": f"impact-{at_bar:g}", "generate": "impact", "at_bar": at_bar, "bars": 2,
                               "gain_db": -5})
     plan.setdefault("notes", []).append(
         f"drop at bar {at_bar:g}: {build_bars:g}-bar build on {', '.join(t.id for t in targets)}"
-        f"{', riser' if riser else ''}{', impact' if impact else ''}, {silence_beats:g} beat(s) of silence")
+        f"{', ' + str(riser) + ' riser' if riser else ''}{', snare roll' if roll else ''}{', impact' if impact else ''}, "
+        f"{silence_beats:g} beat(s) of silence")
     return plan
 
 
@@ -458,6 +512,12 @@ def arrange_bed_stems(plan: dict[str, Any], *, bed_clip_id: str | None = None, v
         automation = clip.setdefault("automation", {})
         if stem == "bass" and any(bass):
             automation["arrange_db"] = _levels_to_points(bass, bpb)
+        if stem == "drums":
+            clip["punch"] = {"attack_db": 3.0, "parallel": 0.2}
+        if stem == "other":
+            # Width contrast: narrower under verses, wider on hooks and drops.
+            widths = [0.7 if level < 0 else 1.25 for level in other]
+            automation["width"] = _levels_to_points(widths, bpb)
         if stem == "drums" and duck_drums_db:
             # Hats, shakers, and snare share the vocal's presence range (percussive house especially); duck only
             # where they actually compete, so the kick and the groove keep their punch.
@@ -476,4 +536,174 @@ def arrange_bed_stems(plan: dict[str, Any], *, bed_clip_id: str | None = None, v
         f"stem arrangement on {spec.get('id', 'bed')}: verses over drums + bass (melodic layer {verse_other_db:g} dB), "
         f"full beat under hooks, {drums_only_bars:g} drums-only bar before each hook"
         + (", melodic layer pumps on the beat" if pump else ""))
+    return plan
+
+
+# ---------------------------------------------------------------- DJ edges, fills, edits
+
+
+def _lane_override(automation: dict[str, Any], lane: str, start: float, end: float, value: float) -> None:
+    """Hold ``lane`` at ``value`` over [start, end) bar offsets, restoring what was there on either side."""
+    from glass_harbor.plan import AUTOMATABLE, automation_value
+
+    points = automation.get(lane)
+    before = automation_value(points, start, AUTOMATABLE[lane])
+    after = automation_value(points, end, AUTOMATABLE[lane])
+    kept = [p for p in (points or []) if p[0] < start - 0.004 or p[0] > end]
+    new = [[round(start - 0.004, 4), before], [round(start, 4), value], [round(end - 0.004, 4), value],
+           [round(end, 4), after]]
+    automation[lane] = sorted(kept + new, key=lambda p: p[0])
+
+
+def _bed_clips(res) -> list:
+    return [c for c in res.clips if c.stem not in ("vocals", "fx") and c.chop is None]
+
+
+def add_dj_edges(plan: dict[str, Any], *, intro_bars: int = 16, outro_bars: int = 16) -> dict[str, Any]:
+    """DJ-friendly edit: a beat-only intro (drums, then bass halfway) and outro (bass out halfway) so a DJ can
+    mix the edit in and out. Everything else moves later by ``intro_bars``; end-of-bed fades are replaced by the
+    outro."""
+    from glass_harbor.plan import resolve
+
+    res = resolve(plan)
+    if not res.ok:
+        raise ValueError("fix plan errors before adding DJ edges")
+    beds = _bed_clips(res)
+    if not beds:
+        raise ValueError("no beat clip to build DJ edges from")
+    bed = beds[0]
+    analysis = res.analyses[bed.track]
+    groove = (analysis.get("drops") or [None])[0] or next(
+        (s["start_bar"] for s in analysis.get("sections", []) if s.get("energy") == "high"), 1)
+    stems = library.available_stems(bed.track)
+    parts = [("drums", 0.0), ("bass", 0.5)] if {"drums", "bass"} <= set(stems) else [(bed.stem, 0.0)]
+    loop_len = 8 if intro_bars % 8 == 0 and outro_bars % 8 == 0 else 4
+
+    last_bar = max(1 + c.out_end_beat / res.beats_per_bar for c in res.clips if c.stem != "fx")
+    for clip in plan["clips"]:
+        clip["at_bar"] = clip["at_bar"] + intro_bars
+        gains = (clip.get("automation") or {}).get("gain_db")
+        if gains and clip.get("stem") not in ("vocals",) and "generate" not in clip and gains[-1][1] <= -30:
+            fade_start = max(p[0] for p in gains if p[1] > -30) if any(p[1] > -30 for p in gains) else 0
+            clip["automation"]["gain_db"] = [p for p in gains if p[0] <= fade_start]
+    if "tempo" in plan:
+        for point in plan["tempo"][1:]:
+            point["bar"] += intro_bars
+    for edit in plan.get("edits", []):
+        edit["at_bar"] += intro_bars
+
+    source = bed.source
+    edges = []
+    for stem, enter in parts:
+        if intro_bars:
+            start = int(intro_bars * enter)
+            edges.append({"id": f"intro-{stem}", "source": source, "stem": stem, "from_bar": groove,
+                          "bars": loop_len, "loop": max(1, (intro_bars - start) // loop_len), "at_bar": 1 + start})
+        if outro_bars:
+            length = outro_bars if enter == 0 else outro_bars // 2
+            edges.append({"id": f"outro-{stem}", "source": source, "stem": stem, "from_bar": groove,
+                          "bars": loop_len, "loop": max(1, length // loop_len),
+                          "at_bar": round(last_bar + intro_bars, 4)})
+    plan["clips"] = edges[: len(parts)] + plan["clips"] + edges[len(parts):] if intro_bars else plan["clips"] + edges
+    plan.setdefault("notes", []).append(f"DJ edges: {intro_bars}-bar beat intro, {outro_bars}-bar beat outro "
+                                        f"(looped from bar {groove} of {bed.track})")
+    return plan
+
+
+def _first_word(res, clip, lyrics: dict[str, Any]) -> tuple[str, int] | None:
+    from glass_harbor.lyrics import _normalize
+
+    start = clip.src_beat_times[0]
+    words = [w for seg in lyrics["segments"] for w in seg["words"]]
+    for i, word in enumerate(words):
+        if word["start"] >= start - 0.05 and _normalize(word["word"]):
+            text = _normalize(word["word"])
+            occurrence = sum(1 for w in words[: i + 1] if _normalize(w["word"]) == text)
+            return text, occurrence
+    return None
+
+
+def add_fills(plan: dict[str, Any], *, crashes: bool = True, swells: bool = True) -> dict[str, Any]:
+    """Crash on every hook entry and drop, and a one-bar reverse swell of the hook's first word leading into it."""
+    from glass_harbor.lyrics import load_lyrics
+    from glass_harbor.plan import resolve
+
+    res = resolve(plan)
+    if not res.ok:
+        raise ValueError("fix plan errors before adding fills")
+    beds = _bed_clips(res)
+    drum_source = beds[0].source if beds else None
+    existing = {(c.get("generate"), c.get("at_bar")) for c in plan["clips"]}
+    added = []
+    hooks = [c for c in res.clips if c.stem == "vocals" and c.chop is None and c.spec.get("chain") == "hook"]
+    targets = sorted({c.spec["at_bar"] for c in hooks} | {c.spec["at_bar"] for c in res.clips
+                                                          if c.spec.get("generate") == "impact"})
+    for bar in targets:
+        if crashes and drum_source and ("crash", bar) not in existing:
+            plan["clips"].append({"id": f"crash-{bar:g}", "generate": "crash", "source": drum_source,
+                                  "at_bar": bar, "bars": 2, "gain_db": -8, "duck": FILL_DUCK})
+            added.append(f"crash {bar:g}")
+    for hook in hooks:
+        lyrics = load_lyrics(hook.track)
+        found = _first_word(res, hook, lyrics) if lyrics else None
+        bar = hook.spec["at_bar"] - 1
+        if swells and found and bar >= 1 and ("reverse_swell", bar) not in existing:
+            plan["clips"].append({"id": f"swell-{hook.spec['at_bar']:g}", "generate": "reverse_swell",
+                                  "source": hook.source, "word": found[0], "occurrence": found[1], "at_bar": bar,
+                                  "bars": 1, "gain_db": -8, "automation": {"highpass_hz": [[0, 250]]},
+                                  "duck": FILL_DUCK})
+            added.append(f"swell into {hook.spec['at_bar']:g}")
+    plan.setdefault("notes", []).append("fills: " + (", ".join(added) or "none needed"))
+    return plan
+
+
+def add_edit(plan: dict[str, Any], kind: str, at_bar: float, *, beats: float = 1.0, word: str | None = None,
+             occurrence: int = 1, pattern: str = "j-j-jjjj", source: str | None = None,
+             semitones: int = 1) -> dict[str, Any]:
+    """Punchline edits: ``mute`` (the beat drops out under a line), ``stutter`` (a word repeated on 16ths, the
+    vocal muted under it), ``tape_stop`` (the whole mix brakes to a stop), ``lift`` (clips from ``at_bar`` on go up
+    ``semitones``)."""
+    from glass_harbor.plan import resolve
+
+    res = resolve(plan)
+    if not res.ok:
+        raise ValueError("fix plan errors before adding edits")
+    bpb = res.beats_per_bar
+    start_beat, end_beat = (at_bar - 1) * bpb, (at_bar - 1) * bpb + beats
+    if kind == "tape_stop":
+        plan.setdefault("edits", []).append({"type": "tape_stop", "at_bar": at_bar, "beats": beats})
+    elif kind in ("mute", "stutter"):
+        if kind == "stutter":
+            vox = source or next(c.source for c in res.clips if c.stem == "vocals")
+            if not word:
+                raise ValueError("stutter needs --word")
+            steps = len(pattern)
+            beats = steps * 0.25
+            end_beat = start_beat + beats
+            plan["clips"].append({"id": f"stutter-{at_bar:g}", "source": vox, "stem": "vocals", "at_bar": at_bar,
+                                  "bars": beats / bpb, "chop": {"slices": {"j": {"word": word, "occurrence": occurrence}},
+                                                                 "pattern": pattern}})
+        for clip in res.clips:
+            playing = clip.out_start_beat < end_beat and clip.out_end_beat > start_beat
+            silence = (kind == "mute" and clip.stem not in ("vocals", "fx")) or (
+                kind == "stutter" and clip.stem == "vocals" and clip.chop is None)
+            if playing and silence:
+                spec = plan["clips"][clip.index]
+                offset = (start_beat - clip.anchor_beat) / bpb
+                _lane_override(spec.setdefault("automation", {}), "arrange_db", offset, offset + beats / bpb, -60.0)
+    elif kind == "lift":
+        spanning = []
+        for clip in res.clips:
+            if clip.stem == "fx":
+                continue
+            if clip.anchor_beat >= start_beat:
+                spec = plan["clips"][clip.index]
+                spec["semitones"] = int(spec.get("semitones", 0)) + semitones
+            elif clip.out_end_beat > start_beat:
+                spanning.append(clip.id)
+        if spanning:
+            raise ValueError(f"split these clips at bar {at_bar:g} first: {', '.join(spanning)}")
+    else:
+        raise ValueError("edit must be mute, stutter, tape_stop, or lift")
+    plan.setdefault("notes", []).append(f"edit: {kind} at bar {at_bar:g}")
     return plan

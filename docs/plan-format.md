@@ -42,6 +42,9 @@ overlaps, key clashes, audible stretch, silence).
 | `master.reference` | a library track id (or `{track, stem}`): Matchering matches tonal balance and width to that released master; without `lufs`, its loudness becomes the target (clamped to -14..-7) |
 | `master.mono_bass_hz` | default `120`: everything below is folded to mono (club systems); `0` turns it off |
 | `master.soft_clip` | default `true`: a soft clipper shaves the sharpest transients before the limiter |
+| `master.tame_harshness` | default `true`: a dynamic cut of 2-5 kHz (max 3 dB) only when that band jumps above its usual share |
+| `master.stream_version` | default `true`: also writes `mix-stream.wav/mp3` at -14 LUFS with bass harmonics for phones |
+| `edits` | `[{"type": "tape_stop", "at_bar": 64.5, "beats": 2}]`: the whole mix brakes to a stop |
 
 ## Sources
 
@@ -66,12 +69,17 @@ overlaps, key clashes, audible stretch, silence).
 | `automation` | DJ-mixer channel strip, `param: [[bar_offset, value], ...]`, offsets in output bars from `at_bar` (pickup beats are negative), linear (log for Hz) interpolation |
 | `fx` | `echo: {beats, feedback, mix}` (tempo-synced), `reverb: {mix, room}` |
 | `tail_beats` | keep rendering N beats after the clip for fx tails (default 8 when fx are set, 4 for vocal chains) |
-| `chain` | vocal processing: `rap` (default on vocal clips), `hook` (more plate + throws), `dry` (default on chops: EQ, de-ess, compression only), `none` |
+| `chain` | vocal processing: `rap` (default on vocal clips), `hook` (more plate + throws + detuned doubles), `dry` (default on chops: EQ, de-ess, compression only), `none` |
+| `doubles` / `octave` | override the hook doubles; `octave: true` adds an octave-down layer at -15 dB |
+| `tune` | light pitch correction toward the source key (0 = off, 1 = hard); only steady sung notes move |
+| `nudge_ms` | shift a clip earlier (-) or later (+) by up to 60 ms to sit in the pocket |
+| `semitones` | per-clip pitch shift on top of the source's (key lift: `mix edit <slug> lift --at-bar N`) |
+| `punch` | `{attack_db, parallel}`: transient shaping + parallel compression below 900 Hz (kick and snare body, not the hats) |
 | `word_safe` | default `true` on vocal clips: edges move so no word is cut (lyrics), or to the nearest quiet point |
 | `ride` | default `true` on vocal clips: phrase-level gain riding (up to ±6 dB) to an even level |
 
-Automation parameters: `gain_db`, `highpass_hz`, `lowpass_hz`, `eq_low_db` (shelf at 180 Hz), `eq_mid_db`
-(peak at 1 kHz), `eq_high_db` (shelf at 4.5 kHz). `-40` on `eq_low_db` is a DJ bass kill; validation treats
+Automation parameters: `gain_db`, `arrange_db`, `highpass_hz`, `lowpass_hz`, `eq_low_db` (shelf at 180 Hz),
+`eq_mid_db` (peak at 1 kHz), `eq_high_db` (shelf at 4.5 kHz), `width` (0 = mono, 1 = as recorded, up to 2). `-40` on `eq_low_db` is a DJ bass kill; validation treats
 `eq_low_db <= -15`, `highpass_hz >= 150`, or `gain <= -20` as "bass out of the way".
 
 ## Vocal chops
@@ -113,13 +121,29 @@ A clip with `generate` renders synthesized FX instead of a stem (no samples need
 ```
 
 Types: `riser` (band-passed noise sweeping 250 Hz to 9 kHz with a rising tone, ends dead on the downbeat),
-`downlifter` (the reverse, after a drop), `impact` (sub boom + noise burst). They take `automation`, `fx`, and
-`gain_db` like any clip.
+`downlifter` (the reverse, after a drop), `impact` (sub boom + noise burst). From the song's own audio (need
+`source`): `snare_roll` (the beat's cleanest snare from its drum stem, 8ths to 16ths to 32nds, rising), `crash` (a
+crash found in the drum stem, else synthesized), `vocal_riser` and `reverse_swell` (need `word` + `occurrence` from
+the lyrics: a word stretched and pitched up an octave over the build, or its reverse reverb swelling into the word).
+They take `automation`, `fx`, `duck`, and `gain_db` like any clip; macros duck every fill under the vocals.
 
 `glass-harbor mix drop <slug> --at-bar 92 [--build-bars 8] [--silence-beats 1]` writes a whole drop into the plan:
 a high-pass sweep (20 Hz to 700 Hz) on every bed clip across the build, a beat of silence before the one, a
 riser that ends on the downbeat, and an impact on the drop. `track show` lists detected drops (bars where kick and
 bass come back hard).
+
+## DJ edges, fills, and edits
+
+- `glass-harbor mix edges <slug> [--intro-bars 16 --outro-bars 16]`: a beat-only intro (drums, bass in halfway)
+  and outro looped from the beat's first drop, so DJs can mix the edit; everything else moves later. New mashups
+  get 16 bars by default (`taste set dj_edge_bars=0` turns it off).
+- `glass-harbor mix fills <slug>`: a crash on every hook entry and drop, a one-bar reverse swell of each hook's first
+  word into it. New mashups get these by default.
+- `glass-harbor mix drop <slug> --at-bar N --roll --riser vocal:janice`: the drop builder can add a snare roll from
+  the drum stem and use a vocal riser.
+- `glass-harbor mix edit <slug> mute|stutter|tape_stop|lift --at-bar N`: the beat drops out under a punchline, a
+  word stutters on 16ths (vocal muted under it), the mix brakes to a stop, or everything from bar N goes up
+  `--semitones`.
 
 ## Vocal chain
 

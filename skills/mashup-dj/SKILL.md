@@ -106,6 +106,14 @@ intent in `<slug>.brief.md` (what came from analysis vs your musical inference).
 - **Groove**: on house/EDM beds, pump the melodic layer (`pump`, ~3 dB) and the vocal reverb/echo returns
   (`groove.pump_fx`, ~5 dB) so they breathe with the kick.
 - **Master against the release**: mashup scaffolds set `master.reference` to the bed's original track.
+- **DJ-friendly edges**: club edits open and close with 16-32 bars of beat only (`mix edges`, default on new
+  mashups). Turn them off for a listening/streaming cut.
+- **Fills and punchlines**: crashes on hook entries, reverse swells into hooks (`mix fills`), a snare roll from the
+  real drums into big drops (`mix drop --roll`), the beat dropping out under the best line (`mix edit mute`), a
+  tape stop into a breakdown (`mix edit tape_stop`). Every fill ducks under the vocal; never let a riser or swell
+  run under a rapped line (check `vocal_presence` for the bars it covers).
+- **Hooks**: the `hook` chain adds detuned doubles; keep verses single and centred for contrast. `tune` (0.2-0.4)
+  only for sung hooks; rap barely moves. Use `nudge_ms` when a vocal sits ahead of or behind the groove.
 - **Vocal chops** (`chop` clips, see `docs/plan-format.md`): the EDM move for builds, drops, and fills. Pick one or
   two short, punchy syllables (the title word, an ad-lib), slice them at 1/16-1/8 note lengths, and sequence them on
   a 16th-step pattern. Keep chops off the lead vocal's bars, high-pass them (~200 Hz), add a little tempo-synced

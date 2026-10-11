@@ -144,6 +144,33 @@ def check_run(run_dir: Path) -> dict[str, Any]:
         if abs(clip.get("stretch_pct", 0)) > 8:
             flag("info", clip["id"], f"{clip['stretch_pct']:+.1f}% stretch; listen for artifacts")
 
+    # Energy arc: long stretches with nothing changing, and drops without a dip in front of them.
+    if levels:
+        changes = set()
+        for clip in report["clips"]:
+            for edge in (clip["start_s"], clip["start_s"] + clip["length_s"]):
+                idx = int(np.searchsorted(bar_times, edge, side="right")) - 1
+                changes.add(start_bar + max(0, idx))
+        run_start = 0
+        for i in range(1, len(levels) + 1):
+            window = levels[run_start:i]
+            flat = max(window) - min(window) < 2.0 and not any(run_start + start_bar < b <= i - 1 + start_bar
+                                                                for b in changes)
+            if not flat or i == len(levels):
+                length = (i - 1 if not flat else i) - run_start
+                if length >= 32:
+                    flag("warning", f"bars {start_bar + run_start}-{start_bar + run_start + length - 1}",
+                         f"nothing changes for {length} bars; add a fill, a strip, or a vocal move")
+                run_start = i - 1 if not flat else i
+        drops = sorted({int(c["at_bar"]) for c in plan.get("clips", []) if c.get("generate") == "impact"})
+        for bar in drops:
+            i = bar - start_bar
+            if 8 <= i < len(levels):
+                dip = levels[i] - min(levels[i - 8:i])
+                if dip < 4.0:
+                    flag("warning", f"bar {bar}", f"the drop has only {dip:.1f} dB of contrast with the 8 bars "
+                         "before it; strip or filter more in the build")
+
     reference = (plan.get("master") or {}).get("reference")
     reference_balance = None
     mix_balance = tonal_balance(audio)

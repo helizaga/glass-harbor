@@ -473,9 +473,10 @@ def cmd_mix_drop(args: argparse.Namespace) -> int:
 
     slug = require_slug(args.slug)
     path = plan_path(slug)
+    riser: bool | str = False if args.no_riser or args.riser == "none" else (args.riser if args.riser.startswith("vocal:") else True)
     plan = add_drop(load_plan(path), args.at_bar, build_bars=args.build_bars,
-                    clip_ids=args.clips.split(",") if args.clips else None, riser=not args.no_riser,
-                    impact=not args.no_impact, silence_beats=args.silence_beats)
+                    clip_ids=args.clips.split(",") if args.clips else None, riser=riser,
+                    impact=not args.no_impact, silence_beats=args.silence_beats, roll=args.roll)
     save_plan(path, plan)
     return _validate_and_report(args, slug, prefix=f"added a drop at bar {args.at_bar:g}\n")
 
@@ -524,6 +525,38 @@ def cmd_mix_arrange(args: argparse.Namespace) -> int:
                              drums_only_bars=args.drums_only_bars, pump=pump, duck_drums_db=args.duck_drums_db)
     save_plan(path, plan)
     return _validate_and_report(args, slug, prefix="arranged the bed from stems\n")
+
+
+def _edit_plan(args: argparse.Namespace, change, message: str) -> int:
+    from glass_harbor.plan import load_plan, save_plan
+
+    slug = require_slug(args.slug)
+    path = plan_path(slug)
+    save_plan(path, change(load_plan(path)))
+    return _validate_and_report(args, slug, prefix=message + "\n")
+
+
+def cmd_mix_edges(args: argparse.Namespace) -> int:
+    from glass_harbor.scaffold import add_dj_edges
+
+    return _edit_plan(args, lambda plan: add_dj_edges(plan, intro_bars=args.intro_bars, outro_bars=args.outro_bars),
+                      f"added a {args.intro_bars}-bar DJ intro and {args.outro_bars}-bar outro")
+
+
+def cmd_mix_fills(args: argparse.Namespace) -> int:
+    from glass_harbor.scaffold import add_fills
+
+    return _edit_plan(args, lambda plan: add_fills(plan, crashes=not args.no_crashes, swells=not args.no_swells),
+                      "added fills")
+
+
+def cmd_mix_edit(args: argparse.Namespace) -> int:
+    from glass_harbor.scaffold import add_edit
+
+    return _edit_plan(args, lambda plan: add_edit(plan, args.kind, args.at_bar, beats=args.beats, word=args.word,
+                                                  occurrence=args.occurrence, pattern=args.pattern,
+                                                  semitones=args.semitones),
+                      f"added {args.kind} at bar {args.at_bar:g}")
 
 
 def cmd_mix_list(args: argparse.Namespace) -> int:
@@ -644,6 +677,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--clips", help="comma list of bed clip ids (default: every non-vocal clip in the build)")
     p.add_argument("--silence-beats", type=float, default=1.0)
     p.add_argument("--no-riser", action="store_true")
+    p.add_argument("--riser", default="noise", help="noise (default), none, or vocal:<word> (a riser made from a lyric word)")
+    p.add_argument("--roll", action="store_true", help="snare roll cut from the beat's drum stem in the last 2 bars")
     p.add_argument("--no-impact", action="store_true")
     p.add_argument("--verbose", action="store_true")
     p.set_defaults(func=cmd_mix_drop)
@@ -658,6 +693,32 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-pump", action="store_true")
     p.add_argument("--verbose", action="store_true")
     p.set_defaults(func=cmd_mix_arrange)
+
+    p = common(mix.add_parser("edges", help="DJ-friendly beat-only intro and outro so DJs can mix the edit"))
+    p.add_argument("slug")
+    p.add_argument("--intro-bars", type=int, default=16)
+    p.add_argument("--outro-bars", type=int, default=16)
+    p.add_argument("--verbose", action="store_true")
+    p.set_defaults(func=cmd_mix_edges)
+
+    p = common(mix.add_parser("fills", help="crashes on hook entries and drops, reverse swells into hooks"))
+    p.add_argument("slug")
+    p.add_argument("--no-crashes", action="store_true")
+    p.add_argument("--no-swells", action="store_true")
+    p.add_argument("--verbose", action="store_true")
+    p.set_defaults(func=cmd_mix_fills)
+
+    p = common(mix.add_parser("edit", help="punchline edits: mute, stutter, tape_stop, lift"))
+    p.add_argument("slug")
+    p.add_argument("kind", choices=("mute", "stutter", "tape_stop", "lift"))
+    p.add_argument("--at-bar", type=float, required=True)
+    p.add_argument("--beats", type=float, default=1.0, help="mute/tape_stop length in beats")
+    p.add_argument("--word", help="stutter: the lyric word to repeat")
+    p.add_argument("--occurrence", type=int, default=1)
+    p.add_argument("--pattern", default="j-j-jjjj", help="stutter: 16th-note pattern using j")
+    p.add_argument("--semitones", type=int, default=1, help="lift: semitones up from --at-bar")
+    p.add_argument("--verbose", action="store_true")
+    p.set_defaults(func=cmd_mix_edit)
 
     p = mix.add_parser("review", help="open the local review page (play, A/B, comment on time ranges)")
     p.add_argument("slug")

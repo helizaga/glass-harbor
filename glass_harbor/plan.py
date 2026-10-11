@@ -28,6 +28,7 @@ AUTOMATABLE = {
     "eq_low_db": 0.0,
     "eq_mid_db": 0.0,
     "eq_high_db": 0.0,
+    "width": 1.0,  # stereo width (side level): 0 = mono, 1 = as recorded, up to 2
 }
 FREQUENCY_PARAMS = {"highpass_hz", "lowpass_hz"}
 BASS_STEMS = {"mix", "instrumental", "bass"}
@@ -153,6 +154,8 @@ def _check_automation(res: Resolution, where: str, automation: Any) -> None:
             res.add("error", where, f"automation {name} bar offsets must be ascending")
         if name in FREQUENCY_PARAMS and any(not 20 <= p[1] <= 20000 for p in points):
             res.add("error", where, f"automation {name} values must be between 20 and 20000 Hz")
+        if name == "width" and any(not 0 <= p[1] <= 2 for p in points):
+            res.add("error", where, "automation width values must be between 0 and 2")
 
 
 def _check_fx(res: Resolution, where: str, fx: Any) -> None:
@@ -181,9 +184,11 @@ def _check_vocal_options(res: Resolution, where: str, clip: dict[str, Any]) -> N
 
     if "chain" in clip and clip["chain"] not in CHAINS:
         res.add("error", where, f"chain must be one of {', '.join(CHAINS)}")
-    for flag in ("word_safe", "ride"):
+    for flag in ("word_safe", "ride", "doubles", "octave"):
         if flag in clip and not isinstance(clip[flag], bool):
             res.add("error", where, f"{flag} must be true or false")
+    if "tune" in clip and not (_number(clip["tune"]) and 0 <= clip["tune"] <= 1):
+        res.add("error", where, "tune must be between 0 (off) and 1 (hard tune)")
 
 
 def _check_duck(res: Resolution, where: str, duck: Any) -> None:
@@ -434,12 +439,30 @@ def resolve(plan: dict[str, Any]) -> Resolution:
             res.add("error", where, "clip must be an object")
             continue
         if "generate" in clip:
-            from glass_harbor.fx import TYPES as FX_TYPES
+            from glass_harbor.fx import ALL_TYPES as FX_TYPES
+            from glass_harbor.fx import SOURCE_TYPES
 
             kind = clip["generate"]
             if kind not in FX_TYPES:
                 res.add("error", where, f"generate must be one of {', '.join(FX_TYPES)}")
                 continue
+            if kind in SOURCE_TYPES:
+                if clip.get("source") not in res.grids:
+                    res.add("error", where, f"{kind} needs a source (a track in sources)")
+                    continue
+                if kind in ("vocal_riser", "reverse_swell"):
+                    from glass_harbor.lyrics import find_word, load_lyrics
+
+                    track = sources[clip["source"]]["track"]
+                    lyrics = load_lyrics(track)
+                    if lyrics is None or "vocals" not in library.available_stems(track):
+                        res.add("error", where, f"{kind} needs a vocals stem and lyrics for {track}")
+                        continue
+                    try:
+                        find_word(lyrics, str(clip.get("word", "")), int(clip.get("occurrence", 1)))
+                    except ValueError as error:
+                        res.add("error", where, str(error))
+                        continue
             if not (_number(clip.get("bars")) and clip["bars"] > 0 and _number(clip.get("at_bar")) and clip["at_bar"] >= 1):
                 res.add("error", where, "generated fx need bars > 0 and at_bar >= 1")
                 continue
@@ -557,6 +580,17 @@ def resolve(plan: dict[str, Any]) -> Resolution:
         elif abs(stretch_pct) > limit:
             res.add("warning", where, f"{stretch_pct:+.1f}% time-stretch on {stem} will be audible")
         semitones = source.get("semitones", 0) if isinstance(source.get("semitones", 0), int) else 0
+        clip_semitones = clip.get("semitones", 0)
+        if not isinstance(clip_semitones, int) or abs(clip_semitones) > 12:
+            res.add("error", where, "clip semitones must be an integer between -12 and 12 (added to the source's)")
+            clip_semitones = 0
+        semitones += clip_semitones
+        if "nudge_ms" in clip and not (_number(clip["nudge_ms"]) and abs(clip["nudge_ms"]) <= 60):
+            res.add("error", where, "nudge_ms must be between -60 and 60")
+        punch = clip.get("punch")
+        if punch is not None and not (isinstance(punch, dict) and 0 <= punch.get("attack_db", 3) <= 9
+                                      and 0 <= punch.get("parallel", 0.3) <= 1):
+            res.add("error", where, "punch must be {attack_db: 0-9, parallel: 0-1}")
         if abs(semitones) > (2 if stem in VOCAL_STEMS else 4):
             res.add("warning", where, f"{semitones:+d} semitone shift on {stem} may sound unnatural")
 
@@ -578,6 +612,15 @@ def resolve(plan: dict[str, Any]) -> Resolution:
             gain_db=float(source.get("gain_db", 0)) + float(clip.get("gain_db", 0)),
             stretch_pct=stretch_pct,
         ))
+
+    edits = plan.get("edits", [])
+    if not isinstance(edits, list):
+        res.add("error", "edits", "edits must be a list")
+    else:
+        for i, edit in enumerate(edits):
+            if not (isinstance(edit, dict) and edit.get("type") == "tape_stop" and _number(edit.get("at_bar"))
+                    and _number(edit.get("beats")) and 0.25 <= edit["beats"] <= 8):
+                res.add("error", f"edits[{i}]", "edits support {type: tape_stop, at_bar, beats (0.25-8)}")
 
     groove = plan.get("groove")
     if groove is not None:

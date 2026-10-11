@@ -35,12 +35,13 @@ class ChainSettings:
     throw_mix: float
     throws: bool
     saturation: float = 0.12
+    doubles: bool = False
     extras: dict[str, Any] = field(default_factory=dict)
 
 
 PRESETS = {
     "rap": ChainSettings(reverb_mix=0.10, throw_mix=0.35, throws=True),
-    "hook": ChainSettings(reverb_mix=0.18, throw_mix=0.45, throws=True, saturation=0.15),
+    "hook": ChainSettings(reverb_mix=0.18, throw_mix=0.45, throws=True, saturation=0.15, doubles=True),
     "dry": ChainSettings(reverb_mix=0.0, throw_mix=0.0, throws=False),
 }
 
@@ -196,8 +197,72 @@ def _deess(signal: np.ndarray, max_cut_db: float = 6.0) -> np.ndarray:
     return (signal - band * cut[:, None]).astype(np.float32)
 
 
+def _double(x: np.ndarray, cents: float, delay_s: float, pan: float) -> np.ndarray:
+    import pedalboard
+
+    shifted = pedalboard.Pedalboard([pedalboard.PitchShift(semitones=cents / 100.0),
+                                     pedalboard.Delay(delay_seconds=delay_s, feedback=0.0, mix=1.0)])(x.T, A.SR).T
+    mono = A.mono(shifted)
+    left, right = (1.0, 1.0 - pan) if pan > 0 else (1.0 + pan, 1.0)
+    return np.stack([mono * left, mono * right], axis=1).astype(np.float32)
+
+
+def add_layers(x: np.ndarray, *, doubles: bool, octave: bool) -> np.ndarray:
+    """Chorus thickening: two detuned, slightly late, panned doubles (-9 dB) and an optional octave-down layer
+    (-15 dB). Verses stay single and centred so the hooks feel bigger by contrast."""
+    import pedalboard
+
+    out = x.copy()
+    if doubles:
+        out += A.db_to_gain(-9.0) * (_double(x, +8.0, 0.018, 0.65) + _double(x, -8.0, 0.026, -0.65))
+    if octave:
+        low = pedalboard.Pedalboard([pedalboard.PitchShift(semitones=-12.0),
+                                     pedalboard.LowpassFilter(cutoff_frequency_hz=3000.0)])(x.T, A.SR).T
+        out += A.db_to_gain(-15.0) * low
+    return out.astype(np.float32)
+
+
+def tune(vocal: np.ndarray, key_tonic: int, key_mode: str, strength: float) -> tuple[np.ndarray, float]:
+    """Light pitch correction: pull steady sung notes part of the way (``strength``) to the nearest note of the
+    key; unpitched rap and transitions are left alone. Returns (audio, mean correction in cents)."""
+    import librosa
+    import pedalboard
+
+    if strength <= 0:
+        return vocal, 0.0
+    sr = 22050
+    y = librosa.resample(A.mono(vocal), orig_sr=A.SR, target_sr=sr)
+    hop = 256
+    f0, voiced, prob = librosa.pyin(y, fmin=70, fmax=900, sr=sr, frame_length=2048, hop_length=hop)
+    steps = [0, 2, 3, 5, 7, 8, 10] if key_mode == "minor" else [0, 2, 4, 5, 7, 9, 11]
+    scale = np.array([(key_tonic + s) % 12 for s in steps])
+    correction = np.zeros(f0.size)
+    for i, (freq, ok, p) in enumerate(zip(f0, voiced, prob)):
+        if not ok or p < 0.6 or not np.isfinite(freq):
+            continue
+        midi = 69 + 12 * np.log2(freq / 440.0)
+        candidates = np.array([round((midi - pc) / 12) * 12 + pc for pc in scale])
+        target = candidates[np.argmin(np.abs(candidates - midi))]
+        correction[i] = (target - midi) * strength
+    if not np.any(correction):
+        return vocal, 0.0
+    kernel = np.ones(5) / 5
+    correction = np.convolve(correction, kernel, mode="same")
+    times = np.arange(f0.size) * hop / sr
+    per_sample = np.interp(np.arange(vocal.shape[0]) / A.SR, times, correction)
+    out = pedalboard.time_stretch(np.ascontiguousarray(vocal.T), A.SR, stretch_factor=1.0,
+                                  pitch_shift_in_semitones=per_sample.astype(np.float64), high_quality=True,
+                                  preserve_formants=True).T
+    out = np.ascontiguousarray(out[: vocal.shape[0]], dtype=np.float32)
+    if out.shape[0] < vocal.shape[0]:
+        out = np.pad(out, ((0, vocal.shape[0] - out.shape[0]), (0, 0)))
+    active = np.abs(correction) > 0
+    return out, float(np.mean(np.abs(correction[active])) * 100) if active.any() else 0.0
+
+
 def apply_chain(vocal: np.ndarray, preset: str, *, beat_seconds: float,
-                throw_regions: list[tuple[float, float]] | None = None, split: bool = False):
+                throw_regions: list[tuple[float, float]] | None = None, split: bool = False,
+                doubles: bool | None = None, octave: bool = False):
     """Process a (tail-padded) vocal. Level in = level out, so plan gains keep their meaning.
     With ``split=True`` returns (dry, wet) so the reverb/delay returns can be pumped separately."""
     import pedalboard
@@ -229,6 +294,10 @@ def apply_chain(vocal: np.ndarray, preset: str, *, beat_seconds: float,
         wet = np.tanh(x * drive / A.db_to_gain(NOMINAL_DB + 10)) * A.db_to_gain(NOMINAL_DB + 10) / drive
         x = (1 - settings.saturation) * x + settings.saturation * wet
     x = x * A.db_to_gain(level - _active_rms_db(x))  # back to the input level
+    use_doubles = settings.doubles if doubles is None else doubles
+    if use_doubles or octave:
+        x = add_layers(x, doubles=use_doubles, octave=octave)
+        x = x * A.db_to_gain(level - _active_rms_db(x))  # thicker, not louder
 
     wet = np.zeros_like(x)
     send_filters = [pedalboard.HighpassFilter(cutoff_frequency_hz=250.0), pedalboard.LowpassFilter(cutoff_frequency_hz=9000.0)]
