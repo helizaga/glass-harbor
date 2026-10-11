@@ -176,6 +176,8 @@ def clean_stem(track_id: str, stem: str = "vocals", mode: str = "dereverb", log:
 
     if mode not in CLEAN_MODELS:
         raise ValueError(f"mode must be one of {', '.join(CLEAN_MODELS)}")
+    if mode == "lead" and stem != "vocals":
+        raise ValueError("lead cleanup splits a vocal into lead and backing vocals; use it on the vocals stem")
     source = library.stem_path(track_id, stem)
     if not source.exists():
         raise FileNotFoundError(f"{track_id} has no {stem} stem to clean")

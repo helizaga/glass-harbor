@@ -143,14 +143,17 @@ def follow(bass: np.ndarray, spans: list[Span], *, glide_s: float = 0.025, xfade
     envelope = np.sqrt(np.convolve(A.mono(bass) ** 2, np.ones(window) / window, mode="same"))
     sub = (tone * envelope * np.sqrt(2))[:, None] * np.ones((1, 2))
     ramp = np.convolve(use, np.ones(max(1, int(xfade_s * A.SR))) / max(1, int(xfade_s * A.SR)), mode="same")
-    for span in spans:  # level-match each span on its own (verse and chorus bass levels differ)
-        a = max(0, min(w[0] for w in span.windows))
-        b = min(n, max(w[1] for w in span.windows))
-        mask = use[a:b] > 0
-        if mask.any():
-            target = np.sqrt(np.mean(bass[a:b][mask] ** 2))
-            current = np.sqrt(np.mean(sub[a:b][mask] ** 2)) + 1e-12
-            sub[a:b] *= target / current
+    span_gain = np.ones(n)
+    for span in spans:  # level-match each span on its own followed windows (verse and chorus bass levels differ)
+        own = np.zeros(n, dtype=bool)
+        for (a, b), note in zip(span.windows, span.notes):
+            if note is not None:
+                own[max(0, a):min(n, b)] = True
+        if own.any():
+            target = np.sqrt(np.mean(bass[own] ** 2))
+            current = np.sqrt(np.mean(sub[own] ** 2)) + 1e-12
+            span_gain[own] = target / current
+    sub = sub * span_gain[:, None]
     return (bass * (1 - ramp[:, None]) + sub * ramp[:, None]).astype(np.float32)
 
 

@@ -117,6 +117,7 @@
         "attack_db": 3.0,
         "parallel": 0.2
       },
+      "clip_db": 3.0,
       "duck": {
         "under": "vocals",
         "db": 4.0
@@ -256,7 +257,13 @@
             20
           ]
         ]
-      }
+      },
+      "follow_roots": [
+        "verse1",
+        "hook1",
+        "hook2",
+        "hook3"
+      ]
     },
     {
       "id": "bed-other",
@@ -960,14 +967,16 @@
     "ceiling_db": -1.0
   },
   "notes": [
-    "fit: same key, G# minor (1A) over G# minor (1A), +0.8% stretch on vocals, score 0.998",
+    "fit: same key, G# minor (1A) over G# minor (1A), +0.8% stretch on vocals, score 0.996",
     "title line a cappella in the break before the bar-92 drop",
     "structure-aware draft: 3 chorus(es) on the beat's drops/full sections, 4 verse chunk(s), chops in low-energy stretches",
     "stem arrangement on bed: verses over drums + bass (melodic layer -60 dB), full beat under hooks, 1 drums-only bar before each hook, melodic layer pumps on the beat",
     "drop at bar 25: 8-bar build on bed-drums, bed-bass, bed-other, riser, snare roll, impact, 1 beat(s) of silence",
     "drop at bar 92: 8-bar build on bed-drums, bed-bass, bed-other, riser, impact, 1 beat(s) of silence",
     "fills: crash 25, crash 49, crash 92, swell into 25, swell into 49, swell into 92",
-    "DJ edges: 16-bar beat intro, 16-bar beat outro (looped from bar 5 of keep-workin)"
+    "bar numbers in the notes above (and in fill ids like riser-92) are from before the DJ intro: add 16 to find them in this plan",
+    "DJ edges: 16-bar beat intro, 16-bar beat outro (looped from bar 5 of keep-workin)",
+    "bass follows the vocal's original chords under hook1, hook2, hook3, verse1 (their sung notes sat a half-step off the beat's bassline)"
   ],
   "groove": {
     "pump_fx": {

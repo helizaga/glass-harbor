@@ -91,3 +91,15 @@ def test_follow_roots_only_on_bass_clips(workspace):
     plan["clips"][1].pop("follow_roots")
     plan["clips"][0]["follow_roots"] = ["nope"]
     assert any("unknown vocal clips" in i.message for i in resolve(plan).issues)
+
+
+def test_overlapping_spans_are_level_matched_on_their_own_windows():
+    bass = _bass([27], 4.0)
+    bass[int(2 * SR):] *= 0.25  # quieter second half
+    first = bassline.Span([(int(s * SR), int((s + 0.25) * SR)) for s in np.arange(0.0, 2.0, 0.25)], [25] * 8)
+    second = bassline.Span([(int(s * SR), int((s + 0.25) * SR)) for s in np.arange(1.5, 4.0, 0.25)], [25] * 10)
+    out = bassline.follow(bass, [first, second])
+    for a, b in ((0.1, 1.4), (2.1, 3.9)):
+        part = slice(int(a * SR), int(b * SR))
+        level = 20 * np.log10(np.sqrt(np.mean(out[part] ** 2)) / np.sqrt(np.mean(bass[part] ** 2)))
+        assert abs(level) < 2.0  # neither half picks up the other span's gain

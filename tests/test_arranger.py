@@ -61,3 +61,24 @@ def test_structure_aware_draft(workspace):
     assert any(c["id"].startswith("verse") and c["at_bar"] == 9 for c in vocals.values())
     assert not any(c.get("generate") == "snare_roll" and 57 <= c["at_bar"] < 61 for c in plan["clips"])
     assert any(n.startswith("structure-aware draft") for n in plan["notes"])
+
+
+def test_hook_ending_on_the_next_drop_does_not_hang(workspace):
+    import signal
+
+    _setup(workspace)
+    beat = library.load_analysis("beat")
+    beat["drops"] = [25, 33]  # the 8-bar hook on the bar-25 drop ends exactly on the next drop
+    library.save_analysis("beat", beat)
+
+    def timeout(*_):
+        raise TimeoutError("build_mashup looped")
+
+    previous = signal.signal(signal.SIGALRM, timeout)
+    signal.alarm(30)
+    try:
+        plan = build_mashup("vox", "beat")
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, previous)
+    assert resolve(plan).ok

@@ -169,6 +169,9 @@ def copy_stem_file(track_id: str, name: str, source: Path) -> None:
     raw = target.parent / "raw" / target.name
     if raw.exists():  # a fresh separation replaces the pre-cleanup copy too
         raw.unlink()
+    backing = target.parent / "raw" / f"{name}-backing.flac"
+    if backing.exists():  # set aside by lead cleanup of the previous stem
+        backing.unlink()
     meta_path = track_dir(track_id) / "track.json"
     if meta_path.exists():
         meta = _read_json(meta_path)

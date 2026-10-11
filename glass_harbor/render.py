@@ -1107,16 +1107,20 @@ def render_plan(plan: dict[str, Any], out_dir: Path, *, start_bar: float | None 
         stream_wav = A.save(out_dir / "mix-stream.wav", streamed, subtype="PCM_24")
         if mp3:
             A.encode_mp3(stream_wav, out_dir / "mix-stream.mp3")
-    phone_stats = None
+    phone_stats, phone_file = None, None
+    stale = out_dir / "mix-phone.m4a"
+    if stale.exists():
+        stale.unlink()
     if master_spec.get("phone_version", True):
         # For sending to a phone: about as loud as a release (phones play files as they are), with bass harmonics
         # so small speakers still carry the bassline, as AAC (native on iPhone and Android, smaller than the MP3).
         phone, phone_stats = master(small_speaker_bass(premaster), lufs=min(float(target_lufs), PHONE_LUFS),
                                     ceiling_db=-1.0, soft_clip=True)
-        if mp3:
-            phone_wav = A.save(out_dir / "mix-phone.wav", phone, subtype="PCM_16")
-            if A.encode_m4a(phone_wav, out_dir / "mix-phone.m4a", title=str(plan.get("title", ""))):
-                phone_wav.unlink()
+        phone_wav = A.save(out_dir / "mix-phone.wav", phone, subtype="PCM_16")
+        encoded = A.encode_m4a(phone_wav, out_dir / "mix-phone.m4a", title=str(plan.get("title", "")))
+        if encoded:
+            phone_wav.unlink()
+        phone_file = (encoded or phone_wav).name
     if write_clips:
         clip_dir = out_dir / "clips"
         for n, r in enumerate(rendered, start=1):
@@ -1133,7 +1137,7 @@ def render_plan(plan: dict[str, Any], out_dir: Path, *, start_bar: float | None 
         "timeline_offset_s": round(timeline_offset, 4),
         "duration_s": round(mastered.shape[0] / A.SR, 3),
         "files": {"wav": wav_path.name, "mp3": mp3_path.name if mp3_path else None,
-                  "phone": "mix-phone.m4a" if (out_dir / "mix-phone.m4a").exists() else None},
+                  "phone": phone_file},
         "master": master_stats,
         "stream_master": stream_stats,
         "phone_master": phone_stats,

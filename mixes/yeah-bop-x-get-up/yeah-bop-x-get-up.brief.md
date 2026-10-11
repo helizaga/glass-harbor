@@ -15,12 +15,15 @@
 
 ## Why this pairing (sources)
 
-- Beatport lists "yeah bop" at 90 BPM, A minor, and "Get Up" at 88 BPM (half of 176), A minor; "Get Up" was #9 on
-  Beatport's Drum & Bass Top 100 on 2026-10-10.
-- Apple Music ranks "yeah bop 2" and "yeah bop" among Lil Bean's top songs; he is not on kworb's US Spotify or Apple
-  charts, so this is a regional record, not a national hit.
-- Lil Bean has no DJ edits on Beatport and nothing found on 1001Tracklists: the pairing is not overdone, and also
-  not proven.
+- Beatport lists "yeah bop" at 90 BPM, A minor
+  ([Lil Bean tracks](https://www.beatport.com/artist/lil-bean/762594/tracks)), and "Get Up" at 88 BPM (half of
+  176), A minor, #9 on the [Drum & Bass Top 100](https://www.beatport.com/genre/drum-bass/1/top-100) on 2026-10-10.
+- [Apple Music](https://music.apple.com/us/artist/lil-bean/295156715) ranks "yeah bop 2" and "yeah bop" among Lil
+  Bean's top songs. He is not on kworb's [US Spotify daily](https://kworb.net/spotify/country/us_daily.html) or
+  [US Apple Music](https://kworb.net/charts/apple_s/us.html) charts (checked 2026-10-10), so this is a regional
+  record, not a national hit.
+- Lil Bean has no DJ edits on [Beatport](https://www.beatport.com/artist/lil-bean/762594/tracks) and nothing turned
+  up on a [1001Tracklists](https://www.1001tracklists.com/) search: the pairing is not overdone, and also not proven.
 
 ## From analysis (library, not committed)
 

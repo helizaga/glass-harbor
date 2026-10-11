@@ -717,8 +717,12 @@ def add_dj_edges(plan: dict[str, Any], *, intro_bars: int = 16, outro_bars: int 
                           "bars": loop_len, "loop": max(1, length // loop_len),
                           "at_bar": round(last_bar + intro_bars, 4)})
     plan["clips"] = edges[: len(parts)] + plan["clips"] + edges[len(parts):] if intro_bars else plan["clips"] + edges
-    plan.setdefault("notes", []).append(f"DJ edges: {intro_bars}-bar beat intro, {outro_bars}-bar beat outro "
-                                        f"(looped from bar {groove} of {bed.track})")
+    notes = plan.setdefault("notes", [])
+    if intro_bars and notes:
+        notes.append(f"bar numbers in the notes above (and in fill ids like riser-92) are from before the DJ intro: "
+                     f"add {intro_bars} to find them in this plan")
+    notes.append(f"DJ edges: {intro_bars}-bar beat intro, {outro_bars}-bar beat outro "
+                 f"(looped from bar {groove} of {bed.track})")
     return plan
 
 
@@ -914,9 +918,11 @@ def smart_arrangement(vocals: str, bed: str, vox: dict[str, Any], beat: dict[str
     last_chops = -99
     cursor = 9
     outro = 8
+    handled: set[int] = set()  # each drop is arranged once (a hook can end exactly on the next drop)
     while cursor + 8 <= bars + 1 - outro:
-        next_drop = next((d for d in drops if d >= cursor), None)
+        next_drop = next((d for d in drops if d >= cursor and d not in handled), None)
         if next_drop is not None and next_drop - cursor < 8:
+            handled.add(next_drop)
             gap = next_drop - cursor
             line = material["title_line"]
             spotlight = 0

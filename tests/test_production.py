@@ -132,3 +132,43 @@ def test_render_writes_a_phone_version(workspace, synth_files, tmp_path):
                            capture_output=True, text=True, check=True).stdout
     assert "codec_name=aac" in probe and "Phone Test" in probe
     assert not (tmp_path / "run" / "mix-phone.wav").exists()
+
+
+def test_phone_version_without_mp3_and_no_stale_report(workspace, synth_files, tmp_path):
+    import shutil
+
+    from glass_harbor import library
+    from glass_harbor.analyze import analyze_track
+    from glass_harbor.render import render_plan
+
+    if not shutil.which("ffmpeg"):
+        pytest.skip("ffmpeg not installed")
+    paths = synth_files("q", 120, "Am", bars=8, seed=5)
+    library.add_track(paths["mix"], track_id="q")
+    library.save_analysis("q", analyze_track(library.load_audio("q"), beat_backend="librosa"))
+    plan = {"version": 1, "title": "Q", "kind": "mashup", "bpm": 120, "sources": {"a": {"track": "q"}},
+            "clips": [{"id": "a", "source": "a", "from_bar": 1, "bars": 2, "at_bar": 1}]}
+    run = tmp_path / "run"
+    assert render_plan(plan, run, mp3=False, log=lambda m: None, use_cache=False)["files"]["phone"] == "mix-phone.m4a"
+    plan["master"] = {"phone_version": False}
+    report = render_plan(plan, run, mp3=False, log=lambda m: None, use_cache=False)
+    assert report["files"]["phone"] is None and not (run / "mix-phone.m4a").exists()
+
+
+def test_lead_cleanup_rejects_non_vocal_stems(workspace):
+    from glass_harbor import separate
+
+    write_fake_track("song", bpm=120, key="Am", bars=8, stems=("vocals", "instrumental"))
+    with pytest.raises(ValueError, match="vocals stem"):
+        separate.clean_stem("song", "instrumental", "lead", log=lambda m: None)
+
+
+def test_fresh_separation_drops_the_old_backing_vocals(workspace, tmp_path):
+    from glass_harbor import library
+
+    write_fake_track("song", bpm=120, key="Am", bars=8, stems=("vocals",))
+    backing = library.stem_path("song", "vocals").parent / "raw" / "vocals-backing.flac"
+    backing.parent.mkdir(parents=True, exist_ok=True)
+    A.save(backing, np.zeros((SR, 2), np.float32))
+    library.copy_stem_file("song", "vocals", A.save(tmp_path / "new.flac", np.zeros((SR, 2), np.float32)))
+    assert not backing.exists()

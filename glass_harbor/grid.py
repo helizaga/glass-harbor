@@ -164,7 +164,9 @@ def _fit_majority(beats: np.ndarray, *, window: int = 32) -> tuple[float, float,
     # Over a few hundred beats a 0.05% period error drifts a whole beat, so refine the period to the one where the
     # most beats share a phase (a comb search within +-1.5% of the windowed estimate).
     candidates = period * (1 + np.linspace(-0.015, 0.015, 3001))
-    coherence = np.abs(np.exp(2j * np.pi * beats[None, :] / candidates[:, None]).mean(axis=1))
+    batch = max(1, 2_000_000 // beats.size)  # bounded memory on hour-long recordings
+    coherence = np.concatenate([np.abs(np.exp(2j * np.pi * beats[None, :] / candidates[i:i + batch, None]).mean(axis=1))
+                                for i in range(0, candidates.size, batch)])
     period = float(candidates[int(np.argmax(coherence))])
     phases = np.angle(np.mean(np.exp(2j * np.pi * beats / period)))
     t0 = float(phases / (2 * np.pi) * period)
