@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from conftest import write_fake_track
 
 from glass_harbor import arrange, library
@@ -149,3 +151,32 @@ def test_bed_sections_fall_back_without_allin1(monkeypatch):
     assert auto.bed_sections() == "novelty"
     monkeypatch.setattr(importlib.util, "find_spec", lambda name, *a: object() if name == "allin1_infer" else real(name, *a))
     assert auto.bed_sections() == "allin1"
+
+
+def test_auto_callers_use_novelty_without_allin1(monkeypatch):
+    import importlib.util
+
+    from glass_harbor import analyze, auto, separate
+
+    real = importlib.util.find_spec
+    monkeypatch.setattr(importlib.util, "find_spec", lambda name, *a: None if name == "allin1_infer" else real(name, *a))
+    seen = []
+
+    class Stop(Exception):
+        pass
+
+    def fake_ingest(source, *, sections, log):
+        seen.append(("ingest", source, sections))
+        if source == "bed":
+            raise Stop
+        return source
+
+    monkeypatch.setattr(auto, "ingest", fake_ingest)
+    with pytest.raises(Stop):
+        auto.run_auto("vox", "bed", log=lambda m: None)
+    monkeypatch.setattr(separate, "separate_track", lambda *a, **k: {"drums": {}})
+    monkeypatch.setattr(analyze, "analyze_library_track",
+                        lambda track_id, **k: seen.append(("analyze", track_id, k.get("sections"))))
+    monkeypatch.setattr(auto, "_lyrics", lambda *a: None)
+    auto.prepare_bed("bed", lambda m: None)
+    assert ("ingest", "bed", "novelty") in seen and ("analyze", "bed", "novelty") in seen
