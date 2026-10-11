@@ -147,8 +147,9 @@ def follow(bass: np.ndarray, spans: list[Span], *, glide_s: float = 0.025, xfade
     for span in spans:  # level-match each span on its own followed windows (verse and chorus bass levels differ)
         own = np.zeros(n, dtype=bool)
         for (a, b), note in zip(span.windows, span.notes):
-            if note is not None:
-                own[max(0, a):min(n, b)] = True
+            a, b = max(0, a), min(n, b)
+            if note is not None and b > a:  # windows outside the clip select nothing
+                own[a:b] = True
         if own.any():
             target = np.sqrt(np.mean(bass[own] ** 2))
             current = np.sqrt(np.mean(sub[own] ** 2)) + 1e-12

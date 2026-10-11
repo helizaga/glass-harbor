@@ -103,3 +103,12 @@ def test_overlapping_spans_are_level_matched_on_their_own_windows():
         part = slice(int(a * SR), int(b * SR))
         level = 20 * np.log10(np.sqrt(np.mean(out[part] ** 2)) / np.sqrt(np.mean(bass[part] ** 2)))
         assert abs(level) < 2.0  # neither half picks up the other span's gain
+
+
+def test_windows_outside_the_clip_do_not_touch_it():
+    bass = _bass([27], 2.0)
+    early = bassline.Span([(-int(1.0 * SR), -int(0.5 * SR))], [25])  # a vocal window that ends before the clip
+    inside = bassline.Span([(int(0.5 * SR), int(1.5 * SR))], [25])
+    alone = bassline.follow(bass, [inside])
+    both = bassline.follow(bass, [early, inside])
+    assert np.allclose(alone, both)
