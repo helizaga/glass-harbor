@@ -60,12 +60,12 @@ def _junctions(words: list[dict[str, Any]]) -> list[tuple[float, float]]:
             points.append((max(0.0, before), min(1.0, word["start"] - prev_end)))
         if after <= next_start:
             points.append((after, min(1.0, next_start - word["end"])))
-        elif i + 1 < len(words):  # touching words: cut where they meet
-            points.append((word["end"], 0.0))
+        elif i + 1 < len(words):  # touching or overlapping timestamps: cut where they meet
+            points.append(((word["end"] + next_start) / 2 if next_start < word["end"] else word["end"], 0.0))
     return points
 
 
-def _inside(words: list[dict[str, Any]], t: float, margin: float = 0.02) -> dict[str, Any] | None:
+def _inside(words: list[dict[str, Any]], t: float, margin: float = 0.03) -> dict[str, Any] | None:
     return next((w for w in words if w["start"] + margin < t < w["end"] - margin), None)
 
 
