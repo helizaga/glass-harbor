@@ -152,6 +152,10 @@ def separate_local(track_id: str, wanted: set[str], quality: str, log: Log) -> d
             outputs = _two_stem(_run_audio_separator(source, tmp_dir / "instrumental", **spec))
             library.copy_stem_file(track_id, "instrumental", outputs["instrumental"])
             produced["instrumental"] = {"quality": quality, **spec}
+            if "vocals" in outputs and not library.stem_path(track_id, "vocals").exists():
+                # Keep the beat's own vocal too: its hook can answer the acapella (call and response).
+                library.copy_stem_file(track_id, "vocals", outputs["vocals"])
+                produced["vocals"] = {"quality": quality, "kept_from": "instrumental pass", **spec}
 
         four = wanted & {"drums", "bass", "other"}
         if four:

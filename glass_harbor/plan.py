@@ -189,6 +189,13 @@ def _check_vocal_options(res: Resolution, where: str, clip: dict[str, Any]) -> N
             res.add("error", where, f"{flag} must be true or false")
     if "tune" in clip and not (_number(clip["tune"]) and 0 <= clip["tune"] <= 1):
         res.add("error", where, "tune must be between 0 (off) and 1 (hard tune)")
+    for name in ("groove_lock", "density"):
+        if name in clip and not (_number(clip[name]) and 0 <= clip[name] <= 1):
+            res.add("error", where, f"{name} must be between 0 (off) and 1")
+    if "gate" in clip and not (isinstance(clip["gate"], bool) or (_number(clip["gate"]) and 0 < clip["gate"] <= 40)):
+        res.add("error", where, "gate must be true/false or a depth in dB (0-40)")
+    if "clip_db" in clip and not (_number(clip["clip_db"]) and 0 <= clip["clip_db"] <= 9):
+        res.add("error", where, "clip_db must be between 0 and 9 dB")
 
 
 def _check_duck(res: Resolution, where: str, duck: Any) -> None:
@@ -462,6 +469,12 @@ def resolve(plan: dict[str, Any]) -> Resolution:
                         find_word(lyrics, str(clip.get("word", "")), int(clip.get("occurrence", 1)))
                     except ValueError as error:
                         res.add("error", where, str(error))
+                        continue
+                if kind == "halftime":
+                    pattern = clip.get("pattern") or {}
+                    if not (isinstance(pattern, dict) and set(pattern) <= {"kick", "snare", "hat"} and all(
+                            isinstance(v, str) and v and set(v) <= set("xo.") for v in pattern.values())):
+                        res.add("error", where, "halftime pattern must map kick/snare/hat to step strings of x, o, .")
                         continue
             if not (_number(clip.get("bars")) and clip["bars"] > 0 and _number(clip.get("at_bar")) and clip["at_bar"] >= 1):
                 res.add("error", where, "generated fx need bars > 0 and at_bar >= 1")

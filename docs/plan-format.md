@@ -39,7 +39,7 @@ overlaps, key clashes, audible stretch, silence).
 | `master.ceiling_db` | true-peak ceiling (default -1) |
 | `master.match_loudness` | default `true`: every source is first matched to -14 LUFS so clip gains are relative |
 | `master.glue` | default `true`: gentle bus compression (about 1 dB) before the true-peak limiter |
-| `master.reference` | a library track id (or `{track, stem}`): Matchering matches tonal balance and width to that released master; without `lufs`, its loudness becomes the target (clamped to -14..-7) |
+| `master.reference` | a library track id (or `{track, stem}`): Matchering matches tonal balance and width to that released master; without `lufs`, its loudness becomes the target (clamped to -14..-6; loud DnB/EDM beds reach -6 with drum clipping) |
 | `master.mono_bass_hz` | default `120`: everything below is folded to mono (club systems); `0` turns it off |
 | `master.soft_clip` | default `true`: a soft clipper shaves the sharpest transients before the limiter |
 | `master.tame_harshness` | default `true`: a dynamic cut of 2-5 kHz (max 3 dB) only when that band jumps above its usual share |
@@ -76,6 +76,7 @@ overlaps, key clashes, audible stretch, silence).
 | `nudge_ms` | shift a clip earlier (-) or later (+) by up to 60 ms to sit in the pocket |
 | `semitones` | per-clip pitch shift on top of the source's (key lift: `mix edit <slug> lift --at-bar N`) |
 | `punch` | `{attack_db, parallel}`: transient shaping + parallel compression below 900 Hz (kick and snare body, not the hats) |
+| `clip_db` | non-vocal clips: soft-clip the clip's peaks by this many dB (0-9). On the drums of loud genres it buys master loudness before the limiter; new EDM/DnB mashups set 3 |
 | `follow_roots` | bass stem clips only: `true` or a list of vocal clip ids. Under those vocals the bass keeps its rhythm and pumping but plays the root notes the vocal was written over (read from the vocal track's own bass stem, else its instrumental or mix). `glass-harbor mix follow <slug>` decides which clips need it; new mashup scaffolds do this automatically |
 | `word_safe` | default `true` on vocal clips: edges move so no word is cut (lyrics), or to the nearest quiet point |
 | `ride` | default `true` on vocal clips: phrase-level gain riding (up to ±6 dB) to an even level |
@@ -126,7 +127,11 @@ Types: `riser` (band-passed noise sweeping 250 Hz to 9 kHz with a rising tone, e
 `downlifter` (the reverse, after a drop), `impact` (sub boom + noise burst). From the song's own audio (need
 `source`): `snare_roll` (the beat's cleanest snare from its drum stem, 8ths to 16ths to 32nds, rising), `crash` (a
 crash found in the drum stem, else synthesized), `vocal_riser` and `reverse_swell` (need `word` + `occurrence` from
-the lyrics: a word stretched and pitched up an octave over the build, or its reverse reverb swelling into the word).
+the lyrics: a word stretched and pitched up an octave over the build, or its reverse reverb swelling into the word),
+`halftime` (a half-time beat played on the record's own kick, snare, and hats from its drum stem; default kick on
+steps 1 and 11, snare on 9, hats on 8ths; override with `"pattern": {"kick": "x.........x.....", ...}` using
+`x` hit, `o` soft hit, `.` rest per 16th). Mute the bed's drums over the same bars (`arrange_db` -60) for the
+classic DnB/rap half-time switch.
 They take `automation`, `fx`, `duck`, and `gain_db` like any clip; macros duck every fill under the vocals.
 
 `glass-harbor mix drop <slug> --at-bar 92 [--build-bars 8] [--silence-beats 1]` writes a whole drop into the plan:
@@ -139,8 +144,8 @@ bass come back hard).
 - `glass-harbor mix edges <slug> [--intro-bars 16 --outro-bars 16]`: a beat-only intro (drums, bass in halfway)
   and outro looped from the beat's first drop, so DJs can mix the edit; everything else moves later. New mashups
   get 16 bars by default (`taste set dj_edge_bars=0` turns it off).
-- `glass-harbor mix fills <slug>`: a crash on every hook entry and drop, a one-bar reverse swell of each hook's first
-  word into it. New mashups get these by default.
+- `glass-harbor mix fills <slug>`: a crash on drops and on hook entries at least 16 bars apart, and a one-bar
+  reverse swell of each marked hook's first word into it. New mashups get these by default.
 - `glass-harbor mix drop <slug> --at-bar N --roll --riser vocal:janice`: the drop builder can add a snare roll from
   the drum stem and use a vocal riser.
 - `glass-harbor mix edit <slug> mute|stutter|tape_stop|lift --at-bar N`: the beat drops out under a punchline, a
@@ -154,6 +159,19 @@ acapella), then returns to its original level: high-pass 90 Hz, -3 dB at 300 Hz 
 +2 dB shelf at 10 kHz (air), a dynamic de-esser on 5.5-9 kHz, a fast 4:1 compressor and a slow 2:1 leveler, light
 tanh saturation, a pre-delayed plate reverb send (high- and low-cut), and dotted-eighth delay throws on the last
 word of each lyric line. QA flags any word still cut at a clip edge.
+
+Before the chain, vocal clips with lyrics get two clean-ups:
+
+- **Gate between words** (`gate`, default on, 14 dB): separation leaves the original beat's hats and 808 tails
+  between the words, and over a different groove they smear the new drums. The acapella drops 14 dB outside the
+  words (40 ms before to 150 ms after each), and stays open for anything near word level that Whisper missed
+  (ad-libs). `"gate": false` turns it off, a number sets the depth in dB.
+- **Groove lock** (`groove_lock`, default 0.4): word onsets move that share of the way onto the flow's own 16th
+  grid (at most 30 ms; triplets and deliberate drags, more than a quarter of a 16th off, stay put) through extra
+  warp keyframes. 0 turns it off.
+
+After the compressors, `density` (default 0.5 on `rap` and `hook`, 0 on `dry`) blends in parallel (New York)
+compression and a 2-6 kHz exciter, then re-levels: the vocal reads through dense beats without being turned up.
 
 ## Ducking
 

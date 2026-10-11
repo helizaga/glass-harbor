@@ -37,7 +37,9 @@
     "drop at bar 129: 8-bar build on bed-c-drums, bed-c-bass, bed-c-other, riser, impact, 1 beat(s) of silence",
     "v2: chant clips +4 dB, melodic layer ducks 8 dB under the vocal (chants were buried under the full drop)",
     "fills: crash 17, crash 57, crash 81, crash 105, crash 129, crash 145, swell into 57, swell into 81, swell into 105, swell into 145",
-    "v3: crashes only on the two drops (Get Up has its own cymbals; crashes on chant entries masked the shouts), drums duck 6 dB under the vocal"
+    "v3: crashes only on the two drops (Get Up has its own cymbals; crashes on chant entries masked the shouts), drums duck 6 dB under the vocal",
+    "v4: half-time switch for bars 61-80 (Get Up's own kick/snare/hats) with a snare roll and impact back into the full beat at 81; Get Up's vocal answers Lil Bean (shout before drop 1, its breakdown chant, chops trading with yeah/bop in the build, its hook every 4 bars after the reprise); drums clipped 3 dB; master target follows Get Up up to -6 LUFS; gate, groove lock, and density on every vocal by default",
+    "bar 80: bass and melody out, only the half-time kit and snare roll into the slam at 81"
   ],
   "clips": [
     {
@@ -91,8 +93,27 @@
             16,
             0
           ]
+        ],
+        "arrange_db": [
+          [
+            59.996,
+            0.0
+          ],
+          [
+            60,
+            -60.0
+          ],
+          [
+            79.996,
+            -60.0
+          ],
+          [
+            80,
+            0.0
+          ]
         ]
-      }
+      },
+      "clip_db": 3.0
     },
     {
       "id": "bed-a-bass",
@@ -136,6 +157,24 @@
           [
             16,
             0
+          ]
+        ],
+        "arrange_db": [
+          [
+            78.996,
+            0.0
+          ],
+          [
+            79,
+            -60.0
+          ],
+          [
+            79.996,
+            -60.0
+          ],
+          [
+            80,
+            0.0
           ]
         ]
       }
@@ -256,11 +295,19 @@
             -6.0
           ],
           [
-            79.9688,
+            78.996,
             -6.0
           ],
           [
-            80.0,
+            79,
+            -60.0
+          ],
+          [
+            79.996,
+            -60.0
+          ],
+          [
+            80,
             0.0
           ],
           [
@@ -332,7 +379,8 @@
       "duck": {
         "under": "vocals",
         "db": 6.0
-      }
+      },
+      "clip_db": 3.0
     },
     {
       "id": "bed-b-bass",
@@ -424,7 +472,8 @@
             0
           ]
         ]
-      }
+      },
+      "clip_db": 3.0
     },
     {
       "id": "bed-c-bass",
@@ -547,7 +596,8 @@
       "duck": {
         "under": "vocals",
         "db": 6.0
-      }
+      },
+      "clip_db": 3.0
     },
     {
       "id": "bed-d-bass",
@@ -699,7 +749,7 @@
           "y-------b-------",
           "................",
           "y-------b-------",
-          "........Y-------",
+          "................",
           "y-------b-------",
           "y-------b-------",
           "y---y---b---b---",
@@ -895,6 +945,96 @@
       "duck": {
         "under": "vocals",
         "db": 8.0
+      }
+    },
+    {
+      "id": "halftime",
+      "generate": "halftime",
+      "source": "bed",
+      "at_bar": 61,
+      "bars": 18,
+      "duck": {
+        "under": "vocals",
+        "db": 6.0
+      },
+      "gain_db": -3.0
+    },
+    {
+      "id": "roll-81",
+      "generate": "snare_roll",
+      "source": "bed",
+      "at_bar": 79,
+      "bars": 2,
+      "gain_db": -3,
+      "duck": {
+        "under": "vocals",
+        "db": 8.0
+      }
+    },
+    {
+      "id": "impact-81",
+      "generate": "impact",
+      "at_bar": 81,
+      "bars": 2,
+      "gain_db": -6
+    },
+    {
+      "id": "getup-shout-17",
+      "source": "bed",
+      "stem": "vocals",
+      "from_bar": 16,
+      "bars": 1,
+      "at_bar": 16,
+      "chain": "hook"
+    },
+    {
+      "id": "getup-breakdown",
+      "source": "bed",
+      "stem": "vocals",
+      "from_bar": 97,
+      "bars": 4,
+      "at_bar": 113,
+      "chain": "hook"
+    },
+    {
+      "id": "getup-answers",
+      "source": "bed",
+      "stem": "vocals",
+      "from_bar": 144,
+      "bars": 17,
+      "at_bar": 160,
+      "chain": "hook"
+    },
+    {
+      "id": "getup-chops",
+      "source": "bed",
+      "stem": "vocals",
+      "at_bar": 121,
+      "bars": 4,
+      "fx": {
+        "echo": {
+          "beats": 0.75,
+          "feedback": 0.3,
+          "mix": 0.2
+        }
+      },
+      "chop": {
+        "slices": {
+          "g": {
+            "word": "get",
+            "occurrence": 6
+          },
+          "G": {
+            "word": "get",
+            "occurrence": 7
+          }
+        },
+        "pattern": [
+          "................",
+          "g-------G-------",
+          "................",
+          "g---g---G-------"
+        ]
       }
     }
   ]

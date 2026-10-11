@@ -74,6 +74,69 @@ def find_crash(drums: np.ndarray, grid: Grid) -> Hit | None:
     return best
 
 
+def find_kick(drums: np.ndarray, grid: Grid) -> Hit | None:
+    """The cleanest kick on a downbeat: strong sub/low end, little snare body or hats on top of it."""
+    low = _band_env(drums, 0, 120)
+    body = _band_env(drums, 300, 5000)
+    length = min(0.3, 0.8 * grid.period)
+    best: Hit | None = None
+    for bar in range(1, grid.bar_count):
+        t = grid.bar_time(bar)
+        if t < 0.05 or t + length > drums.shape[0] / A.SR:
+            continue
+        kick_db = _window_db(low, t, 0.08)
+        score = kick_db - 0.5 * max(0.0, _window_db(body, t, 0.08) - kick_db + 3) \
+            - 0.5 * max(0.0, _window_db(low, t - 0.1, 0.08) - kick_db + 12)
+        if best is None or score > best.score:
+            best = Hit(start=max(0.0, t - 0.003), length=length, score=score)
+    return best if best is not None and best.score > -45 else None
+
+
+def find_hat(drums: np.ndarray, grid: Grid) -> Hit | None:
+    """A closed hat on an off-beat 8th: bright and short, with no kick or snare under it."""
+    top = _band_env(drums, 7000, 16000)
+    body = _band_env(drums, 100, 3000)
+    best: Hit | None = None
+    beats = grid.beats
+    for index in range(grid.first_downbeat, len(beats) - 1):
+        t = (beats[index] + beats[index + 1]) / 2
+        if t + 0.1 > drums.shape[0] / A.SR:
+            break
+        hat_db = _window_db(top, t, 0.03)
+        score = hat_db - max(0.0, _window_db(body, t, 0.05) - hat_db + 6) - max(0.0, _window_db(top, t + 0.06, 0.04) - hat_db + 10)
+        if best is None or score > best.score:
+            best = Hit(start=max(0.0, t - 0.002), length=0.09, score=score)
+    return best if best is not None and best.score > -60 else None
+
+
+HALFTIME = {"kick": "x.........x.....", "snare": "........x.......", "hat": "x.x.x.x.x.x.x.x."}
+
+
+def sequence(hits: dict[str, np.ndarray], patterns: dict[str, str], seconds: float, beat_seconds: float,
+             *, gains_db: dict[str, float] | None = None) -> np.ndarray:
+    """Play one-shot ``hits`` on 16-step-per-bar ``patterns`` ("x" hit, "o" soft hit, "." rest) for ``seconds``.
+    Each hit is cut short (with a fade) when the same voice hits again."""
+    frames = int(round(seconds * A.SR))
+    out = np.zeros((frames, 2), dtype=np.float32)
+    step = beat_seconds / 4
+    gains_db = gains_db or {}
+    for voice, pattern in patterns.items():
+        hit = hits.get(voice)
+        if hit is None or not pattern:
+            continue
+        times = [i * step for i in range(int(seconds / step + 1e-6)) if pattern[i % len(pattern)] in "xo"]
+        for n, t in enumerate(times):
+            start = int(round(t * A.SR))
+            stop = int(round(times[n + 1] * A.SR)) if n + 1 < len(times) else frames
+            piece = hit[: max(0, min(stop, frames) - start)].copy()
+            fade = min(piece.shape[0], int(0.004 * A.SR))
+            if fade:
+                piece[-fade:] *= np.linspace(1, 0, fade)[:, None]
+            soft = pattern[int(round(t / step)) % len(pattern)] == "o"
+            out[start:start + piece.shape[0]] += piece * 10 ** ((gains_db.get(voice, 0.0) - (6 if soft else 0)) / 20)
+    return out
+
+
 def synth_crash(seconds: float = 2.5, seed: int = 5) -> np.ndarray:
     """Fallback crash: bright noise with metallic band peaks and a long decay."""
     from scipy.signal import butter, sosfilt

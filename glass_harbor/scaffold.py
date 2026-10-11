@@ -392,7 +392,8 @@ def build_mashup(vocals: str, bed: str, *, semitones: int | None = None, intro_b
     if edm:
         plan["groove"] = {"pump_fx": {"db": 5.0, "release": 0.6}}
     if {"drums", "bass", "other"} <= set(library.available_stems(bed)) and len(bed_clips) == 1:
-        plan = arrange_bed_stems(plan, pump={"db": 3.0, "release": 0.5} if edm else None)
+        plan = arrange_bed_stems(plan, pump={"db": 3.0, "release": 0.5} if edm else None,
+                                 drum_clip_db=3.0 if edm else 0.0)
     has_drums = "drums" in library.available_stems(bed)
     for bar, spotlight in drop_builds:
         try:
@@ -489,7 +490,7 @@ def _levels_to_points(levels: list[float], bpb: int, ramp_beats: float = 0.125) 
 
 def arrange_bed_stems(plan: dict[str, Any], *, bed_clip_id: str | None = None, verse_other_db: float = -60.0,
                       drums_only_bars: float = 1, pump: dict[str, float] | None = None,
-                      duck_drums_db: float = 4.0) -> dict[str, Any]:
+                      duck_drums_db: float = 4.0, drum_clip_db: float = 0.0) -> dict[str, Any]:
     """Replace one bed clip with drums / bass / other clips and arrange them around the vocal: verses over drums +
     bass (the melodic layer stripped by ``verse_other_db``), choruses over the full beat, and a drums-only bar
     before each chorus. Ducking moves to the melodic layer; optional grid pumping on it too."""
@@ -539,6 +540,8 @@ def arrange_bed_stems(plan: dict[str, Any], *, bed_clip_id: str | None = None, v
             automation["arrange_db"] = _levels_to_points(bass, bpb)
         if stem == "drums":
             clip["punch"] = {"attack_db": 3.0, "parallel": 0.2}
+            if drum_clip_db:
+                clip["clip_db"] = drum_clip_db  # loud genres: clip the drums so the master gets club-loud
         if stem == "other":
             # Width contrast: narrower under verses, wider on hooks and drops.
             widths = [0.7 if level < 0 else 1.25 for level in other]

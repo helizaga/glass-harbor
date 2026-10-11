@@ -81,7 +81,7 @@ def generate(kind: str, seconds: float) -> np.ndarray:
 
 # ---------------------------------------------------------------- FX made from the song's own audio
 
-SOURCE_TYPES = ("snare_roll", "crash", "vocal_riser", "reverse_swell")
+SOURCE_TYPES = ("snare_roll", "crash", "vocal_riser", "reverse_swell", "halftime")
 ALL_TYPES = TYPES + SOURCE_TYPES
 
 

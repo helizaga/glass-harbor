@@ -123,6 +123,13 @@ intent in `<slug>.brief.md` (what came from analysis vs your musical inference).
   real drums into big drops (`mix drop --roll`), the beat dropping out under the best line (`mix edit mute`), a
   tape stop into a breakdown (`mix edit tape_stop`). Every fill ducks under the vocal; never let a riser or swell
   run under a rapped line (check `vocal_presence` for the bars it covers).
+- **Both songs' hooks**: a mashup lands harder when the beat's own vocal hook answers the acapella (call and
+  response in builds and drops); the instrumental pass keeps the bed's vocal stem for this. Use it as short shouts
+  or chops, never under a rapped line.
+- **Half-time switch** (DnB, trap, dubstep beds): one verse over a `halftime` beat from the bed's own kit with the
+  bed's drums muted, then the full beat slams back on a hook or drop. It gives a long rap section an energy shape.
+- **Loud genres**: DnB and EDM releases sit around -5 LUFS; a quieter edit sounds weak next to them in a set. Clip
+  the drums (`clip_db` 3) and let the master target follow the reference up to -6 LUFS.
 - **Hooks**: the `hook` chain adds detuned doubles; keep verses single and centred for contrast. `tune` (0.2-0.4)
   only for sung hooks; never retune rap (chord-aware `harmonize` is on for `hook` clips only). Use `nudge_ms` when a vocal sits ahead of or behind the groove.
 - **Vocal chops** (`chop` clips, see `docs/plan-format.md`): the EDM move for builds, drops, and fills. Pick one or

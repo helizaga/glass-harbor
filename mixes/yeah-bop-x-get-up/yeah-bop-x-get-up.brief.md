@@ -48,3 +48,16 @@
   the chants.
 - Chants +4 dB, melodic layer ducks 8 dB and drums 6 dB under the vocal (Get Up is mastered at -4.7 LUFS and
   dense in 1-4 kHz).
+
+## v2 (production pass)
+
+- Every vocal: gate between words (separation bleed from P-Lo's beat, 14 dB), groove lock (onsets 40% onto the
+  flow's 16th grid, ~9 ms average move), density (parallel compression + presence exciter).
+- Half-time switch on bars 61-80: verse 2, chant 2, and verse 3 over a half-time beat played on Get Up's own kick,
+  snare, and hats (3 dB under its drums), snare roll and impact back into the full beat at 81, bass and melody out
+  on bar 80.
+- Get Up's own vocal answers Lil Bean: its shout before drop 1 (bar 16), its breakdown chant (113), its shout
+  traded with the yeah/bop chops in the build (121-124), its hook every 4 bars after the reprise (160-176).
+- Drums clipped 3 dB; master -6.2 LUFS (Get Up is -4.7; v1 was -7.3).
+- QA still reads bar 81 at 2.3 dB of contrast (the full drums returning mid-drop, not a breakdown drop) and flags
+  the vocal at entry and FX bars (57, 80-81, 105, 129, 166, 178). Needs ears.

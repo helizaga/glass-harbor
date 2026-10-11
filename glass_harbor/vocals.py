@@ -35,6 +35,7 @@ class ChainSettings:
     throw_mix: float
     throws: bool
     saturation: float = 0.12
+    density: float = 0.5  # parallel compression + presence exciter, so the vocal cuts through dense beats
     doubles: bool = False
     extras: dict[str, Any] = field(default_factory=dict)
 
@@ -42,7 +43,7 @@ class ChainSettings:
 PRESETS = {
     "rap": ChainSettings(reverb_mix=0.10, throw_mix=0.35, throws=True),
     "hook": ChainSettings(reverb_mix=0.18, throw_mix=0.45, throws=True, saturation=0.15, doubles=True),
-    "dry": ChainSettings(reverb_mix=0.0, throw_mix=0.0, throws=False),
+    "dry": ChainSettings(reverb_mix=0.0, throw_mix=0.0, throws=False, density=0.0),
 }
 
 
@@ -260,9 +261,87 @@ def tune(vocal: np.ndarray, key_tonic: int, key_mode: str, strength: float) -> t
     return out, float(np.mean(np.abs(correction[active])) * 100) if active.any() else 0.0
 
 
+def densify(x: np.ndarray, amount: float) -> np.ndarray:
+    """New York (parallel) compression plus a presence-band exciter, blended in by ``amount`` (0-1). Raises the
+    vocal's average level and its 2-6 kHz harmonics so it reads through a dense beat without turning it up.
+    Expects the chain's nominal level."""
+    import pedalboard
+
+    squashed = pedalboard.Compressor(threshold_db=NOMINAL_DB - 12, ratio=10.0, attack_ms=1.0, release_ms=60.0)(
+        x.T, A.SR).T
+    squashed = squashed * A.db_to_gain(_active_rms_db(x) - _active_rms_db(squashed))
+    presence = pedalboard.Pedalboard([pedalboard.HighpassFilter(cutoff_frequency_hz=2000.0),
+                                      pedalboard.LowpassFilter(cutoff_frequency_hz=6000.0)])(x.T, A.SR).T
+    scale = A.db_to_gain(NOMINAL_DB)
+    excited = np.tanh(presence * 4.0 / scale) * scale / 4.0
+    return (x + amount * (0.5 * squashed + 0.6 * excited)).astype(np.float32)
+
+
+GATE_PRE_S = 0.04
+GATE_POST_S = 0.15  # keeps word tails and breaths that belong to the word
+
+
+def gate_between_words(vocal: np.ndarray, words: list[tuple[float, float]], *, depth_db: float = 14.0,
+                       loud_open_db: float = 6.0) -> tuple[np.ndarray, float]:
+    """Turn the acapella down by ``depth_db`` between words (clip-local word spans, seconds). Separation leaves the
+    original beat's hats and 808 tails in those gaps, and over a different groove they smear the new drums. The gate
+    also opens for anything within ``loud_open_db`` of the typical word level, so untranscribed ad-libs survive.
+    Returns (audio, share of time closed)."""
+    n = vocal.shape[0]
+    if n == 0 or not words:
+        return vocal, 0.0
+    open_ = np.zeros(n, dtype=bool)
+    for start, end in words:
+        open_[max(0, int((start - GATE_PRE_S) * A.SR)):max(0, int((end + GATE_POST_S) * A.SR))] = True
+    hop = int(0.01 * A.SR)
+    env = _envelope_db(vocal, hop)
+    word_frames = np.zeros(env.size, dtype=bool)
+    for start, end in words:
+        word_frames[max(0, int(start * A.SR / hop)):max(0, int(end * A.SR / hop))] = True
+    if word_frames.any():
+        typical = float(np.median(env[word_frames[:env.size]]))
+        loud = np.repeat(env > typical - loud_open_db, hop)[:n]
+        open_[:loud.size] |= loud
+    gain = np.where(open_, 1.0, A.db_to_gain(-depth_db))
+    ramp = int(0.01 * A.SR)
+    gain = np.convolve(np.pad(gain, (ramp // 2, ramp - ramp // 2 - 1), mode="edge"), np.ones(ramp) / ramp, mode="valid")
+    return (vocal * gain[:, None]).astype(np.float32), float(1.0 - open_.mean())
+
+
+def groove_keyframes(src_bounds: np.ndarray, out_bounds: np.ndarray, onsets: list[float], strength: float, *,
+                     max_shift_s: float = 0.03, min_gap_s: float = 0.08) -> tuple[np.ndarray, np.ndarray, list[float]]:
+    """Extra warp keyframes that pull word onsets part of the way (``strength``) onto the flow's own 16th-note grid.
+    Onsets far from any 16th (triplets, deliberate drags) are left alone. Returns (src, out, shifts in seconds)."""
+    src = list(map(float, src_bounds))
+    out = list(map(float, out_bounds))
+    shifts = []
+    for onset in sorted(onsets):
+        i = int(np.searchsorted(src_bounds, onset, side="right")) - 1
+        if i < 0 or i >= len(src_bounds) - 1:
+            continue
+        frac = (onset - src_bounds[i]) / (src_bounds[i + 1] - src_bounds[i]) * 4
+        if abs(frac - round(frac)) > 0.25:  # triplets sit a third of a 16th away: leave them
+            continue
+        natural = out_bounds[i] + (frac / 4) * (out_bounds[i + 1] - out_bounds[i])
+        target = out_bounds[i] + (round(frac) / 4) * (out_bounds[i + 1] - out_bounds[i])
+        k = int(np.searchsorted(src, onset))
+        lo_gap = min(onset - src[k - 1], natural - out[k - 1]) if k > 0 else 1.0
+        hi_gap = min(src[k] - onset, out[k] - natural) if k < len(src) else 1.0
+        if min(lo_gap, hi_gap) < min_gap_s:
+            continue
+        shift = float(np.clip(strength * (target - natural), -max_shift_s, max_shift_s))
+        shift = float(np.clip(shift, -0.25 * lo_gap, 0.25 * hi_gap))
+        if abs(shift) < 0.002:
+            continue
+        src.insert(k, onset)
+        out.insert(k, natural + shift)
+        shifts.append(shift)
+    return np.array(src), np.array(out), shifts
+
+
 def apply_chain(vocal: np.ndarray, preset: str, *, beat_seconds: float,
                 throw_regions: list[tuple[float, float]] | None = None, split: bool = False,
-                doubles: bool | None = None, octave: bool = False):
+                doubles: bool | None = None, octave: bool = False, density: float | None = None):
     """Process a (tail-padded) vocal. Level in = level out, so plan gains keep their meaning.
     With ``split=True`` returns (dry, wet) so the reverb/delay returns can be pumped separately."""
     import pedalboard
@@ -293,6 +372,9 @@ def apply_chain(vocal: np.ndarray, preset: str, *, beat_seconds: float,
         drive = 2.5
         wet = np.tanh(x * drive / A.db_to_gain(NOMINAL_DB + 10)) * A.db_to_gain(NOMINAL_DB + 10) / drive
         x = (1 - settings.saturation) * x + settings.saturation * wet
+    amount = settings.density if density is None else density
+    if amount > 0:
+        x = densify(x, amount)
     x = x * A.db_to_gain(level - _active_rms_db(x))  # back to the input level
     use_doubles = settings.doubles if doubles is None else doubles
     if use_doubles or octave:

@@ -165,7 +165,7 @@ def check_run(run_dir: Path) -> dict[str, Any]:
                 run_start = i - 1 if not flat else i
         drops = sorted({int(c["at_bar"]) for c in plan.get("clips", []) if c.get("generate") == "impact"})
         for bar in drops:
-            i = bar - start_bar
+            i = int(round(bar - start_bar))
             if 8 <= i < len(levels):
                 dip = levels[i] - min(levels[i - 8:i])
                 if dip < 4.0:

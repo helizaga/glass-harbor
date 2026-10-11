@@ -23,6 +23,9 @@ from glass_harbor.plan import (AUTOMATABLE, CHOP_HOLD, CHOP_REST, FREQUENCY_PARA
 BLOCK = 512
 DECLICK_SECONDS = 0.004
 LOUDNESS_MATCH_LIMIT_DB = 12.0
+GATE_DB = 14.0  # acapella level between words (separation bleed from the original beat)
+GROOVE_LOCK = 0.4  # share of the way word onsets move onto the flow's 16th grid
+LOUDEST_TARGET_LUFS = -6.0  # club masters for loud genres (DnB, EDM); reached with drum clipping + limiting
 MAX_LIMITING_DB = 6.0
 
 Log = Callable[[str], None]
@@ -388,12 +391,22 @@ def render_clip(res: Resolution, clip: ResolvedClip, source_audio: np.ndarray, l
 
     src_beats = len(src_bounds) - 1
     segment = _segment(source_audio, src_bounds[0], src_bounds[-1])
+    beat_src = src_bounds.copy()  # beat boundaries only (groove keyframes get added below)
+    words = [w for seg in lyrics["segments"] for w in seg["words"]] if (is_vocal and lyrics) else []
+    lock = float(spec.get("groove_lock", GROOVE_LOCK)) if is_vocal and clip.loop == 1 else 0.0
     pieces = []
     out_beat = out_start
     cached: tuple[np.ndarray, np.ndarray] | None = None
     out_bounds = np.array([])
     for _ in range(clip.loop):
         out_bounds = np.array([res.tempo.time_at(out_beat + i * ratio) for i in range(src_beats + 1)])
+        if lock > 0 and words:
+            # Pull word onsets part of the way onto the flow's 16th grid: extra warp keyframes between the beats.
+            onsets = [w["start"] for w in words if src_bounds[0] < w["start"] < src_bounds[-1]]
+            src_bounds, out_bounds, shifts = vocals.groove_keyframes(src_bounds, out_bounds, onsets, lock)
+            if shifts:
+                notes["groove_lock"] = {"moved": len(shifts),
+                                        "mean_ms": round(1000 * float(np.mean(np.abs(shifts))), 1)}
         durations = np.diff(out_bounds)
         if cached is not None and np.allclose(cached[0], durations, atol=1.0 / A.SR):
             piece = cached[1]
@@ -423,6 +436,13 @@ def render_clip(res: Resolution, clip: ResolvedClip, source_audio: np.ndarray, l
     processed = dry
     if edges is not None:
         processed = vocals.mask(processed, to_clip_time(edges.start), to_clip_time(edges.end))
+    gate = spec.get("gate", True)
+    if is_vocal and words and gate is not False:
+        spans = [(to_clip_time(w["start"]), to_clip_time(w["end"])) for w in words
+                 if w["end"] > src_bounds[0] and w["start"] < src_bounds[-1]]
+        processed, closed = vocals.gate_between_words(processed, spans,
+                                                      depth_db=GATE_DB if gate is True else float(gate))
+        notes["gate_closed_pct"] = round(100 * closed, 1)
     if is_vocal and spec.get("ride", True):
         processed, notes["ride_max_db"] = vocals.ride(processed)
         notes["ride_max_db"] = round(notes["ride_max_db"], 1)
@@ -438,6 +458,12 @@ def render_clip(res: Resolution, clip: ResolvedClip, source_audio: np.ndarray, l
 
         processed = punch(processed, attack_db=float(spec["punch"].get("attack_db", 3.0)),
                           parallel=float(spec["punch"].get("parallel", 0.3)))
+    if spec.get("clip_db") and not is_vocal:
+        # Clip the drum bus: the sharpest transients give up a few dB so the master gets louder before limiting.
+        peak = float(np.max(np.abs(processed))) if processed.size else 0.0
+        if peak > 0:
+            processed = soft_clipper(processed, A.gain_to_db(peak) - float(spec["clip_db"]), knee=0.7)
+            notes["clipped_db"] = float(spec["clip_db"])
     chain_tail = 4 if chain in ("rap", "hook") else 0
     tail_beats = float(spec.get("tail_beats", 8 if spec.get("fx") else chain_tail))
     if tail_beats:
@@ -447,7 +473,8 @@ def render_clip(res: Resolution, clip: ResolvedClip, source_audio: np.ndarray, l
         throws = vocals.throw_regions_from_words(lyrics["segments"], to_clip_time, window) if lyrics else []
         dry_part, wet_part = vocals.apply_chain(processed, chain, beat_seconds=60.0 / bpm_out, throw_regions=throws,
                                                 split=True, doubles=spec.get("doubles"),
-                                                octave=bool(spec.get("octave", False)))
+                                                octave=bool(spec.get("octave", False)),
+                                                density=spec.get("density"))
         pump_fx = (res.plan.get("groove") or {}).get("pump_fx")
         if pump_fx and np.any(wet_part):
             wet_part = wet_part * _pump_gain(res, start_time, wet_part.shape[0], pump_fx, out_start, out_end)[:, None]
@@ -458,7 +485,7 @@ def render_clip(res: Resolution, clip: ResolvedClip, source_audio: np.ndarray, l
     audio = processed * A.db_to_gain(clip.gain_db + loudness_offset_db)
     audio = _apply_mixer(res, clip, audio, start_time)
 
-    source_dev, _, _ = grid_deviation_ms(segment, list(src_bounds[:src_beats] - src_bounds[0]))
+    source_dev, _, _ = grid_deviation_ms(segment, list(beat_src[:src_beats] - beat_src[0]))
     warp_dev, jitter, _ = grid_deviation_ms(dry, target_beats)
     warp_offset = None if warp_dev is None or source_dev is None else warp_dev - source_dev
     nudge = float(spec.get("nudge_ms", 0.0)) / 1000.0
@@ -753,9 +780,24 @@ def _generate_from_source(res: Resolution, clip: ResolvedClip, kind: str, second
     track = res.plan["sources"][source]["track"]
     grid = res.grids[source]
     frames = int(round(seconds * A.SR))
-    if kind in ("snare_roll", "crash"):
+    if kind in ("snare_roll", "crash", "halftime"):
         stem = "drums" if "drums" in library.available_stems(track) else "mix"
         kit_audio = library.load_audio(track, stem)
+        if kind == "halftime":
+            # A half-time beat played on the record's own kick, snare, and hats (the DnB verse switch).
+            found = {"kick": kit.find_kick(kit_audio, grid), "snare": kit.find_snare(kit_audio, grid),
+                     "hat": kit.find_hat(kit_audio, grid)}
+            hits = {name: _fade(_segment(kit_audio, h.start, h.start + h.length), 0.001, 0.02)
+                    for name, h in found.items() if h is not None}
+            patterns = {**kit.HALFTIME, **(clip.spec.get("pattern") or {})}
+            beat = kit.sequence(hits, patterns, seconds, 60.0 / res.tempo.bpm_at(clip.anchor_beat),
+                                gains_db={"hat": -6.0})
+            # It stands in for the bed's drum clips, so it gets the same loudness matching they do.
+            track_lufs = float(res.analyses[track].get("loudness_lufs", A.REFERENCE_LUFS))
+            if (res.plan.get("master") or {}).get("match_loudness", True) and math.isfinite(track_lufs):
+                beat = beat * A.db_to_gain(float(np.clip(A.REFERENCE_LUFS - track_lufs, -LOUDNESS_MATCH_LIMIT_DB,
+                                                         LOUDNESS_MATCH_LIMIT_DB)))
+            return beat
         if kind == "snare_roll":
             hit = kit.find_snare(kit_audio, grid)
             if hit is None:
@@ -1047,7 +1089,7 @@ def render_plan(plan: dict[str, Any], out_dir: Path, *, start_bar: float | None 
     if target_lufs is None:
         ref_analysis = (res.analyses.get(reference["track"]) or library.load_analysis(reference["track"])) if reference else {}
         target_lufs = ref_analysis.get("loudness_lufs", -9.0) if reference else -9.0
-        target_lufs = float(np.clip(target_lufs, -14.0, -7.0))
+        target_lufs = float(np.clip(target_lufs, -14.0, LOUDEST_TARGET_LUFS))
     mastered, master_stats = master(mix, lufs=float(target_lufs), ceiling_db=float(master_spec.get("ceiling_db", -1.0)),
                                     soft_clip=bool(master_spec.get("soft_clip", True)))
     master_stats["target_lufs"] = round(float(target_lufs), 2)
