@@ -137,3 +137,15 @@ def test_fix_rounds_lift_clips_whisper_cannot_make_out(workspace):
                           "chain": "hook"})
     changes = apply_qa_fixes(plan, {"vocal_presence": []}, {"flags": []}, {"weak": ["hook1"]})
     assert plan["clips"][-1]["gain_db"] == 2.0 and any("hard to make out" in c for c in changes)
+
+
+def test_bed_sections_fall_back_without_allin1(monkeypatch):
+    import importlib.util
+
+    from glass_harbor import auto
+
+    real = importlib.util.find_spec
+    monkeypatch.setattr(importlib.util, "find_spec", lambda name, *a: None if name == "allin1_infer" else real(name, *a))
+    assert auto.bed_sections() == "novelty"
+    monkeypatch.setattr(importlib.util, "find_spec", lambda name, *a: object() if name == "allin1_infer" else real(name, *a))
+    assert auto.bed_sections() == "allin1"

@@ -67,6 +67,13 @@ def prepare_vocal(track_id: str, log: Log) -> None:
     _lyrics(track_id, log)
 
 
+def bed_sections() -> str:
+    """Verse/chorus labels from allin1 when its optional package is installed, else energy-based novelty sections."""
+    import importlib.util
+
+    return "allin1" if importlib.util.find_spec("allin1_infer") else "novelty"
+
+
 def prepare_bed(track_id: str, log: Log) -> None:
     """Instrumental and drums/bass/other stems (the separation keeps the beat's own vocal for call and response),
     verse/chorus sections, and lyrics for that vocal."""
@@ -75,7 +82,7 @@ def prepare_bed(track_id: str, log: Log) -> None:
 
     produced = separate_track(track_id, stems=["instrumental", "drums", "bass", "other"], quality="best", log=log)
     if produced:
-        analyze_library_track(track_id, log=log, sections="allin1")
+        analyze_library_track(track_id, log=log, sections=bed_sections())
     _lyrics(track_id, log)
 
 
@@ -215,7 +222,7 @@ def run_auto(vocal: str, bed: str, *, slug: str | None = None, title: str = "", 
     from glass_harbor.scaffold import build_mashup
 
     vocal_id = ingest(vocal, sections="novelty", log=log)
-    bed_id = ingest(bed, sections="allin1", log=log)
+    bed_id = ingest(bed, sections=bed_sections(), log=log)
     prepare_vocal(vocal_id, log)
     prepare_bed(bed_id, log)
     slug = require_slug(slug or f"{vocal_id}-x-{bed_id}")
