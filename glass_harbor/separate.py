@@ -79,8 +79,21 @@ def _two_stem(outputs: dict[str, Path]) -> dict[str, Path]:
     return outputs
 
 
-def _run_audio_separator(source: Path, out_dir: Path, *, model: str | None = None,
-                         ensemble_preset: str | None = None) -> dict[str, Path]:
+MPS_BUDGET_ENV = "AUDIO_SEPARATOR_MPS_BUFFER_BUDGET_GIB"
+MPS_RETRY_BUDGET_GIB = "6"
+
+
+def _free_mps() -> None:
+    try:
+        import torch
+
+        if torch.backends.mps.is_available():
+            torch.mps.empty_cache()
+    except Exception:  # noqa: BLE001 - cache release is best effort
+        pass
+
+
+def _separate_once(source: Path, out_dir: Path, model: str | None, ensemble_preset: str | None) -> list[str]:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         from audio_separator.separator import Separator
@@ -97,7 +110,29 @@ def _run_audio_separator(source: Path, out_dir: Path, *, model: str | None = Non
             separator.load_model()
         else:
             separator.load_model(model_filename=model)
-        outputs = separator.separate(str(source))
+        return separator.separate(str(source))
+
+
+def _run_audio_separator(source: Path, out_dir: Path, *, model: str | None = None,
+                         ensemble_preset: str | None = None) -> dict[str, Path]:
+    import os
+
+    # Models from earlier passes in this process hold GPU memory; release it so audio-separator's memory budget
+    # (measured against what is free) does not shrink pass after pass.
+    _free_mps()
+    try:
+        outputs = _separate_once(source, out_dir, model, ensemble_preset)
+    except RuntimeError as error:
+        # When MPS looks short on memory, audio-separator keeps long-track Demucs buffers on the CPU while the model
+        # runs on MPS, and that path mixes devices. Retry with the buffers kept on MPS.
+        if "same device" not in str(error) or os.environ.get(MPS_BUDGET_ENV):
+            raise
+        _free_mps()
+        os.environ[MPS_BUDGET_ENV] = MPS_RETRY_BUDGET_GIB
+        try:
+            outputs = _separate_once(source, out_dir, model, ensemble_preset)
+        finally:
+            del os.environ[MPS_BUDGET_ENV]
     found: dict[str, Path] = {}
     for name in outputs:
         path = Path(name) if Path(name).is_absolute() else out_dir / name
