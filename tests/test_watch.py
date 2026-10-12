@@ -71,3 +71,54 @@ def test_fetch_takes_only_the_artists_free_download(monkeypatch, tmp_path):
         fetch.fetch("https://artist.bandcamp.com/track/x", folder=tmp_path, log=lambda m: None)
     with pytest.raises(fetch.NoFreeDownload):
         fetch.fetch("https://www.youtube.com/watch?v=abc", folder=tmp_path, log=lambda m: None)
+
+
+def test_concurrent_adds_keep_every_pairing(workspace):
+    import threading
+
+    threads = [threading.Thread(target=watch.add, args=(f"vocal {i}", f"beat {i}")) for i in range(12)]
+    [t.start() for t in threads]
+    [t.join() for t in threads]
+    items = watch.load_queue()
+    assert len(items) == 12 and len({i["id"] for i in items}) == 12
+    assert not list(watch.queue_path().parent.glob("queue.json.*"))  # no temp or lock files left behind
+
+
+def test_hints_that_match_one_file_wait_for_the_other(workspace, tmp_path):
+    folder = tmp_path / "dl"
+    folder.mkdir()
+    (folder / "DJ remix.mp3").write_bytes(b"x")
+    watch.add("dj", "dj remix")
+    assert watch.run_once(folder=folder, settle_s=0, runner=lambda *a, **k: {}) == []
+    assert watch.load_queue()[0]["status"] == "waiting"
+
+
+def test_interrupted_runs_are_retried(workspace, tmp_path):
+    folder = tmp_path / "dl"
+    folder.mkdir()
+    (folder / "glock.flac").write_bytes(b"x")
+    (folder / "beat.mp3").write_bytes(b"y")
+    item = watch.add("glock", "beat")
+    watch._update(item["id"], status="running", pid=2 ** 22 + 12345, started_at="2026-01-01T00:00:00")
+    handled = watch.run_once(folder=folder, settle_s=0,
+                             runner=lambda *a, **k: {"slug": "s", "phone": "p.m4a", "brief": "b.md"})
+    assert handled and handled[0]["status"] == "done"
+
+
+def test_watch_keeps_going_with_an_empty_queue(workspace, tmp_path):
+    watch.watch(folder=tmp_path, interval=0, log=lambda m: None, passes=2)  # returns only because passes ran out
+
+
+def test_listen_defaults_to_the_latest_full_render(workspace):
+    import json as _json
+
+    from glass_harbor.cli import _latest_full_render
+    from glass_harbor.paths import runs_dir
+
+    for stamp, rng in (("20260101-000000", {"start_bar": None, "end_bar": None}),
+                       ("20260102-000000", {"start_bar": 9, "end_bar": 17})):
+        run = runs_dir("mix") / stamp
+        run.mkdir(parents=True)
+        (run / "render.json").write_text(_json.dumps({"range": rng}))
+        (run / "mix.wav").write_bytes(b"")
+    assert _latest_full_render("mix").name == "20260101-000000"  # the newer one is only a preview

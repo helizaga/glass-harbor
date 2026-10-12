@@ -556,10 +556,22 @@ def cmd_mix_follow(args: argparse.Namespace) -> int:
     return _validate_and_report(args, slug, prefix="\n".join(lines) + "\n")
 
 
+def _latest_full_render(slug: str) -> Path:
+    """The newest render of the whole plan (bar-range previews can't be listened to against the full lyrics)."""
+    from glass_harbor.feedback import list_runs
+
+    for run in sorted(list_runs(slug), key=lambda r: r.name, reverse=True):
+        report = run / "render.json"
+        if report.exists() and not any((json.loads(report.read_text()).get("range") or {}).values()):
+            return run
+    raise FileNotFoundError(f"no full render of {slug} yet: glass-harbor mix render {slug}")
+
+
 def cmd_mix_listen(args: argparse.Namespace) -> int:
     from glass_harbor.listen import listen_run
 
-    run = _run_for(require_slug(args.slug), args.run)
+    slug = require_slug(args.slug)
+    run = _run_for(slug, args.run) if args.run else _latest_full_render(slug)
     result = listen_run(run, log=_log(args))
     lines = [f"{run.name}: Whisper made out {result['overall_recall']:.0%} of the lyrics in the finished mix"
              if result["overall_recall"] is not None else f"{run.name}: no lyrics to check"]
@@ -623,7 +635,10 @@ def cmd_watch(args: argparse.Namespace) -> int:
         _emit(args, handled, "\n".join(f"{i['id']}: {i['status']}" + (f" -> {i.get('phone')}" if i.get("phone") else "")
                                        for i in handled) or "nothing ready yet")
         return 0
-    watch.watch(folder=folder, interval=args.interval, log=_log(args))
+    try:
+        watch.watch(folder=folder, interval=args.interval, log=_log(args))
+    except KeyboardInterrupt:
+        print("stopped watching")
     return 0
 
 

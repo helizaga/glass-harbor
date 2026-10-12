@@ -8,13 +8,15 @@ check's reasons) go back into the queue and to a macOS notification.
 
 from __future__ import annotations
 
+import contextlib
 import datetime as dt
 import json
+import os
 import re
 import subprocess
 import time
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Iterator
 
 from glass_harbor import library
 from glass_harbor.paths import workspace_root
@@ -30,22 +32,93 @@ def queue_path() -> Path:
     return workspace_root() / "queue.json"
 
 
+LOCK_TIMEOUT_S = 30.0
+LEASE_S = 3 * 3600.0  # a pairing "running" longer than this without a live owner is retried
+
+
 def load_queue() -> list[dict[str, Any]]:
     path = queue_path()
     return json.loads(path.read_text()) if path.exists() else []
 
 
 def save_queue(items: list[dict[str, Any]]) -> None:
-    queue_path().write_text(json.dumps(items, indent=2) + "\n")
+    """Write to a temporary file and swap it in, so a reader never sees half a queue."""
+    path = queue_path()
+    tmp = path.with_name(path.name + f".{os.getpid()}.tmp")
+    tmp.write_text(json.dumps(items, indent=2) + "\n")
+    os.replace(tmp, path)
+
+
+@contextlib.contextmanager
+def locked() -> Iterator[None]:
+    """Serialize read-modify-write of the queue across processes (a lock file created exclusively)."""
+    lock = queue_path().with_name(queue_path().name + ".lock")
+    deadline = time.monotonic() + LOCK_TIMEOUT_S
+    while True:
+        try:
+            fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            break
+        except FileExistsError:
+            if time.monotonic() > deadline:
+                raise TimeoutError(f"the queue is locked by another process ({lock})") from None
+            time.sleep(0.05)
+    try:
+        os.write(fd, str(os.getpid()).encode())
+        yield
+    finally:
+        os.close(fd)
+        lock.unlink(missing_ok=True)
+
+
+def _update(item_id: str, **fields: Any) -> dict[str, Any]:
+    """Change one pairing in the current queue (never a stale copy, so additions made meanwhile survive)."""
+    with locked():
+        items = load_queue()
+        item = next(i for i in items if i["id"] == item_id)
+        item.update(fields)
+        save_queue(items)
+        return dict(item)
 
 
 def add(vocal: str, beat: str, *, slug: str | None = None, title: str = "") -> dict[str, Any]:
-    items = load_queue()
-    item = {"id": f"q{len(items) + 1}", "vocal": vocal, "beat": beat, "slug": slug, "title": title,
-            "status": "waiting", "added_at": dt.datetime.now().isoformat(timespec="seconds")}
-    items.append(item)
-    save_queue(items)
+    with locked():
+        items = load_queue()
+        number = max((int(i["id"][1:]) for i in items if i["id"][1:].isdigit()), default=0) + 1
+        item = {"id": f"q{number}", "vocal": vocal, "beat": beat, "slug": slug, "title": title,
+                "status": "waiting", "added_at": dt.datetime.now().isoformat(timespec="seconds")}
+        items.append(item)
+        save_queue(items)
     return item
+
+
+def _owner_alive(item: dict[str, Any]) -> bool:
+    """Whether the process that started a running pairing still exists (by pid; by lease age where pids can't
+    be checked)."""
+    pid = item.get("pid")
+    if pid and os.name == "posix":
+        try:
+            os.kill(int(pid), 0)
+            return True
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return True
+    started = item.get("started_at")
+    if not started:
+        return False
+    return (dt.datetime.now() - dt.datetime.fromisoformat(started)).total_seconds() < LEASE_S
+
+
+def recover_stale() -> list[str]:
+    """Put pairings whose watcher died mid-mix back to waiting."""
+    with locked():
+        items = load_queue()
+        stale = [i for i in items if i["status"] == "running" and not _owner_alive(i)]
+        for item in stale:
+            item.update(status="waiting", note="retried after an interrupted run")
+        if stale:
+            save_queue(items)
+    return [i["id"] for i in stale]
 
 
 def _words(text: str) -> list[str]:
@@ -93,38 +166,43 @@ def run_once(*, folder: Path = DEFAULT_FOLDER, settle_s: float = 2.0, log: Log =
     from glass_harbor.auto import PoorFit, run_auto
 
     runner = runner or run_auto
-    items = load_queue()
+    for item_id in recover_stale():
+        log(f"{item_id}: the last run was interrupted; retrying")
     handled = []
-    for item in items:
+    for item in load_queue():
         if item["status"] != "waiting":
             continue
         vocal, beat = find(item["vocal"], folder), find(item["beat"], folder)
         if not (vocal and beat and _settled(vocal, settle_s) and _settled(beat, settle_s)):
             continue
-        item.update(status="running", vocal_file=vocal, beat_file=beat)
-        save_queue(items)
+        if vocal == beat and _words(item["vocal"]) != _words(item["beat"]):
+            continue  # both names matched one file: wait for the other one to arrive
+        _update(item["id"], status="running", vocal_file=vocal, beat_file=beat, pid=os.getpid(),
+                started_at=dt.datetime.now().isoformat(timespec="seconds"))
         log(f"{item['id']}: {Path(vocal).name} over {Path(beat).name}")
         try:
             result = runner(vocal, beat, slug=item.get("slug"), title=item.get("title") or "", log=log)
-            item.update(status="done", phone=result.get("phone"), brief=result.get("brief"), slug=result.get("slug"))
+            outcome = {"status": "done", "phone": result.get("phone"), "brief": result.get("brief"),
+                       "slug": result.get("slug")}
             notify("Mix ready", f"{result.get('slug')}: {Path(result.get('phone') or '').name}")
         except PoorFit as error:
-            item.update(status="poor fit", reason=str(error))
+            outcome = {"status": "poor fit", "reason": str(error)}
             notify("Beat doesn't fit", str(error)[:200])
         except Exception as error:  # noqa: BLE001 - one failed pairing must not stop the watcher
-            item.update(status="failed", reason=f"{error.__class__.__name__}: {error}"[:500])
+            outcome = {"status": "failed", "reason": f"{error.__class__.__name__}: {error}"[:500]}
             notify("Mix failed", str(error)[:200])
-        item["finished_at"] = dt.datetime.now().isoformat(timespec="seconds")
-        save_queue(items)
-        handled.append(item)
+        handled.append(_update(item["id"], **outcome, finished_at=dt.datetime.now().isoformat(timespec="seconds")))
     return handled
 
 
-def watch(*, folder: Path = DEFAULT_FOLDER, interval: float = 10.0, log: Log = print) -> None:
-    """Keep checking until no pairing is waiting."""
-    log(f"watching {folder} for {sum(1 for i in load_queue() if i['status'] == 'waiting')} queued pairing(s)")
-    while any(i["status"] == "waiting" for i in load_queue()):
+def watch(*, folder: Path = DEFAULT_FOLDER, interval: float = 10.0, log: Log = print,
+          passes: int | None = None) -> None:
+    """Keep checking until interrupted (``passes`` limits it, for tests); pairings queued later are picked up."""
+    log(f"watching {folder} (Ctrl-C to stop); {sum(1 for i in load_queue() if i['status'] == 'waiting')} "
+        "pairing(s) waiting")
+    done = 0
+    while passes is None or done < passes:
         run_once(folder=folder, log=log)
-        if any(i["status"] == "waiting" for i in load_queue()):
+        done += 1
+        if passes is None or done < passes:
             time.sleep(interval)
-    log("nothing left in the queue")
