@@ -180,3 +180,20 @@ def test_auto_callers_use_novelty_without_allin1(monkeypatch):
     monkeypatch.setattr(auto, "_lyrics", lambda *a: None)
     auto.prepare_bed("bed", lambda m: None)
     assert ("ingest", "bed", "novelty") in seen and ("analyze", "bed", "novelty") in seen
+
+
+def test_split_cuts_at_the_last_line_start_inside_the_limit():
+    pieces = arrange._split_at_lines(1, 20, [5, 9, 14, 18], limit=12)
+    assert pieces == [(1, 9), (9, 20)] and all(b - a <= 12 for a, b in pieces)
+    assert arrange._split_at_lines(1, 30, [], limit=12) == [(1, 30)]  # one long line stays whole
+
+
+def test_song_order_keeps_the_fitting_part_of_a_clip_at_the_beat_end(workspace):
+    from glass_harbor.lyrics import load_lyrics
+
+    _chant_song(workspace)
+    beat = _dnb_beat(bars=80)  # ends at bar 80: the second verse cannot fit whole
+    beat["bar_db"] = beat["bar_db"][:80]
+    clips, _, notes = arrange.song_order("vox", beat, 2.0, load_lyrics("vox"))
+    last = max((c for c in clips if "from_bar" in c), key=lambda c: c["at_bar"])
+    assert last["at_bar"] + last["bars"] * 2 <= 81 and last["bars"] >= 1

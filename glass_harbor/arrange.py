@@ -47,6 +47,21 @@ def _lines(lyrics: dict[str, Any], grid) -> list[dict[str, Any]]:
     return out
 
 
+def _split_at_lines(a: int, b: int, starts: list[int], limit: int | None = None) -> list[tuple[int, int]]:
+    """Split [a, b) at line starts into pieces of at most ``limit`` bars, cutting at the last line start that
+    still fits; a single line longer than the limit stays whole."""
+    limit = limit or MAX_CLIP_BARS
+    cuts = sorted({c for c in starts if a < c < b})
+    pieces, start, previous = [], a, None
+    for cut in cuts + [b]:
+        if cut - start > limit and previous is not None and previous > start:
+            pieces.append((start, previous))
+            start = previous
+        previous = cut
+    pieces.append((start, b))
+    return [(x, y) for x, y in pieces if y > x]
+
+
 def _hook_texts(lines: list[dict[str, Any]], *, min_count: int = 2) -> set[str]:
     """Short repeated lines (chants and tags count, not just full choruses)."""
     counts: dict[str, int] = {}
@@ -164,13 +179,7 @@ def song_order(vocals: str, beat: dict[str, Any], ratio: float, lyrics: dict[str
                 continue
             # Long runs split at line starts into pieces of at most MAX_CLIP_BARS, so a beat shorter than the
             # song keeps as much as fits (ending on a whole line) instead of losing the whole run.
-            starts = [_floor(ln["start"]) for ln in run[1:]]
-            pieces, piece_start = [], a
-            for cut in starts:
-                if cut - piece_start >= MAX_CLIP_BARS and cut > piece_start:
-                    pieces.append((piece_start, cut))
-                    piece_start = cut
-            pieces.append((piece_start, b))
+            pieces = _split_at_lines(a, b, [_floor(ln["start"]) for ln in run[1:]])
             for pa, pb in pieces:
                 if pb <= pa:
                     continue
@@ -192,7 +201,18 @@ def song_order(vocals: str, beat: dict[str, Any], ratio: float, lyrics: dict[str
         if build:
             clips.append(build)
             notes.append(f"the chant is chopped into a build over bars {resume - 8}-{resume - 1}")
-    kept = [c for c in clips if c["at_bar"] + c.get("bars", 0) * (ratio if "from_bar" in c else 1) <= last_bar + 1]
+    kept = []
+    for clip in clips:
+        scale = ratio if "from_bar" in clip else 1
+        if clip["at_bar"] + clip.get("bars", 0) * scale <= last_bar + 1:
+            kept.append(clip)
+        elif "from_bar" in clip:
+            # Keep the part that fits, cut at the last line start inside it (never mid-line).
+            room = (last_bar + 1 - clip["at_bar"]) / scale
+            starts = [_floor(ln["start"]) for ln in lines
+                      if clip["from_bar"] < _floor(ln["start"]) <= clip["from_bar"] + room]
+            if starts:
+                kept.append({**clip, "bars": int(starts[-1] - clip["from_bar"])})
     if len(kept) < len(clips):
         notes.append(f"the beat ends before the song: the draft keeps {len(kept)} of {len(clips)} vocal pieces "
                      "(extend the beat or pick a longer one to use the rest)")
