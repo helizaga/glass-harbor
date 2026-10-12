@@ -26,8 +26,13 @@ user has the files, `glass-harbor fit <vocal> <beat>` measures vocal room (1-4 k
 out-of-key harmony in a minute, plus an advisory hit-potential score (a known song on either side, a beat from
 the last six months, a short hook that repeats early, a rap/R&B vocal on a club beat). Treat a low score as a
 reason to look for a fresher or better-known beat, not as a verdict. Lyrics come from Whisper for timing and from LRCLIB (free, synced lines) for
-the right words and which lines really repeat; both stay in the gitignored library. Chart BPM/key
-are hints; trust `glass-harbor track show` once the user supplies the files.
+the right words and which lines really repeat; both stay in the gitignored library.
+
+**Measure before you rank.** Chart and streaming-derived keys are hints and can be wrong: Spotify's data lists
+Kodak Black's "Thankful" in C major, while the file measures B minor (S-KEY 0.71 on the instrumental stem, the 808
+root on B), which turned every C-major pick into a clash. When the user already has the vocal, `track add` it
+first and shortlist beats against its measured key and tempo. When they don't, present chart-based picks as
+provisional and say which numbers are unverified. Rank a shortlist only after `fit` has measured both files.
 
 ## Where the files come from (ranked)
 

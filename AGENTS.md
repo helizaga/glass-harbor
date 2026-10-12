@@ -28,6 +28,7 @@ brief; step in with the manual steps below only to change what the draft decided
 1. Turn the request into a slug and a brief; list the tracks and the intended moment (energy, setting).
    Read `taste.json` (defaults, preferences, past verdicts) before planning. When suggesting songs, follow
    "Choosing songs" in the skill (Beatport + kworb first, 1001Tracklists to check a pairing is proven, not overdone).
+   Chart and streaming keys are hints: measure the user's files (`track add`, then `fit`) before ranking picks.
 2. `glass-harbor track add <files>` (`--sections allin1` for beds whose structure matters); check
    `glass-harbor track show <id>` (bpm half/double, key + confidence, grid notes, drops).
 3. Separate only what the plan needs (`track separate <id> --stems vocals`), `track clean <id>` the acapella,
