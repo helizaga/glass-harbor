@@ -93,7 +93,14 @@ def _free_mps() -> None:
         pass
 
 
-def _separate_once(source: Path, out_dir: Path, model: str | None, ensemble_preset: str | None) -> list[str]:
+def _separate_once(source: Path, out_dir: Path, model: str | None, ensemble_preset: str | None, *,
+                   cpu: bool = False) -> list[str]:
+    if cpu:
+        # audio-separator picks MPS whenever it is available; hide it so this one pass runs on the CPU.
+        from unittest import mock
+
+        with mock.patch("torch.backends.mps.is_available", return_value=False):
+            return _separate_once(source, out_dir, model, ensemble_preset)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         from audio_separator.separator import Separator
@@ -131,6 +138,12 @@ def _run_audio_separator(source: Path, out_dir: Path, *, model: str | None = Non
         os.environ[MPS_BUDGET_ENV] = MPS_RETRY_BUDGET_GIB
         try:
             outputs = _separate_once(source, out_dir, model, ensemble_preset)
+        except RuntimeError as again:
+            # Demucs can also mix devices inside its own forward pass on some inputs; the CPU always works.
+            if "same device" not in str(again):
+                raise
+            _free_mps()
+            outputs = _separate_once(source, out_dir, model, ensemble_preset, cpu=True)
         finally:
             del os.environ[MPS_BUDGET_ENV]
     found: dict[str, Path] = {}
