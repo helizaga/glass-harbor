@@ -149,3 +149,13 @@ def test_double_time_draft_puts_hooks_on_drops_and_the_chant_on_the_last(workspa
     assert vocals["chant1"]["at_bar"] == 81 and vocals["chant1"]["pre_beats"] == 1
     assert vocals["intro1"]["at_bar"] + vocals["intro1"]["bars"] * 2 <= 17.5  # the intro leads into the first drop
     assert any("chant takes the bar-81 drop" in n for n in plan["notes"])
+
+
+def test_the_chant_waits_for_the_last_drop_even_right_after_a_hook(workspace):
+    _double_time_song(workspace)
+    beat = library.load_analysis("beat")
+    beat["drops"] = [17, 35, 49, 81]  # the first hook ends at 33, just before the bar-35 drop
+    library.save_analysis("beat", beat)
+    plan = build_mashup("vox", "beat")
+    chants = [c for c in plan["clips"] if c["id"].startswith("chant")]
+    assert [c["at_bar"] for c in chants] == [81]

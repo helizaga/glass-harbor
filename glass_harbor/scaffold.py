@@ -1061,10 +1061,10 @@ def smart_arrangement(vocals: str, bed: str, vox: dict[str, Any], beat: dict[str
                 notes.append(f"title line a cappella in the break before the bar-{next_drop} drop")
                 spotlight = (length + pre / 4) * ratio
             cursor = next_drop
-            # The second chant is the payoff: it takes the last drop, and may follow the main hook back to back.
+            # The second chant is the payoff: it is kept for the last drop, even right after the main hook.
             room = bars + 1 - cursor
             chant = next((b for b in (chants[0] if chants else []) if _block_out(b, ratio) <= room), None)
-            if chant and (next_drop == final_drop or last_hook):
+            if chant and next_drop == final_drop:
                 clips.append(_block_clip(chant, cursor, ratio, f"chant{len(material['chants']) - len(chants) + 1}",
                                          chain="hook"))
                 notes.append(f"the {material.get('chant_text') or 'second'} chant takes the bar-{next_drop} drop")
