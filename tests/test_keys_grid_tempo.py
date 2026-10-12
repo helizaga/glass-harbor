@@ -152,3 +152,15 @@ def test_parallel_keys_beat_a_big_vocal_shift():
     same_home_note = key_score(3, 0.6, 0, 0.7, parallel=True)  # E major vocal over E minor beat, unshifted
     shifted_up_three = key_score(0, 0.6, 3, 0.7)  # G major over E minor: relative, but a +3 vocal shift
     assert same_home_note > shifted_up_three
+
+
+def test_drum_hits_confirm_a_fixed_grid_when_the_tracker_pulse_is_garbage():
+    from conftest import synth_track
+
+    from glass_harbor.analyze import confirm_fixed_tempo
+
+    drums = synth_track(150, parse_key("E"), 24)["drums"]
+    garbage = np.arange(0.0, 38.0, 0.36)  # a steady but wrong 166.7 bpm pulse, as through Stay With Me's drops
+    assert confirm_fixed_tempo(drums, garbage) is None
+    t0, period = confirm_fixed_tempo(drums, garbage, period_hint=0.4)
+    assert abs(period - 0.4) < 0.0005 and min(t0 % period, period - t0 % period) < 0.015  # kicks on the beat
