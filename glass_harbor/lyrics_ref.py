@@ -73,8 +73,9 @@ def _norm_name(text: str) -> str:
 
 
 def _artist_list(credit: str) -> list[str]:
-    """Each artist in a credit ("Lil Bean, Lil Yee", "Amplify & Bou", "A x B feat. C"), normalized, lead first."""
-    names = re.split(r",|&|\+|/|\bx\b|\band\b|\bfeat\.?|\bft\.?|\bfeaturing\b|\bwith\b", credit.lower())
+    """Each artist in a credit ("Lil Bean, Lil Yee", "Amplify & Bou", "A x B feat. C", the "A; B" of file tags),
+    normalized, lead first."""
+    names = re.split(r",|;|&|\+|/|\bx\b|\band\b|\bfeat\.?|\bft\.?|\bfeaturing\b|\bwith\b", credit.lower())
     return [name for name in (_norm_name(n) for n in names) if name]
 
 
