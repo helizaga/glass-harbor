@@ -53,7 +53,9 @@ def plan_short_edit(plan: dict[str, Any], res: Any, *, target_s: float = TARGET_
         spec = clip.spec
         if "chop" in spec:
             return ("chop", clip.source, json.dumps(spec["chop"], sort_keys=True))
-        start = float(spec.get("from_bar", 0)) - float(spec.get("pre_beats", 0)) / 4
+        grid = res.grids.get(clip.source)
+        source_bpb = grid.beats_per_bar if grid is not None else bpb
+        start = float(spec.get("from_bar", 0)) - float(spec.get("pre_beats", 0)) / source_bpb  # pre_beats: source beats
         return ("range", clip.source, spec.get("stem"), start, float(spec.get("from_bar", 0)) + float(spec["bars"]))
 
     def heard_elsewhere(clip: Any, kept: list[Any]) -> bool:
