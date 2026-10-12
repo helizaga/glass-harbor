@@ -132,3 +132,29 @@ def test_chop_validation_errors(workspace, synth_files):
     assert not res.ok
     messages = " ".join(i.message for i in res.issues)
     assert "single letter" in messages
+
+
+def test_short_edit_trims_the_run_up_and_tail_and_drops_a_repeated_hook_section(workspace):
+    from glass_harbor.edit import plan_short_edit
+    from glass_harbor.plan import resolve
+    from conftest import write_fake_track
+
+    write_fake_track("vox", bpm=75, key="Am", bars=48)
+    write_fake_track("beat", bpm=150, key="Am", bars=140, stems=("instrumental",))
+    hook = {"source": "vox", "stem": "vocals", "from_bar": 9, "bars": 7}
+    plan = {"version": 1, "kind": "mashup", "bpm": 150, "sources": {"vox": {"track": "vox", "tempo_ratio": 2.0},
+                                                                    "bed": {"track": "beat"}},
+            "clips": [{"id": "bed", "source": "bed", "stem": "instrumental", "from_bar": 1, "bars": 134, "at_bar": 1},
+                      {"id": "intro1", "source": "vox", "stem": "vocals", "from_bar": 5, "bars": 4, "at_bar": 9},
+                      {"id": "hook1", **hook, "at_bar": 17},
+                      {"id": "verse1", "source": "vox", "stem": "vocals", "from_bar": 24, "bars": 8, "at_bar": 33},
+                      {"id": "hook2", **hook, "at_bar": 66},  # a repeat of hook1 on the second drop
+                      {"id": "chant1", "source": "vox", "stem": "vocals", "from_bar": 33, "bars": 11, "at_bar": 82,
+                       "pre_beats": 1}]
+            + [{"id": f"impact-{d}", "generate": "impact", "at_bar": d, "bars": 2} for d in (17, 66, 82)]}
+    res = resolve(plan)
+    assert res.ok, [i.message for i in res.issues if i.level == "error"]
+    edit = plan_short_edit(plan, res, target_s=150)
+    assert edit["start_bar"] == 5 and edit["end_bar"] == 109  # 4 bars of run-up; 4 faded bars after the chant
+    assert edit["cuts"] == [(65.5, 81.5)]  # drop 66's repeated hook goes; the chant's pickup into 82 stays
+    assert edit["duration_s"] < edit["full_s"] and abs(edit["duration_s"] - (109 - 5 - 16) * 1.6) < 0.01

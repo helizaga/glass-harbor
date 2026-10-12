@@ -41,7 +41,8 @@ brief; step in with the manual steps below only to change what the draft decided
 
 ## Thread handoff
 - Link the rendered `mix.mp3` (or `mix.wav`), the plan, and the brief. To send to someone's phone, use
-  `mix-phone.m4a`; to upload to a streaming platform, `mix-stream.mp3`.
+  `mix-phone.m4a`, or `mix-short.m4a` (about 2:30, cut at bar lines; full renders only) for a quick share; to
+  upload to a streaming platform, `mix-stream.mp3`.
 - One line on the musical idea, one line on what QA found, one line on what needs the user's ears.
 - Only dump `render.json`/`qa.json` details when something failed or the user asks.
 

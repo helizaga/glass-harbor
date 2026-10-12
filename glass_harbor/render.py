@@ -1196,6 +1196,25 @@ def render_plan(plan: dict[str, Any], out_dir: Path, *, start_bar: float | None 
         if encoded:
             phone_wav.unlink()
         phone_file = (encoded or phone_wav).name
+    short_file, short_edit = None, None
+    for stale_short in (out_dir / "mix-short.m4a", out_dir / "mix-short.wav"):
+        stale_short.unlink(missing_ok=True)
+    from glass_harbor.feedback import taste_default
+
+    seconds = master_spec.get("short_seconds", taste_default("short_edit_seconds"))
+    if phone_stats is not None and start_bar is None and end_bar is None and seconds:
+        # A short edit of the phone master (the full render stays the version QA judges).
+        from glass_harbor.edit import plan_short_edit, splice
+
+        short_edit = plan_short_edit(plan, res, target_s=float(seconds))
+        if short_edit:
+            short_wav = A.save(out_dir / "mix-short.wav", splice(phone, short_edit, res, timeline_offset),
+                               subtype="PCM_16")
+            encoded = A.encode_m4a(short_wav, out_dir / "mix-short.m4a",
+                                   title=f"{plan.get('title', '')} (short edit)".strip())
+            if encoded:
+                short_wav.unlink()
+            short_file = (encoded or short_wav).name
     if write_clips:
         clip_dir = out_dir / "clips"
         for n, r in enumerate(rendered, start=1):
@@ -1212,7 +1231,8 @@ def render_plan(plan: dict[str, Any], out_dir: Path, *, start_bar: float | None 
         "timeline_offset_s": round(timeline_offset, 4),
         "duration_s": round(mastered.shape[0] / A.SR, 3),
         "files": {"wav": wav_path.name, "mp3": mp3_path.name if mp3_path else None,
-                  "phone": phone_file},
+                  "phone": phone_file, "short": short_file},
+        "short_edit": short_edit,
         "master": master_stats,
         "stream_master": stream_stats,
         "phone_master": phone_stats,
