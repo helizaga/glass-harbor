@@ -315,6 +315,8 @@ def _onset_grid(strong: np.ndarray, period_guess: float) -> tuple[float, float, 
     if on.sum() >= 8:  # least squares on the hits that landed, for a period finer than the search step
         slope, t0 = np.polyfit(index[on], strong[on], 1)
         period = float(slope) * 4
+        position = (strong - t0) / (period / 4)  # the share the returned grid itself earns
+        share = float((np.abs(position - np.round(position)) * period / 4 < ONSET_GRID_TOLERANCE_S).mean())
     return float(t0), float(period), share
 
 
