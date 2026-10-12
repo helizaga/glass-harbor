@@ -128,3 +128,43 @@ def test_clean_steps_stack_and_lead_keeps_backing(workspace, monkeypatch):
         separate.clean_stem("song", "vocals", "lead", log=lambda m: None)
     assert separate.clean_stem("song", "vocals", "lead", log=lambda m: None, restart=True)["mode"] == "lead"
     np.testing.assert_allclose(seen[2], A.load(stems / "raw" / "vocals.flac"))  # restart reads the original separation
+
+
+def test_lead_split_that_strips_the_lead_is_refused(workspace, monkeypatch):
+    import sys
+    import types
+
+    from glass_harbor import library, separate
+
+    rng = np.random.default_rng(3)
+    vocal = (0.1 * rng.standard_normal((4 * A.SR, 2))).astype(np.float32)
+    assert separate.lead_loss_share(vocal, 0.6 * vocal) == 0.0  # -4.4 dB: backing removed, the lead kept
+    assert separate.lead_loss_share(vocal, 0.1 * vocal) == 1.0  # -20 dB everywhere: the lead itself went
+    write_fake_track("rap", bpm=120, key="Am", bars=8, stems=("vocals",))
+    A.save(library.stem_path("rap", "vocals"), vocal)
+    before = library.stem_path("rap", "vocals").read_bytes()
+
+    class FakeSeparator:  # a double-tracked verse: the model files most of the voice under "backing"
+        def __init__(self, output_dir, **kwargs):
+            self.out = Path(output_dir)
+
+        def load_model(self, model_filename):
+            pass
+
+        def separate(self, path):
+            heard = A.load(path)
+            names = ["input_(Vocals)_k.flac", "input_(Instrumental)_k.flac"]
+            A.save(self.out / names[0], 0.1 * heard)
+            A.save(self.out / names[1], 0.9 * heard)
+            return names
+
+    module = types.ModuleType("audio_separator.separator")
+    module.Separator = FakeSeparator
+    monkeypatch.setitem(sys.modules, "audio_separator", types.ModuleType("audio_separator"))
+    monkeypatch.setitem(sys.modules, "audio_separator.separator", module)
+
+    with pytest.raises(ValueError, match="heard the main voice as backing"):
+        separate.clean_stem("rap", "vocals", "lead", log=lambda m: None)
+    assert library.stem_path("rap", "vocals").read_bytes() == before
+    assert "cleaned_steps" not in library.load_meta("rap")["stems"].get("vocals", {})
+    assert separate.clean_stem("rap", "vocals", "lead", log=lambda m: None, force=True)["mode"] == "lead"

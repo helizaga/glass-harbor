@@ -168,7 +168,7 @@ def cmd_track_lyrics(args: argparse.Namespace) -> int:
 def cmd_track_clean(args: argparse.Namespace) -> int:
     from glass_harbor.separate import clean_stem
 
-    result = clean_stem(args.id, args.stem, args.mode, log=_log(args), restart=args.restart)
+    result = clean_stem(args.id, args.stem, args.mode, log=_log(args), restart=args.restart, force=args.force)
     _emit(args, result, f"{args.id}/{args.stem}: cleaned with {result['model']} (original kept at {result['raw']})")
     return 0
 
@@ -739,6 +739,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--mode", choices=("dereverb", "dereverb-gentle", "deecho", "denoise", "lead"), default="dereverb",
                    help="lead = keep only the lead vocal (drops backing vocals/samples tuned to the original chords)")
     p.add_argument("--restart", action="store_true", help="start over from the original separation")
+    p.add_argument("--force", action="store_true",
+                   help="lead: keep the split even when it removes most of the vocal (a double-tracked lead)")
     p.set_defaults(func=cmd_track_clean)
 
     p = common(track.add_parser("lyrics", help="transcribe vocals with word timings (local Whisper), find hooks"))

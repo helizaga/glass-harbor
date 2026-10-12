@@ -17,6 +17,8 @@ import warnings
 from pathlib import Path
 from typing import Callable
 
+import numpy as np
+
 from glass_harbor import audio as A
 from glass_harbor import library
 from glass_harbor.paths import model_dir
@@ -216,10 +218,35 @@ def separate_local(track_id: str, wanted: set[str], quality: str, log: Log) -> d
     return produced
 
 
+# A lead split that hears the main voice as backing (a double-tracked or stacked lead, common in rap) swaps the
+# acapella for a thin remainder. On half-second windows where the vocal sounds, Kodak Black's double-tracked verse
+# lost more than 6 dB in 51% of them; real backing removal lost that much in 10% (Don Toliver's ad-lib stacks) and
+# 0% (Clementine Douglas).
+LEAD_LOSS_DB = 6.0
+LEAD_LOSS_SHARE = 0.25
+
+
+def lead_loss_share(original: np.ndarray, lead: np.ndarray, window_s: float = 0.5) -> float:
+    """Share of the windows where the vocal sounds (within 30 dB of its loudest) in which the lead split kept less
+    than ``LEAD_LOSS_DB`` of it."""
+    x, y = A.mono(original), A.mono(lead)
+    win = max(1, int(window_s * A.SR))
+    k = min(x.size, y.size) // win
+    if k == 0:
+        return 0.0
+    xs = np.sqrt(np.mean(x[: k * win].reshape(k, win) ** 2, axis=1))
+    ys = np.sqrt(np.mean(y[: k * win].reshape(k, win) ** 2, axis=1))
+    active = xs > max(1e-6, xs.max() * 10 ** (-30 / 20))
+    if not active.any():
+        return 0.0
+    return float(np.mean(ys[active] < xs[active] * 10 ** (-LEAD_LOSS_DB / 20)))
+
+
 def clean_stem(track_id: str, stem: str = "vocals", mode: str = "dereverb", log: Log = print,
-               restart: bool = False) -> dict[str, str]:
+               restart: bool = False, force: bool = False) -> dict[str, str]:
     """Clean a stem in place: strip reverb/echo/noise, or keep only the lead vocal (``lead``). Steps stack in order
-    (e.g. dereverb, then lead); the original separation is kept under stems/raw/ and ``restart`` starts over from it."""
+    (e.g. dereverb, then lead); the original separation is kept under stems/raw/ and ``restart`` starts over from it.
+    A lead split that removes most of the vocal is refused (the stem stays as it was) unless ``force``."""
     import shutil
 
     if mode not in CLEAN_MODELS:
@@ -256,6 +283,12 @@ def clean_stem(track_id: str, stem: str = "vocals", mode: str = "dereverb", log:
         if cleaned is None:
             raise RuntimeError(f"could not find the cleaned output among {[o.name for o in outputs]}")
         if mode == "lead":
+            share = lead_loss_share(A.load(work), A.load(cleaned))
+            if share > LEAD_LOSS_SHARE and not force:
+                raise ValueError(
+                    f"the lead split lost more than {LEAD_LOSS_DB:g} dB in {share:.0%} of the vocal (removing real "
+                    f"backing vocals stays under {LEAD_LOSS_SHARE:.0%}): the model heard the main voice as backing, "
+                    f"as on a double-tracked verse. {track_id}/{stem} is unchanged; --force keeps the split anyway")
             removed = next((o for o in outputs if o != cleaned), None)
             if removed is not None:
                 shutil.copyfile(removed, raw.parent / f"{stem}-backing.flac")
