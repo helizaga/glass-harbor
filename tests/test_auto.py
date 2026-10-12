@@ -493,3 +493,8 @@ def test_fix_rounds_pull_back_a_vocal_that_buries_the_beat(workspace):
     # Any excess QA warns about gets corrected, rounded down so the vocal lands under the limit
     apply_qa_fixes(plan, {"vocal_presence": [], "vocal_balance": balance(2.04)}, {"flags": []})
     assert verse["gain_db"] == -0.1
+    # The beat's own vocal is measured like any other, so it is pulled back too (though never lifted)
+    plan["clips"].append({"id": "bed-hook", "source": "bed", "stem": "vocals", "from_bar": 40, "bars": 8, "at_bar": 81})
+    over = [{"track": "bed", "clips": ["bed-hook"], "mix_lu": 3.0, "record_lu": -4.0}]
+    apply_qa_fixes(plan, {"vocal_presence": [], "vocal_balance": over}, {"flags": []})
+    assert next(c for c in plan["clips"] if c["id"] == "bed-hook")["gain_db"] == -1.0

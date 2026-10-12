@@ -740,7 +740,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="lead = keep only the lead vocal (drops backing vocals/samples tuned to the original chords)")
     p.add_argument("--restart", action="store_true", help="start over from the original separation")
     p.add_argument("--force", action="store_true",
-                   help="lead: keep the split even when it removes most of the vocal (a double-tracked lead)")
+                   help="lead: keep the split even when its lead loses more than 6 dB in over 25%% of the "
+                        "half-second windows where the vocal sounds (a double-tracked lead)")
     p.set_defaults(func=cmd_track_clean)
 
     p = common(track.add_parser("lyrics", help="transcribe vocals with word timings (local Whisper), find hooks"))

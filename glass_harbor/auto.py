@@ -149,8 +149,8 @@ def apply_qa_fixes(plan: dict[str, Any], report: dict[str, Any], qa: dict[str, A
             continue
         step = math.floor(round(room, 6) * 10) / 10  # rounded down to 0.1 dB, so the vocal lands at or under the limit
         lowered = []
-        for clip in res.clips:
-            if clip.track != track or clip.stem != "vocals" or clip.chop is not None or clip.source == "bed":
+        for clip in res.clips:  # the beat's own vocal too: QA measures it like any other
+            if clip.track != track or clip.stem != "vocals" or clip.chop is not None:
                 continue
             spec = plan["clips"][clip.index]
             spec["gain_db"] = round(float(spec.get("gain_db", 0.0)) + step, 1)
