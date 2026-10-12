@@ -247,6 +247,12 @@ def test_reference_search_only_accepts_the_same_song():
             {"trackName": "yeah bop", "artistName": "Lil Bean", "duration": 127, "syncedLyrics": "x"}]
     assert pick_search_result(hits, "Lil Bean", "yeah bop", 127)["trackName"] == "yeah bop"
     assert pick_search_result(hits, "Someone Else", "yeah bop", 127) is None
+    lookalikes = [{"trackName": "yeah bop", "artistName": "Lil Bean Tribute", "duration": 127, "syncedLyrics": "x"},
+                  {"trackName": "Janice STFU", "artistName": "Mandrake", "duration": 237, "syncedLyrics": "x"}]
+    assert pick_search_result(lookalikes, "Lil Bean", "yeah bop", 127) is None  # a containing name is not a match
+    assert pick_search_result(lookalikes, "Drake", "Janice STFU", 237) is None  # nor a substring of one
+    collab = [{"trackName": "yeah bop 2", "artistName": "Lil Bean, Lil Yee", "duration": 151, "syncedLyrics": "x"}]
+    assert pick_search_result(collab, "Lil Bean", "yeah bop 2", 151) is not None  # one of the credited artists
     same_title = [{"trackName": "Swarm", "artistName": "Elden", "duration": 143, "syncedLyrics": "x"},
                   {"trackName": "Swarm", "artistName": "Risk, Viperactive", "duration": 141, "syncedLyrics": "x"}]
     assert pick_search_result(same_title, "", "SWARM", 142.9) is None  # no artist and two different songs

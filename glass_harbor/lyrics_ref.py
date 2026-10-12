@@ -72,17 +72,25 @@ def _norm_name(text: str) -> str:
     return " ".join(re.sub(r"[^a-z0-9 ]+", " ", text).split())
 
 
+def _artists(credit: str) -> set[str]:
+    """Each artist in a credit ("Lil Bean, Lil Yee", "Amplify & Bou", "A x B feat. C"), normalized."""
+    names = re.split(r",|&|\+|/|\bx\b|\band\b|\bfeat\.?|\bft\.?|\bfeaturing\b|\bwith\b", credit.lower())
+    return {_norm_name(name) for name in names if _norm_name(name)}
+
+
 def pick_search_result(results: list[dict[str, Any]], artist: str, title: str, duration: float
                        ) -> dict[str, Any] | None:
     """A search hit only counts when its title matches, its artist matches when we know the artist, and its
     length is within DURATION_TOLERANCE_S. Without an artist, a title shared by several songs is ambiguous: no
     match rather than the wrong song's lyrics."""
-    want_title, want_artist = _norm_name(title), _norm_name(artist)
+    want_title, wanted = _norm_name(title), _artists(artist)
+    primary = next(iter(sorted(wanted, key=lambda name: _norm_name(artist).find(name))), None) if wanted else None
     matches = [r for r in results if r.get("syncedLyrics")
                and _norm_name(r.get("trackName") or "") == want_title
-               and (not want_artist or want_artist in _norm_name(r.get("artistName") or ""))
+               # the requested (primary) artist must be one of the credited artists exactly, never a substring
+               and (primary is None or primary in _artists(r.get("artistName") or ""))
                and abs(float(r.get("duration") or 0) - duration) <= DURATION_TOLERANCE_S]
-    if not want_artist and len({_norm_name(r.get("artistName") or "") for r in matches}) > 1:
+    if primary is None and len({_norm_name(r.get("artistName") or "") for r in matches}) > 1:
         return None
     return matches[0] if matches else None
 
