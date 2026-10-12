@@ -280,6 +280,28 @@ def test_reference_search_only_accepts_the_same_song():
     assert pick_search_result(featured, "Lil Bean feat. Lil Yee", "yeah bop 2", 151) is None  # the lead must match
 
 
+def test_reference_lookup_falls_back_to_search_for_a_multi_artist_file_tag(monkeypatch, workspace):
+    from glass_harbor import lyrics_ref
+
+    write_fake_track("b", bpm=130, key="Bm", bars=32)
+    library.save_meta("b", {**library.load_meta("b"), "artist": "Calvin Harris; Clementine Douglas",
+                            "title": "Blessings", "duration": 220})
+    calls = []
+
+    def fake(path, params):
+        calls.append(path)
+        if path == "get":  # LRCLIB credits "Calvin Harris", so the exact lookup of the tag misses
+            raise OSError("404")
+        return [{"id": 7, "trackName": "Blessings", "artistName": "Calvin Harris", "duration": 220,
+                 "syncedLyrics": "[00:10.00] count my blessings\n[00:14.00] count my blessings"}]
+
+    monkeypatch.setattr(lyrics_ref, "_get", fake)
+    assert lyrics_ref.fetch_reference("b", log=lambda *_: None)["artist"] == "Calvin Harris"
+    assert calls == ["get", "search"]
+    stored = lyrics_ref.load_reference("b")
+    assert stored["id"] == 7 and [line["time"] for line in stored["lines"]] == [10.0, 14.0]
+
+
 def _deezer(results, released):
     calls = []
 
