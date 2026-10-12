@@ -237,3 +237,17 @@ def test_fit_levels_follow_the_vocal_type(monkeypatch, workspace):
     monkeypatch.setattr(fit, "beat_profile", lambda audio, tonic, mode: {"vocal_room": 0.02, "harshness": 0.01,
                                                                         "out_of_key": 0.3})
     assert fit.assess("v", "b", log=lambda m: None)["verdict"] == "good"
+
+
+def test_reference_search_only_accepts_the_same_song():
+    from glass_harbor.lyrics_ref import pick_search_result
+
+    hits = [{"trackName": "Different Song", "artistName": "Lil Bean", "duration": 127, "syncedLyrics": "x"},
+            {"trackName": "Yeah Bop 2 (feat. Lil Yee)", "artistName": "Lil Bean", "duration": 151, "syncedLyrics": "x"},
+            {"trackName": "yeah bop", "artistName": "Lil Bean", "duration": 127, "syncedLyrics": "x"}]
+    assert pick_search_result(hits, "Lil Bean", "yeah bop", 127)["trackName"] == "yeah bop"
+    assert pick_search_result(hits, "Someone Else", "yeah bop", 127) is None
+    same_title = [{"trackName": "Swarm", "artistName": "Elden", "duration": 143, "syncedLyrics": "x"},
+                  {"trackName": "Swarm", "artistName": "Risk, Viperactive", "duration": 141, "syncedLyrics": "x"}]
+    assert pick_search_result(same_title, "", "SWARM", 142.9) is None  # no artist and two different songs
+    assert pick_search_result(same_title[:1], "", "SWARM", 142.9)["artistName"] == "Elden"

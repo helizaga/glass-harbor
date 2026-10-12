@@ -65,6 +65,28 @@ def parse_synced(text: str) -> list[dict[str, Any]]:
     return lines
 
 
+def _norm_name(text: str) -> str:
+    """Lowercase, without featured artists, bracketed versions, and punctuation."""
+    text = re.sub(r"[\(\[].*?[\)\]]", " ", text.lower())
+    text = re.sub(r"\b(feat|ft|featuring|with)\b.*$", " ", text)
+    return " ".join(re.sub(r"[^a-z0-9 ]+", " ", text).split())
+
+
+def pick_search_result(results: list[dict[str, Any]], artist: str, title: str, duration: float
+                       ) -> dict[str, Any] | None:
+    """A search hit only counts when its title matches, its artist matches when we know the artist, and its
+    length is within DURATION_TOLERANCE_S. Without an artist, a title shared by several songs is ambiguous: no
+    match rather than the wrong song's lyrics."""
+    want_title, want_artist = _norm_name(title), _norm_name(artist)
+    matches = [r for r in results if r.get("syncedLyrics")
+               and _norm_name(r.get("trackName") or "") == want_title
+               and (not want_artist or want_artist in _norm_name(r.get("artistName") or ""))
+               and abs(float(r.get("duration") or 0) - duration) <= DURATION_TOLERANCE_S]
+    if not want_artist and len({_norm_name(r.get("artistName") or "") for r in matches}) > 1:
+        return None
+    return matches[0] if matches else None
+
+
 def _get(path: str, params: dict[str, Any]) -> Any:
     url = f"{API}/{path}?{urllib.parse.urlencode(params)}"
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
@@ -89,9 +111,7 @@ def fetch_reference(track_id: str, *, log=print) -> dict[str, Any] | None:
                 found = None
         if not found or not found.get("syncedLyrics"):
             results = _get("search", {"q": f"{artist} {title}".strip()})
-            results = [r for r in results if r.get("syncedLyrics")
-                       and abs(float(r.get("duration") or 0) - duration) <= DURATION_TOLERANCE_S]
-            found = results[0] if results else None
+            found = pick_search_result(results, artist, title, duration)
     except Exception as error:  # noqa: BLE001 - offline or the service is down: lyrics stay Whisper-only
         log(f"no reference lyrics for {track_id} ({error.__class__.__name__})")
         return None
