@@ -26,6 +26,7 @@ VOCAL_HIGHPASS_HZ = 100.0
 
 MAX_CLIP_BARS = 12  # vocal bars per clip at most (long verses are split at line starts)
 BREATH_BARS = 0.1  # a gap between lines long enough to cut at (about 270 ms at 90 bpm)
+DRUMLESS_DB = 15.0  # drums this far under their median before the first drop: the record's own beatless intro
 BAR_TOLERANCE = 0.05  # a line starting a few ms before a bar line (a pickup, or 25.9999 for 26) belongs to that bar
 
 
@@ -71,13 +72,24 @@ def _hook_texts(lines: list[dict[str, Any]], *, min_count: int = 2) -> set[str]:
     return {text for text, n in counts.items() if n >= min_count}
 
 
+def _first_drop(beat: dict[str, Any]) -> int | None:
+    return next((int(d) for d in sorted(beat.get("drops", [])) if d >= 9), None)
+
+
 def full_start(beat: dict[str, Any]) -> int | None:
-    """First bar where the beat is properly full: an allin1 chorus/drop section, else the first sustained run of
-    loud bars (8 bars at most 2.5 dB under the median), else the first detected drop."""
+    """First bar where the beat is properly full: an allin1 chorus/drop section, or a verse section once the drums
+    and bass are in (a song's own verse groove is where a rap verse goes); else the first sustained run of loud bars
+    (8 bars at most 2.5 dB under the median), else the first detected drop."""
     sections = beat.get("sections", [])
+    first_drop = _first_drop(beat)
     for section in sections:
-        if section.get("label") in ("chorus", "drop") and section["start_bar"] >= 9:
-            return int(section["start_bar"])
+        start = int(section["start_bar"])
+        if start < 9:
+            continue
+        if section.get("label") in ("chorus", "drop"):
+            return start
+        if section.get("label") == "verse" and first_drop is not None and start >= first_drop:
+            return start
     levels = beat.get("bar_db") or []
     if levels:
         median = float(np.median(levels))
@@ -265,10 +277,16 @@ def _chant_build(lyrics: dict[str, Any], lines: list[dict[str, Any]], hooks: set
 
 
 def own_intro_bars(beat: dict[str, Any]) -> int:
-    """Bars of beatless intro the record opens with (no kick or bass), rounded down to 8s."""
+    """Bars of beatless intro the record opens with (no kick or bass), rounded down to 8s. With a drum stem: the
+    bars before the first drop when the drums there sit DRUMLESS_DB under their usual level (a light shaker or a
+    pad-only bass doesn't make a beat)."""
     low = beat.get("low_db") or []
     if len(low) < 16:
         return 0
+    drums = ((beat.get("stems") or {}).get("drums") or {}).get("bar_db") or []
+    first_drop = _first_drop(beat)
+    if drums and first_drop and np.mean(drums[:first_drop - 1]) <= np.median(drums) - DRUMLESS_DB:
+        return ((first_drop - 1) // 8) * 8
     median = float(np.median(low))
     bars = 0
     while bars < len(low) and low[bars] < median - 10:

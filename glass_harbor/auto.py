@@ -173,6 +173,14 @@ def apply_qa_fixes(plan: dict[str, Any], report: dict[str, Any], qa: dict[str, A
     return changes
 
 
+def steady_weak(previous: set[str] | None, heard: dict[str, Any] | None) -> dict[str, Any]:
+    """Clips Whisper could not make out in this render and the one before. Its read of a sung, autotuned vocal
+    swings between near-identical renders (GLOCK's hook read 49%, 40%, then 0% with nothing changed under it), so
+    one weak reading is not enough to act on."""
+    weak = set((heard or {}).get("weak", []))
+    return {"weak": sorted(weak & previous) if previous is not None else []}
+
+
 def _listen(run_dir: Path, log: Log) -> dict[str, Any] | None:
     """Whisper intelligibility of the finished mix (skipped when no Whisper backend is installed)."""
     from glass_harbor.listen import listen_run
@@ -264,6 +272,7 @@ def run_auto(vocal: str, bed: str, *, slug: str | None = None, title: str = "", 
 
     history: list[list[str]] = []
     run_dir, qa, report = None, None, None
+    previous_weak: set[str] | None = None
     for round_index in range(rounds + 1):
         stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
         run_dir = runs_dir(slug) / stamp
@@ -273,7 +282,9 @@ def run_auto(vocal: str, bed: str, *, slug: str | None = None, title: str = "", 
         qa = check_run(run_dir)
         if round_index == rounds:
             break
-        changes = apply_qa_fixes(plan, report, qa, heard)
+        steady = steady_weak(previous_weak, heard)
+        previous_weak = set((heard or {}).get("weak", []))
+        changes = apply_qa_fixes(plan, report, qa, steady)
         history.append(changes)
         if not changes:
             break

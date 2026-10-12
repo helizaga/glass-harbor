@@ -40,6 +40,19 @@ def _chant_song(workspace):
 def test_own_intro_bars():
     assert arrange.own_intro_bars(_dnb_beat()) == 16
     assert arrange.own_intro_bars({"low_db": [-12.0] * 64}) == 0
+    # Stay With Me: a pad-only bass keeps the low band up, but the drums are 24 dB down until the bar-17 drop.
+    soft = {"low_db": [-27.0] * 16 + [-17.0] * 100, "drops": [17, 66],
+            "stems": {"drums": {"bar_db": [-45.0] * 16 + [-21.0] * 100}}}
+    assert arrange.own_intro_bars(soft) == 16
+    busy = {**soft, "stems": {"drums": {"bar_db": [-22.0] * 16 + [-13.0] * 100}}}  # SWARM: real drums before it
+    assert arrange.own_intro_bars(busy) == 0
+
+
+def test_a_verse_groove_after_the_first_drop_is_full():
+    sections = [{"start_bar": 1, "label": "intro"}, {"start_bar": 9, "label": "verse"},
+                {"start_bar": 17, "label": "verse"}, {"start_bar": 41, "label": "chorus"}]
+    assert arrange.full_start({"sections": sections, "drops": [17, 66]}) == 17  # not the bar-41 chorus
+    assert arrange.full_start({"sections": sections, "drops": [33]}) == 41  # verses before the beat comes in don't count
 
 
 def test_song_order_lands_verse_one_on_the_full_section_and_resumes_after_the_breakdown(workspace):
@@ -343,3 +356,12 @@ def test_track_add_reads_artist_and_title_tags(workspace, tmp_path):
     subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-t", "1",
                     "-metadata", "artist=elden", "-metadata", "title=SWARM", str(source)], check=True)
     assert library.file_tags(source) == {"artist": "elden", "title": "SWARM"}
+
+
+def test_a_clip_counts_as_masked_only_when_it_reads_weak_twice_running():
+    from glass_harbor.auto import steady_weak
+
+    assert steady_weak(None, {"weak": ["hook5"]}) == {"weak": []}  # one reading is not enough
+    assert steady_weak({"hook5"}, {"weak": ["verse2"]}) == {"weak": []}  # a different clip each time: noise
+    assert steady_weak({"hook5", "verse2"}, {"weak": ["verse2"]}) == {"weak": ["verse2"]}
+    assert steady_weak({"verse2"}, None) == {"weak": []}
