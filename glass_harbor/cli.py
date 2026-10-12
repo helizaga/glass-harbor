@@ -154,6 +154,13 @@ def cmd_track_lyrics(args: argparse.Namespace) -> int:
 
     if args.force or load_reference(args.id) is None:
         fetch_reference(args.id, log=log)
+    if args.force or lyrics.get("timing") != "aligned":
+        from glass_harbor.align import align_track
+
+        aligned = align_track(args.id, log=log)
+        if aligned is not None:
+            lyrics = aligned
+            update_analysis(args.id, lyrics)
     grid = Grid.from_dict(library.load_analysis(args.id)["grid"])
     lines = bar_lines(lyrics, grid)
     found = hooks(lyrics, grid)
@@ -741,7 +748,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--restart", action="store_true", help="start over from the original separation")
     p.set_defaults(func=cmd_track_clean)
 
-    p = common(track.add_parser("lyrics", help="transcribe vocals with word timings (local Whisper), find hooks"))
+    p = common(track.add_parser("lyrics", help="transcribe vocals with word timings (local Whisper, re-timed from the "
+                                         "published lyrics when LRCLIB has them), find hooks"))
     p.add_argument("id")
     p.add_argument("--model", help="default: whisper-large-v3-turbo for the chosen backend")
     p.add_argument("--backend", choices=("mlx", "faster"), help="default: mlx on Apple Silicon, else faster-whisper")

@@ -52,6 +52,13 @@ def _lyrics(track_id: str, log: Log) -> None:
         update_analysis(track_id, transcribe(track_id))
     if load_lyrics(track_id) is not None and load_reference(track_id) is None:
         fetch_reference(track_id, log=log)
+    lyrics = load_lyrics(track_id)
+    if lyrics is not None and lyrics.get("timing") != "aligned":
+        from glass_harbor.align import align_track
+
+        aligned = align_track(track_id, log=log)
+        if aligned is not None:
+            update_analysis(track_id, aligned)
 
 
 def separate_vocal_only(track_id: str, log: Log) -> None:
