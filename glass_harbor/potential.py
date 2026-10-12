@@ -5,7 +5,7 @@ No one can predict virality. What can be measured is whether a pairing has the u
 - recognizable: at least one song people already know (Deezer's public popularity rank; no account needed);
 - current: a recent release, especially the beat (the lane people are dancing to now);
 - hook: a short line that comes back several times (from the published lyrics), early in the song;
-- crossover: a vocal and a beat from different worlds (a rap or R&B vocal over a club beat).
+- crossover: a vocal and a beat from different worlds (a rap or R&B vocal under 115 bpm over a club beat at 120+).
 
 The score is advisory: ``fit`` reports it next to the musical fit, and the brief records it.
 """
@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import os
 import urllib.parse
 import urllib.request
 from typing import Any
@@ -38,10 +39,12 @@ def popularity(track_id: str) -> dict[str, Any] | None:
     from glass_harbor.lyrics_ref import _artists, _norm_name, artist_and_title, lead_artist
 
     cache = library.track_dir(track_id) / "popularity.json"
-    if cache.exists():
+    try:
         data = json.loads(cache.read_text())
         if (dt.date.today() - dt.date.fromisoformat(data["checked"])).days < CACHE_DAYS:
             return data.get("result")
+    except (OSError, ValueError, KeyError):
+        pass  # missing or unreadable cache: look it up again
     artist, title = artist_and_title(library.load_meta(track_id))
     result = None
     try:
@@ -57,7 +60,10 @@ def popularity(track_id: str) -> dict[str, Any] | None:
                       "release_date": track.get("release_date")}
     except Exception:  # noqa: BLE001 - offline or rate-limited: unknown, not zero
         return None
-    cache.write_text(json.dumps({"checked": dt.date.today().isoformat(), "result": result}) + "\n")
+    # Write a temporary file and swap it in, so a parallel reader (another watcher) never sees half a cache.
+    tmp = cache.with_name(f"{cache.name}.{os.getpid()}.tmp")
+    tmp.write_text(json.dumps({"checked": dt.date.today().isoformat(), "result": result}) + "\n")
+    os.replace(tmp, cache)
     return result
 
 
@@ -132,7 +138,9 @@ def assess(vocal: str, beat: str, *, crossover: bool | None = None) -> dict[str,
     if crossover is None:
         vocal_bpm = library.load_analysis(vocal)["grid"]["bpm"]
         beat_bpm = library.load_analysis(beat)["grid"]["bpm"]
-        crossover = vocal_bpm < 115 and (beat_bpm >= 120 or beat_bpm * 2 >= 140)
+        # Analysis grids sit at the faster pulse, so club beats (house, jersey, DnB) read 120 bpm and up; a slower
+        # beat is the vocal's own world, not a crossover.
+        crossover = vocal_bpm < 115 and beat_bpm >= 120
     if crossover:
         score += 10
         reasons.append("crossover: a hip-hop/R&B vocal on a club beat")

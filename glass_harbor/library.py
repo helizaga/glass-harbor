@@ -108,6 +108,9 @@ def load_grid(track_id: str) -> Grid:
     return Grid.from_dict(load_analysis(track_id)["grid"])
 
 
+FFPROBE_TIMEOUT_S = 15
+
+
 def file_tags(path: Path) -> dict[str, str]:
     """Artist and title from the file's own tags (ffprobe), lowercase keys; empty when unavailable."""
     import subprocess
@@ -115,11 +118,11 @@ def file_tags(path: Path) -> dict[str, str]:
     ffprobe = shutil.which("ffprobe")
     if not ffprobe:
         return {}
-    result = subprocess.run([ffprobe, "-v", "error", "-show_entries", "format_tags=artist,title", "-of", "json",
-                             str(path)], capture_output=True, text=True, check=False)
     try:
+        result = subprocess.run([ffprobe, "-v", "error", "-show_entries", "format_tags=artist,title", "-of", "json",
+                                 str(path)], capture_output=True, text=True, check=False, timeout=FFPROBE_TIMEOUT_S)
         tags = json.loads(result.stdout or "{}").get("format", {}).get("tags", {})
-    except ValueError:
+    except (subprocess.TimeoutExpired, ValueError):
         return {}
     return {k.lower(): v.strip() for k, v in tags.items() if k.lower() in ("artist", "title") and v.strip()}
 

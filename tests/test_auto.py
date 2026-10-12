@@ -303,6 +303,18 @@ def test_hit_potential_scores_the_ingredients(monkeypatch, workspace):
     assert any("crossover" in r for r in result["reasons"])
     potential.assess("v", "b")
     assert calls.count("search") == 2  # cached for a week
+    (library.track_dir("b") / "popularity.json").write_text('{"checked": "20')  # a half-written cache
+    assert potential.popularity("b")["artist"] == "Dabin" and calls.count("search") == 3  # looked up again
+
+
+def test_crossover_needs_a_club_tempo_beat(workspace):
+    from glass_harbor import potential
+
+    write_fake_track("rap", bpm=90, key="E", bars=16)
+    write_fake_track("rapbeat", bpm=90, key="E", bars=16)
+    write_fake_track("house", bpm=126, key="E", bars=16)
+    assert not any("crossover" in r for r in potential.assess("rap", "rapbeat")["reasons"])
+    assert any("crossover" in r for r in potential.assess("rap", "house")["reasons"])
 
 
 def test_hit_potential_treats_ambiguous_and_offline_lookups_as_unknown(monkeypatch, workspace):
