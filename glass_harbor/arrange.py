@@ -125,6 +125,16 @@ def song_order(vocals: str, beat: dict[str, Any], ratio: float, lyrics: dict[str
     if target is None or not lines:
         return None
     hooks = _hook_texts(lines)
+    from glass_harbor.lyrics_ref import load_reference, repeated_spans
+
+    reference = load_reference(vocals)
+    # Published lyrics show which lines really repeat (Whisper often mishears a sung chorus the second time).
+    ref_hooks = [(grid.bar_at_time(a), grid.bar_at_time(b)) for a, b in repeated_spans(reference)] if reference else []
+
+    def is_hook(line: dict[str, Any]) -> bool:
+        mid = (line["start"] + line["end"]) / 2
+        return line["text"] in hooks or any(a <= mid < b for a, b in ref_hooks)
+
     # The first proper verse line (6+ words) after something to open with, else the first line.
     verse = next((ln for ln in lines if ln["words"] >= 6 and ln["start"] >= lines[0]["start"] + 1), lines[0])
     anchor = _floor(verse["start"])
@@ -166,7 +176,7 @@ def song_order(vocals: str, beat: dict[str, Any], ratio: float, lyrics: dict[str
         # before verse 1) get the hook chain, everything else is verse.
         roles = []
         for ln in chunk:
-            hooky = ln["text"] in hooks or ln["start"] < anchor and v == first \
+            hooky = is_hook(ln) or ln["start"] < anchor and v == first \
                 or (ln["words"] <= 2 and bool(roles) and roles[-1][1])
             if roles and roles[-1][1] == hooky:
                 roles[-1][0].append(ln)

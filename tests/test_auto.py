@@ -197,3 +197,40 @@ def test_song_order_keeps_the_fitting_part_of_a_clip_at_the_beat_end(workspace):
     clips, _, notes = arrange.song_order("vox", beat, 2.0, load_lyrics("vox"))
     last = max((c for c in clips if "from_bar" in c), key=lambda c: c["at_bar"])
     assert last["at_bar"] + last["bars"] * 2 <= 81 and last["bars"] >= 1
+
+
+def test_reference_lyrics_parse_and_mark_repeats(workspace):
+    from glass_harbor.lyrics_ref import artist_and_title, expected_words, parse_synced, repeated_spans
+
+    lines = parse_synced("[00:01.00] Yeah bop\n[00:03.50] a verse line here\n[00:06.00] Yeah bop\n[00:08.00] end")
+    assert [round(l["time"], 1) for l in lines] == [1.0, 3.5, 6.0, 8.0] and lines[0]["end"] == 3.5
+    reference = {"lines": lines}
+    assert repeated_spans(reference) == [(1.0, 3.5), (6.0, 8.0)]
+    assert [w for w, _, _ in expected_words(reference, 3.0, 7.0)] == ["a", "verse", "line", "here", "yeah", "bop"]
+    assert artist_and_title({"source_file": "01 - Don Toliver - GLOCK.flac"}) == ("Don Toliver", "GLOCK")
+    assert artist_and_title({"title": "SWARM", "artist": "", "source_file": "SWARM.mp3"}) == ("", "SWARM")
+
+
+def test_listen_counts_reference_words_inside_their_line_span():
+    from glass_harbor.listen import match_spans
+
+    expected = [("yeah", 1.0, 3.0), ("bop", 1.0, 3.0), ("money", 5.0, 6.0)]
+    heard = [("bop", 2.8), ("yeah", 1.2), ("money", 9.0)]
+    assert match_spans(expected, heard) == 2
+
+
+def test_fit_levels_follow_the_vocal_type(monkeypatch, workspace):
+    import numpy as np
+
+    from glass_harbor import fit
+
+    write_fake_track("v", bpm=76, key="E", bars=16)
+    write_fake_track("b", bpm=150, key="E", bars=32, stems=("instrumental",))
+    monkeypatch.setattr(fit, "beat_profile", lambda audio, tonic, mode: {"vocal_room": 0.134, "harshness": 0.02,
+                                                                        "out_of_key": 0.3})
+    monkeypatch.setattr(fit, "sung_share", lambda track: 0.13)
+    sung = fit.assess("v", "b", log=lambda m: None)
+    assert sung["vocal_type"] == "sung" and sung["verdict"] == "poor" and "1-4 kHz" in sung["reasons"][0]
+    monkeypatch.setattr(fit, "beat_profile", lambda audio, tonic, mode: {"vocal_room": 0.02, "harshness": 0.01,
+                                                                        "out_of_key": 0.3})
+    assert fit.assess("v", "b", log=lambda m: None)["verdict"] == "good"

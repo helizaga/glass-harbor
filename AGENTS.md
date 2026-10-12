@@ -56,7 +56,10 @@ Use a Python build with SSL (Homebrew); the pyenv 3.11.3 build on this machine l
 
 ## Commands
 - `glass-harbor doctor`
-- `glass-harbor auto <vocal> <bed> [--slug] [--title] [--rounds 2]` (files or track ids; the whole pipeline)
+- `glass-harbor fit <vocal> <bed>` (one-minute check: key, tempo, and whether the beat leaves the vocal room;
+  run it right after the user downloads a beat, before the full mix)
+- `glass-harbor auto <vocal> <bed> [--slug] [--title] [--rounds 2] [--force]` (files or track ids; the whole
+  pipeline; stops when the fit check says poor unless --force)
 - `glass-harbor track add <files...> [--id] [--stem name=path] [--separate stems] [--quality fast|balanced|best] [--sections novelty|allin1]`
 - `glass-harbor track analyze <ids...>|--all [--force] [--beats auto|beat_this|librosa] [--sections novelty|allin1]`
 - `glass-harbor track separate <id> [--stems vocals,instrumental,drums,bass,other] [--quality ...]`

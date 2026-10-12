@@ -150,6 +150,10 @@ def cmd_track_lyrics(args: argparse.Namespace) -> int:
         log(f"transcribing {args.id} (first run downloads the model)")
         lyrics = transcribe(args.id, model=args.model, backend=args.backend)
     update_analysis(args.id, lyrics)
+    from glass_harbor.lyrics_ref import fetch_reference, load_reference
+
+    if args.force or load_reference(args.id) is None:
+        fetch_reference(args.id, log=log)
     grid = Grid.from_dict(library.load_analysis(args.id)["grid"])
     lines = bar_lines(lyrics, grid)
     found = hooks(lyrics, grid)
@@ -590,11 +594,31 @@ def cmd_mix_list(args: argparse.Namespace) -> int:
 
 # ---------------------------------------------------------------- parser
 
+def cmd_fit(args: argparse.Namespace) -> int:
+    from glass_harbor.auto import bed_sections, ingest, separate_vocal_only
+    from glass_harbor.fit import assess
+
+    log = _log(args)
+    vocal = ingest(args.vocal, sections="novelty", log=log)
+    bed = ingest(args.bed, sections=bed_sections(), log=log)
+    separate_vocal_only(vocal, log)
+    result = assess(vocal, bed, log=log)
+    fit = result["fit"]
+    lines = [f"{vocal} over {bed}: {result['verdict'].upper()} ({result['vocal_type']} vocal, beat measured on "
+             f"{result['measured_on']})",
+             f"  key: {fit['relation']}, {fit['semitones']:+d} st; tempo x{fit['tempo_ratio']:g}, "
+             f"{fit['stretch_pct']:+.1f}% stretch"]
+    lines += [f"  {c['check']:11s} {c['value']}  {c['level']}" for c in result["checks"]]
+    lines += [f"  - {reason}" for reason in result["reasons"]]
+    _emit(args, result, "\n".join(lines))
+    return 0 if result["verdict"] != "poor" else 1
+
+
 def cmd_auto(args: argparse.Namespace) -> int:
     from glass_harbor.auto import run_auto
 
     result = run_auto(args.vocal, args.bed, slug=args.slug, title=args.title or "", rounds=args.rounds,
-                      log=_log(args))
+                      force=args.force, log=_log(args))
     lines = [f"{result['slug']}: {result['verdict']}",
              f"  send to a phone: {result['phone']}", f"  full quality:    {result['mp3']}",
              f"  plan: {result['plan']}", f"  brief: {result['brief']}"]
@@ -829,7 +853,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--slug", help="mix name (default: <vocal>-x-<bed>)")
     p.add_argument("--title")
     p.add_argument("--rounds", type=int, default=2, help="QA fix rounds after the first render (default 2)")
+    p.add_argument("--force", action="store_true", help="make it even if the fit check says the beat is a poor fit")
     p.set_defaults(func=cmd_auto)
+
+    p = common(sub.add_parser("fit", help="one-minute check: will this vocal sit on this beat? (files or track ids)"))
+    p.add_argument("vocal")
+    p.add_argument("bed")
+    p.set_defaults(func=cmd_fit)
 
     p = common(sub.add_parser("taste", help="your mixing defaults and preferences (read by scaffolds and agents)"))
     p.add_argument("action", nargs="?", choices=("show", "set", "add"), default="show")

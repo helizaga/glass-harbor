@@ -19,6 +19,7 @@ from glass_harbor import audio as A
 MATCH_WINDOW_S = 0.6  # a heard word counts if it is the same word within this distance of where it should be
 MIN_WORDS = 8  # clips with fewer expected words are too short to judge
 WEAK_RECALL = 0.5
+RELATIVE_DROP = 0.15
 
 
 def match_words(expected: list[tuple[str, float]], heard: list[tuple[str, float]], *,
@@ -55,6 +56,31 @@ def _expected(res: Any, clip: Any, lyrics: dict[str, Any], offset_s: float) -> l
     return words
 
 
+def match_spans(expected: list[tuple[str, float, float]], heard: list[tuple[str, float]], *,
+                slack: float = 0.5) -> int:
+    """Reference words only carry their line's span: a heard word counts anywhere inside it (plus ``slack``)."""
+    used = [False] * len(heard)
+    found = 0
+    for word, start, end in expected:
+        for i, (other, t) in enumerate(heard):
+            if not used[i] and other == word and start - slack <= t <= end + slack:
+                used[i] = True
+                found += 1
+                break
+    return found
+
+
+def _expected_reference(res: Any, clip: Any, reference: dict[str, Any], offset_s: float
+                        ) -> list[tuple[str, float, float]]:
+    from glass_harbor.lyrics_ref import expected_words
+
+    src = np.array(clip.src_beat_times)
+    out = np.array([res.tempo.time_at(clip.out_start_beat + i * clip.out_beats_per_src_beat)
+                    for i in range(clip.src_beats + 1)]) + offset_s
+    to_out = lambda t: float(np.interp(t, src, out))  # noqa: E731
+    return [(w, to_out(a), to_out(b)) for w, a, b in expected_words(reference, src[0], src[-1])]
+
+
 def listen_run(run_dir: Path, *, log=print) -> dict[str, Any]:
     """Transcribe ``run_dir``'s mix and score every vocal clip. Writes and returns listen.json."""
     from glass_harbor.lyrics import _normalize, load_lyrics, transcribe_audio
@@ -78,18 +104,30 @@ def listen_run(run_dir: Path, *, log=print) -> dict[str, Any]:
             lyrics_cache[clip.track] = load_lyrics(clip.track)
         if not lyrics_cache[clip.track]:
             continue
-        expected = _expected(res, clip, lyrics_cache[clip.track], offset)
-        if not expected:
-            continue
-        found = match_words(expected, heard)
-        clips.append({"clip": clip.id, "source": clip.source, "expected": len(expected), "heard": found,
-                      "recall": round(found / len(expected), 2),
-                      "start_s": round(expected[0][1], 2), "end_s": round(expected[-1][1], 2)})
+        from glass_harbor.lyrics_ref import load_reference
+
+        reference = load_reference(clip.track)
+        if reference:  # the published words (Whisper's own transcript can share its mistakes with this pass)
+            spans = _expected_reference(res, clip, reference, offset)
+            if not spans:
+                continue
+            found, count, start, stop = match_spans(spans, heard), len(spans), spans[0][1], spans[-1][2]
+        else:
+            expected = _expected(res, clip, lyrics_cache[clip.track], offset)
+            if not expected:
+                continue
+            found, count, start, stop = match_words(expected, heard), len(expected), expected[0][1], expected[-1][1]
+        clips.append({"clip": clip.id, "source": clip.source, "expected": count, "heard": found,
+                      "recall": round(found / count, 2), "words": "reference" if reference else "whisper",
+                      "start_s": round(start, 2), "end_s": round(stop, 2)})
     # The beat's own vocal (call and response) is effects and shouts, not lyrics to follow: not judged.
     judged = [c for c in clips if c["expected"] >= MIN_WORDS and c["source"] != "bed"]
     total = sum(c["expected"] for c in judged)
     result = {"model": model, "backend": backend, "clips": clips,
               "overall_recall": round(sum(c["heard"] for c in judged) / total, 2) if total else None,
-              "weak": [c["clip"] for c in judged if c["recall"] < WEAK_RECALL]}
+              # Weak = below the floor and clearly below this track's own average (sung, autotuned vocals read lower
+              # across the board; a clip is masked when it reads worse than the rest of the same song).
+              "weak": [c["clip"] for c in judged if c["recall"] < WEAK_RECALL
+                       and (not total or c["recall"] < sum(c["heard"] for c in judged) / total - RELATIVE_DROP)]}
     (run_dir / "listen.json").write_text(json.dumps(result, indent=2) + "\n")
     return result

@@ -20,7 +20,11 @@ Pick from what is working right now, not from memory:
   its track pages list which tracks get played next to which.
 - **Mashup ideas**: Beatport's "DJ Edits" category shows which rap songs DJs already put over house, and at what BPM.
 
-Use 1001Tracklists to check whether a pairing is proven or already overdone before committing to it. Chart BPM/key
+Use 1001Tracklists to check whether a pairing is proven or already overdone before committing to it. For sung
+vocals, skip dark club-trap and riddim beds and look for melodic, key-matched beds (melodic bass, R&B); once the
+user has the files, `glass-harbor fit <vocal> <beat>` measures vocal room (1-4 kHz crowding), harshness, and
+out-of-key harmony in a minute. Lyrics come from Whisper for timing and from LRCLIB (free, synced lines) for
+the right words and which lines really repeat; both stay in the gitignored library. Chart BPM/key
 are hints; trust `glass-harbor track show` once the user supplies the files.
 
 ## 0. Source audio

@@ -45,10 +45,20 @@ def ingest(source: str, *, sections: str, log: Log) -> str:
 
 def _lyrics(track_id: str, log: Log) -> None:
     from glass_harbor.lyrics import load_lyrics, transcribe, update_analysis
+    from glass_harbor.lyrics_ref import fetch_reference, load_reference
 
     if load_lyrics(track_id) is None and "vocals" in library.available_stems(track_id):
         log(f"transcribing {track_id}")
         update_analysis(track_id, transcribe(track_id))
+    if load_lyrics(track_id) is not None and load_reference(track_id) is None:
+        fetch_reference(track_id, log=log)
+
+
+def separate_vocal_only(track_id: str, log: Log) -> None:
+    """The acapella alone (best quality), enough for the fit check to tell sung from rapped."""
+    from glass_harbor.separate import separate_track
+
+    separate_track(track_id, stems=["vocals"], quality="best", log=log)
 
 
 def prepare_vocal(track_id: str, log: Log) -> None:
@@ -178,7 +188,7 @@ def _listen(run_dir: Path, log: Log) -> dict[str, Any] | None:
 
 
 def write_brief(slug: str, plan: dict[str, Any], vocal: str, bed: str, qa: dict[str, Any] | None,
-                rounds: list[list[str]]) -> Path:
+                rounds: list[list[str]], check: dict[str, Any] | None = None) -> Path:
     from glass_harbor.paths import mix_dir
 
     def describe(track_id: str) -> str:
@@ -195,6 +205,10 @@ def write_brief(slug: str, plan: dict[str, Any], vocal: str, bed: str, qa: dict[
              "- kind: mashup (one-command draft: `glass-harbor auto`)",
              "- vibe: club edit on the beat's own structure; the user judges it by ear", "",
              "## Sources (from analysis)", "", f"- {describe(vocal)}", f"- {describe(bed)}", "",
+             "## Fit check", "",
+             *([f"- verdict: {check['verdict']} ({check['vocal_type']} vocal); "
+                + ", ".join(f"{c['check']} {c['value']} ({c['level']})" for c in check["checks"])]
+               + [f"- {r}" for r in check["reasons"]] if check else ["- not run"]), "",
              "## Decisions (the draft's rules; edit the plan to change them)", ""]
     lines += [f"- {note}" for note in plan.get("notes", [])]
     lines += ["", "## Fix rounds", ""]
@@ -213,16 +227,28 @@ def write_brief(slug: str, plan: dict[str, Any], vocal: str, bed: str, qa: dict[
 # ---------------------------------------------------------------- pipeline
 
 
+class PoorFit(ValueError):
+    """The fit check says this beat will not carry this vocal (raised before the long work starts)."""
+
+
 def run_auto(vocal: str, bed: str, *, slug: str | None = None, title: str = "", rounds: int = 2,
-             log: Log = print) -> dict[str, Any]:
+             force: bool = False, log: Log = print) -> dict[str, Any]:
     from glass_harbor.check import check_run
     from glass_harbor.paths import plan_path, require_slug, runs_dir
     from glass_harbor.plan import resolve, save_plan
     from glass_harbor.render import render_plan
     from glass_harbor.scaffold import build_mashup
 
+    from glass_harbor.fit import assess
+
     vocal_id = ingest(vocal, sections="novelty", log=log)
     bed_id = ingest(bed, sections=bed_sections(), log=log)
+    separate_vocal_only(vocal_id, log)
+    check = assess(vocal_id, bed_id, log=log)
+    log(f"fit check: {check['verdict']}" + (f" ({'; '.join(check['reasons'])})" if check["reasons"] else ""))
+    if check["verdict"] == "poor" and not force:
+        raise PoorFit(f"{vocal_id} over {bed_id} fails the fit check: {'; '.join(check['reasons'])}. Pick another "
+                      "beat, or pass --force to make it anyway.")
     prepare_vocal(vocal_id, log)
     prepare_bed(bed_id, log)
     slug = require_slug(slug or f"{vocal_id}-x-{bed_id}")
@@ -250,7 +276,7 @@ def run_auto(vocal: str, bed: str, *, slug: str | None = None, title: str = "", 
             break
         log("fixing: " + "; ".join(changes))
         save_plan(plan_path(slug), plan)
-    brief = write_brief(slug, plan, vocal_id, bed_id, qa, history)
+    brief = write_brief(slug, plan, vocal_id, bed_id, qa, history, check)
     files = (report or {}).get("files", {})
     return {"slug": slug, "vocal": vocal_id, "bed": bed_id, "run": str(run_dir), "brief": str(brief),
             "plan": str(plan_path(slug)), "phone": str(run_dir / files["phone"]) if files.get("phone") else None,
