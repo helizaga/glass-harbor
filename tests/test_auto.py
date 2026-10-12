@@ -196,7 +196,10 @@ def test_song_order_keeps_the_fitting_part_of_a_clip_at_the_beat_end(workspace):
     beat["bar_db"] = beat["bar_db"][:80]
     clips, _, notes = arrange.song_order("vox", beat, 2.0, load_lyrics("vox"))
     last = max((c for c in clips if "from_bar" in c), key=lambda c: c["at_bar"])
-    assert last["at_bar"] + last["bars"] * 2 <= 81 and last["bars"] >= 1
+    # The second verse's first 12-bar piece (vocal bars 20-31) would run to bar 85; it is cut at the last line
+    # start that fits and ends exactly where the beat does.
+    assert last["from_bar"] == 20 and last["bars"] == 10 and last["at_bar"] + last["bars"] * 2 == 81
+    assert any("keeps 4 of 6" in note for note in notes)
 
 
 def test_reference_lyrics_parse_and_mark_repeats(workspace):
