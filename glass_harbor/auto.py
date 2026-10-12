@@ -309,6 +309,7 @@ def run_auto(vocal: str, bed: str, *, slug: str | None = None, title: str = "", 
     files = (report or {}).get("files", {})
     return {"slug": slug, "vocal": vocal_id, "bed": bed_id, "run": str(run_dir), "brief": str(brief),
             "plan": str(plan_path(slug)), "phone": str(run_dir / files["phone"]) if files.get("phone") else None,
+            "short": str(run_dir / files["short"]) if files.get("short") else None,
             "mp3": str(run_dir / files["mp3"]) if files.get("mp3") else None,
             "verdict": qa["verdict"] if qa else None, "flags": qa.get("flags", []) if qa else [],
             "rounds": history}

@@ -681,7 +681,9 @@ def cmd_auto(args: argparse.Namespace) -> int:
     result = run_auto(args.vocal, args.bed, slug=args.slug, title=args.title or "", rounds=args.rounds,
                       force=args.force, log=_log(args))
     lines = [f"{result['slug']}: {result['verdict']}",
-             f"  send to a phone: {result['phone']}", f"  full quality:    {result['mp3']}",
+             f"  send to a phone: {result['phone']}",
+             *([f"  short edit:      {result['short']}"] if result.get("short") else []),
+             f"  full quality:    {result['mp3']}",
              f"  plan: {result['plan']}", f"  brief: {result['brief']}"]
     lines += [f"  fix round {i + 1}: {'; '.join(r) if r else 'nothing left to fix'}"
               for i, r in enumerate(result["rounds"])]

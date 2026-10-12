@@ -45,6 +45,7 @@ overlaps, key clashes, audible stretch, silence).
 | `master.tame_harshness` | default `true`: a dynamic cut of 2-5 kHz (max 3 dB) only when that band jumps above its usual share |
 | `master.stream_version` | default `true`: also writes `mix-stream.wav/mp3` at -14 LUFS with bass harmonics, for uploading to Spotify/YouTube/SoundCloud (they normalize to -14) |
 | `master.phone_version` | default `true`: also writes `mix-phone.m4a` (256k AAC) for sending as a file: about as loud as a release (-8 LUFS, or the club target if quieter, since phones don't normalize files) with bass harmonics for small speakers |
+| `master.short_seconds` | default from taste (`short_edit_seconds`, 150): full renders also write `mix-short.m4a`, the phone master cut at bar lines to about this length (beat-only run-up and tail trimmed, drop sections that only repeat a hook removed); `0` turns it off |
 | `edits` | `[{"type": "tape_stop", "at_bar": 64.5, "beats": 2}]`: the whole mix brakes to a stop |
 
 ## Sources

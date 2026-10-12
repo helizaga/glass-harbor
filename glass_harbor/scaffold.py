@@ -890,33 +890,40 @@ BUILD = ["j---j---j---j---", "b---b---j---j---", "j---j---j---j---", "j-j-j-j-j-
          "j-j-j-j-k-k-k-k-", "k-k-k-k-l-l-l-l-", "jjjjkkkkllllmmmm", "j-----------...."]
 
 
-def _vocal_material(vox: dict[str, Any], lyrics: dict[str, Any] | None, title: str) -> dict[str, Any] | None:
-    """Chorus blocks (from the most repeated line), 8-bar verse chunks, a title line, and chop words."""
+def _vocal_material(vox: dict[str, Any], lyrics: dict[str, Any] | None, title: str, *, ratio: float = 1.0,
+                    track: str | None = None) -> dict[str, Any] | None:
+    """Chorus blocks (from the most repeated line), verse chunks of 8 output bars, a title line, and chop words.
+    Blocks are {"anchor", "start", "end"} in vocal bars (see ``arrange.reference_material``). With published
+    lyrics for ``track``, choruses, a second chant, the intro, and line-aligned verses come from them; otherwise
+    from Whisper's repeated lines."""
+    from glass_harbor import arrange
     from glass_harbor.grid import Grid
     from glass_harbor.lyrics import _normalize, hooks
 
     if not lyrics:
         return None
     grid = Grid.from_dict(vox["grid"])
+    published = arrange.reference_material(track, grid, ratio) if track else None
     found = [h for h in hooks(lyrics, grid) if h["occurrences"] and len(h["text"].split()) >= 3]
-    if not found:
+    if not found and published is None:
         return None
-    starts = sorted(int(math.floor(o["start_bar"])) for o in found[0]["occurrences"])
+    chorus_out, verse_out = 16 / ratio, 8 / ratio  # vocal bars that fill 16 and 8 output bars
+    starts = sorted(int(math.floor(o["start_bar"])) for o in found[0]["occurrences"]) if found else []
     choruses = []
     for i, start in enumerate(starts):
         nxt = starts[i + 1] if i + 1 < len(starts) else grid.bar_count + 1
-        length = 16 if nxt - start >= 16 else 8
-        if start + length <= grid.bar_count + 1 and all(abs(start - c[0]) >= 8 for c in choruses):
+        length = chorus_out if nxt - start >= chorus_out else verse_out
+        if start + length <= grid.bar_count + 1 and all(abs(start - c[0]) >= verse_out for c in choruses):
             choruses.append((start, length))
-    covered = {b for start, length in choruses for b in range(start, start + length)}
+    covered = {b for start, length in choruses for b in range(start, int(start + length))}
     verses = []
     for phrase in vox.get("stems", {}).get("vocals", {}).get("phrases", []):
         bar = phrase["start_bar"]
         end = phrase["start_bar"] + phrase["bars"]
-        while bar + 8 <= end + 2 and bar + 8 <= grid.bar_count + 1:
-            if not covered & set(range(bar, bar + 8)) and all(abs(bar - v) >= 8 for v in verses):
+        while bar + verse_out <= end + 2 and bar + verse_out <= grid.bar_count + 1:
+            if not covered & set(range(bar, int(bar + verse_out))) and all(abs(bar - v) >= verse_out for v in verses):
                 verses.append(bar)
-            bar += 8
+            bar += int(verse_out)
     verses.sort()
     title_words = [w for w in (_normalize(t) for t in title.split()) if len(w) >= 4]
     line = None
@@ -933,9 +940,62 @@ def _vocal_material(vox: dict[str, Any], lyrics: dict[str, Any] | None, title: s
                 counts[text] = counts.get(text, 0) + 1
     chop_word = next((w for w in title_words if counts.get(w)), None) or max(counts, key=counts.get, default=None)
     filler = next((w for w, _ in sorted(counts.items(), key=lambda kv: -kv[1]) if w != chop_word), None)
-    first_hook_word = _normalize(found[0]["text"].split()[0]) if found else None
-    return {"choruses": choruses, "verses": verses, "title_line": line, "chop_word": chop_word,
-            "filler_word": filler or chop_word, "hook_word": first_hook_word}
+    hook_text = published["hook_text"] if published else found[0]["text"]
+    material = {"choruses": [{"anchor": s, "start": s, "end": s + n} for s, n in choruses],
+                "verses": [{"anchor": v, "start": v, "end": v + verse_out} for v in verses], "chants": [],
+                "intro": [], "title_line": line, "chop_word": chop_word, "filler_word": filler or chop_word,
+                "hook_word": _normalize(hook_text.split()[0])}
+    if published:
+        material.update({k: published[k] for k in ("choruses", "chants", "intro", "verses")})
+    return material
+
+
+def _bar_value(x: float) -> float | int:
+    return int(x) if float(x).is_integer() else round(float(x), 4)
+
+
+def _block_clip(block: dict[str, float], cursor: float, ratio: float, clip_id: str, **extra: Any) -> dict[str, Any]:
+    """A vocal clip that plays ``block`` with its anchor bar on output bar ``cursor``."""
+    anchor, start, end = block["anchor"], block["start"], block["end"]
+    clip: dict[str, Any] = {"id": clip_id, "source": "vox", "stem": "vocals"}
+    if start < anchor:  # a pickup into the anchor bar
+        clip.update(from_bar=_bar_value(anchor), bars=_bar_value(end - anchor), at_bar=_bar_value(cursor),
+                    pre_beats=int(round((anchor - start) * 4)))
+    else:
+        clip.update(from_bar=_bar_value(start), bars=_bar_value(end - start),
+                    at_bar=_bar_value(cursor + (start - anchor) * ratio))
+    clip.update(extra)
+    return clip
+
+
+def _block_out(block: dict[str, float], ratio: float) -> float:
+    """Output bars from the section start to the block's end."""
+    return (block["end"] - block["anchor"]) * ratio
+
+
+def _advance(block: dict[str, float], ratio: float) -> int:
+    """Whole 8-bar phrases the block takes (a last-line tail of up to half a bar may spill into the next)."""
+    return 8 * max(1, math.ceil((_block_out(block, ratio) - SPILL_OUT) / 8))
+
+
+SPILL_OUT = 0.5
+
+
+def _trim_overlaps(clips: list[dict[str, Any]], ratio: float) -> None:
+    """End a vocal clip where the next one starts (its pickup, or a tail that spilled into the next phrase)."""
+    from glass_harbor.arrange import _beat_floor
+
+    def span(clip: dict[str, Any]) -> tuple[float, float]:
+        scale = 1 if "chop" in clip else ratio
+        return (clip["at_bar"] - clip.get("pre_beats", 0) * scale / 4, clip["at_bar"] + clip["bars"] * scale)
+
+    ordered = sorted((c for c in clips if c.get("stem") == "vocals" and "bars" in c), key=lambda c: span(c)[0])
+    for clip, nxt in zip(ordered, ordered[1:]):
+        if "chop" in clip or span(clip)[1] <= span(nxt)[0] + 1e-6:
+            continue
+        bars = _beat_floor((span(nxt)[0] - clip["at_bar"]) / ratio, ratio)
+        if bars > 0:
+            clip["bars"] = _bar_value(bars)
 
 
 def smart_arrangement(vocals: str, bed: str, vox: dict[str, Any], beat: dict[str, Any], ratio: float,
@@ -944,9 +1004,11 @@ def smart_arrangement(vocals: str, bed: str, vox: dict[str, Any], beat: dict[str
     when there is not enough structure to work with (the caller falls back to back-to-back placement)."""
     from glass_harbor.lyrics import load_lyrics
 
-    material = _vocal_material(vox, load_lyrics(vocals), title)
+    if ratio not in (0.5, 1.0, 2.0):
+        return None
+    material = _vocal_material(vox, load_lyrics(vocals), title, ratio=ratio, track=vocals)
     levels = beat.get("bar_db") or []
-    if material is None or not material["choruses"] or len(levels) < 32 or ratio != 1:
+    if material is None or not material["choruses"] or len(levels) < 32:
         return None
     bars = len(levels)
     median = float(np.median(levels))
@@ -968,6 +1030,17 @@ def smart_arrangement(vocals: str, bed: str, vox: dict[str, Any], beat: dict[str
     cursor = 9
     outro = 8
     handled: set[int] = set()  # each drop is arranged once (a hook can end exactly on the next drop)
+    final_drop = max((d for d in drops if d + 8 <= bars + 1 - outro), default=None)
+    chants = list(material["chants"])
+
+    def place_chorus(at: float) -> None:
+        nonlocal chorus_i, cursor, last_hook
+        block = material["choruses"][chorus_i % len(material["choruses"])]
+        clips.append(_block_clip(block, at, ratio, f"hook{chorus_i + 1}", chain="hook"))
+        chorus_i += 1
+        cursor = at + _advance(block, ratio)
+        last_hook = True
+
     while cursor + 8 <= bars + 1 - outro:
         next_drop = next((d for d in drops if d >= cursor and d not in handled), None)
         if next_drop is not None and next_drop - cursor < 8:
@@ -978,33 +1051,34 @@ def smart_arrangement(vocals: str, bed: str, vox: dict[str, Any], beat: dict[str
             quiet_run = 0  # silent bars right before the drop
             while quiet_run < gap and silent[next_drop - 2 - quiet_run]:
                 quiet_run += 1
-            if quiet_run and line and math.ceil(line[1]) - math.ceil(line[0]) <= quiet_run:
+            if quiet_run and line and (math.ceil(line[1]) - math.ceil(line[0])) * ratio <= quiet_run:
                 from_bar = math.ceil(line[0])
                 pre = math.ceil((from_bar - line[0]) * 4)
                 length = max(1, math.ceil(line[1]) - from_bar)
                 clips.append({"id": "title-break", "source": "vox", "stem": "vocals", "from_bar": from_bar,
-                              "bars": length, "at_bar": next_drop - length, **({"pre_beats": pre} if pre else {}),
-                              "fx": {"reverb": {"mix": 0.15, "room": 0.5}}})
+                              "bars": length, "at_bar": next_drop - length * ratio,
+                              **({"pre_beats": pre} if pre else {}), "fx": {"reverb": {"mix": 0.15, "room": 0.5}}})
                 notes.append(f"title line a cappella in the break before the bar-{next_drop} drop")
-                spotlight = length + pre / 4
+                spotlight = (length + pre / 4) * ratio
             cursor = next_drop
-            if not last_hook and cursor + 16 <= bars + 1:
-                start, length = material["choruses"][chorus_i % len(material["choruses"])]
-                clips.append({"id": f"hook{chorus_i + 1}", "source": "vox", "stem": "vocals", "from_bar": start,
-                              "bars": length, "at_bar": cursor, "chain": "hook"})
+            # The second chant is the payoff: it is kept for the last drop, even right after the main hook.
+            room = bars + 1 - cursor
+            chant = next((b for b in (chants[0] if chants else []) if _block_out(b, ratio) <= room), None)
+            if chant and next_drop == final_drop:
+                clips.append(_block_clip(chant, cursor, ratio, f"chant{len(material['chants']) - len(chants) + 1}",
+                                         chain="hook"))
+                notes.append(f"the {material.get('chant_text') or 'second'} chant takes the bar-{next_drop} drop")
                 builds.append((cursor, spotlight))
-                chorus_i += 1
-                cursor += length
+                chants.pop(0)
+                cursor += _advance(chant, ratio)
                 last_hook = True
+            elif not last_hook and cursor + 16 <= bars + 1:
+                builds.append((cursor, spotlight))
+                place_chorus(cursor)
             continue
         straddles = next_drop is not None and cursor < next_drop < cursor + 16
         if not last_hook and not straddles and share(full, cursor, 16) >= 0.75 and cursor + 16 <= bars + 1 - outro + 8:
-            start, length = material["choruses"][chorus_i % len(material["choruses"])]
-            clips.append({"id": f"hook{chorus_i + 1}", "source": "vox", "stem": "vocals", "from_bar": start,
-                          "bars": length, "at_bar": cursor, "chain": "hook"})
-            chorus_i += 1
-            cursor += length
-            last_hook = True
+            place_chorus(cursor)
         elif share(low, cursor, 8) >= 0.6 and material["chop_word"] and cursor - last_chops >= 16:
             build = next_drop is not None and next_drop - (cursor + 8) < 8
             slices = {"j": {"word": material["chop_word"], "occurrence": 1},
@@ -1022,9 +1096,16 @@ def smart_arrangement(vocals: str, bed: str, vox: dict[str, Any], beat: dict[str
             last_chops = cursor
             cursor += 8
             last_hook = False
+        elif chorus_i == 0 and not clips and next_drop is not None and material["intro"]:
+            # Before the first hook: the end of the song's own intro, timed to lead into the drop.
+            slots = max(1, (next_drop - cursor) // 8)
+            for n, block in enumerate(material["intro"][-slots:]):
+                at = next_drop - 8 * (min(slots, len(material["intro"])) - n)
+                clips.append(_block_clip(block, at, ratio, f"intro{n + 1}"))
+            cursor = next_drop  # earlier slots (a long run-up) stay beat only
+            last_hook = False
         elif verse_i < len(material["verses"]):
-            clips.append({"id": f"verse{verse_i + 1}", "source": "vox", "stem": "vocals",
-                          "from_bar": material["verses"][verse_i], "bars": 8, "at_bar": cursor})
+            clips.append(_block_clip(material["verses"][verse_i], cursor, ratio, f"verse{verse_i + 1}"))
             verse_i += 1
             cursor += 8
             last_hook = False
@@ -1033,6 +1114,7 @@ def smart_arrangement(vocals: str, bed: str, vox: dict[str, Any], beat: dict[str
             last_hook = False
     if chorus_i == 0:
         return None
+    _trim_overlaps(clips, ratio)
     for clip in clips:
         if clip.get("stem") == "vocals" and "chop" not in clip:
             clip.setdefault("automation", {"highpass_hz": [[0, float(taste_default("vocal_highpass_hz"))]]})
