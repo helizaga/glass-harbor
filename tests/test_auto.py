@@ -490,3 +490,6 @@ def test_fix_rounds_pull_back_a_vocal_that_buries_the_beat(workspace):
     # 1 dB of room left: a +2 dB lift would cross the limit, so the buried bars are left to the ears
     assert apply_qa_fixes(plan, {"vocal_presence": buried, "vocal_balance": balance(1.0)}, {"flags": []}) == []
     assert "gain_db" not in verse
+    # Any excess QA warns about gets corrected, rounded down so the vocal lands under the limit
+    apply_qa_fixes(plan, {"vocal_presence": [], "vocal_balance": balance(2.04)}, {"flags": []})
+    assert verse["gain_db"] == -0.1

@@ -140,6 +140,10 @@ def test_lead_split_that_strips_the_lead_is_refused(workspace, monkeypatch):
     vocal = (0.1 * rng.standard_normal((4 * A.SR, 2))).astype(np.float32)
     assert separate.lead_loss_share(vocal, 0.6 * vocal) == 0.0  # -4.4 dB: backing removed, the lead kept
     assert separate.lead_loss_share(vocal, 0.1 * vocal) == 1.0  # -20 dB everywhere: the lead itself went
+    short = vocal[: int(0.3 * A.SR)]
+    assert separate.lead_loss_share(short, 0.1 * short) == 1.0  # shorter than one window still counts
+    tail = np.concatenate([np.zeros((A.SR, 2), np.float32), vocal[: A.SR // 4]])  # only the last partial window
+    assert separate.lead_loss_share(tail, 0.1 * tail) == 1.0
     write_fake_track("rap", bpm=120, key="Am", bars=8, stems=("vocals",))
     A.save(library.stem_path("rap", "vocals"), vocal)
     before = library.stem_path("rap", "vocals").read_bytes()

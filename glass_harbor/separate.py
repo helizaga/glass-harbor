@@ -230,12 +230,20 @@ def lead_loss_share(original: np.ndarray, lead: np.ndarray, window_s: float = 0.
     """Share of the windows where the vocal sounds (within 30 dB of its loudest) in which the lead split kept less
     than ``LEAD_LOSS_DB`` of it."""
     x, y = A.mono(original), A.mono(lead)
-    win = max(1, int(window_s * A.SR))
-    k = min(x.size, y.size) // win
-    if k == 0:
+    n = min(x.size, y.size)
+    if n == 0:
         return 0.0
-    xs = np.sqrt(np.mean(x[: k * win].reshape(k, win) ** 2, axis=1))
-    ys = np.sqrt(np.mean(y[: k * win].reshape(k, win) ** 2, axis=1))
+    win = max(1, int(window_s * A.SR))
+    k = -(-n // win)  # the last, partial window counts too (and a stem shorter than one window)
+    pad = k * win - n
+    counts = np.full(k, float(win))
+    counts[-1] = win - pad
+
+    def rms(signal: np.ndarray) -> np.ndarray:
+        power = np.pad(signal[:n].astype(np.float64) ** 2, (0, pad)).reshape(k, win).sum(axis=1)
+        return np.sqrt(power / counts)
+
+    xs, ys = rms(x), rms(y)
     active = xs > max(1e-6, xs.max() * 10 ** (-30 / 20))
     if not active.any():
         return 0.0

@@ -145,18 +145,19 @@ def apply_qa_fixes(plan: dict[str, Any], report: dict[str, Any], qa: dict[str, A
 
     # 2. Vocal louder over the beat than its own record allows: bring its clips back down to the limit.
     for track, room in sorted(headroom.items()):
-        if room > -0.5:
+        if room >= 0:  # QA warns on any excess over the limit
             continue
+        step = math.floor(round(room, 6) * 10) / 10  # rounded down to 0.1 dB, so the vocal lands at or under the limit
         lowered = []
         for clip in res.clips:
             if clip.track != track or clip.stem != "vocals" or clip.chop is not None or clip.source == "bed":
                 continue
             spec = plan["clips"][clip.index]
-            spec["gain_db"] = round(float(spec.get("gain_db", 0.0)) + room, 1)
-            auto["gain_db"][clip.id] = round(auto["gain_db"].get(clip.id, 0.0) + room, 1)
+            spec["gain_db"] = round(float(spec.get("gain_db", 0.0)) + step, 1)
+            auto["gain_db"][clip.id] = round(auto["gain_db"].get(clip.id, 0.0) + step, 1)
             lowered.append(clip.id)
         if lowered:
-            changes.append(f"vocal louder over the beat than on its own record: {room:.1f} dB on {', '.join(lowered)}")
+            changes.append(f"vocal louder over the beat than on its own record: {step:.1f} dB on {', '.join(lowered)}")
 
     # 3. A drop without contrast: take the bass and melody out of the bar before it.
     for flag in qa.get("flags", []):

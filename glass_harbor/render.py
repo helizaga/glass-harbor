@@ -638,10 +638,12 @@ def record_balance(track_id: str) -> float | None:
     return measured[0] if measured else None
 
 
-def vocal_balance(rendered: list["RenderedClip"], total: int) -> list[dict]:
+def vocal_balance(rendered: list["RenderedClip"], total: int, keep: tuple[int, int] | None = None) -> list[dict]:
     """Per vocal track: how loud it sits over everything that is not a vocal, where it sounds (LU), next to the same
     measure on its own record. Hit records keep the lead within a few dB of the band (Gerdes & Siedenburg, JASA
-    Express Letters 2023), so a vocal far louder than on its own record buries the beat."""
+    Express Letters 2023), so a vocal far louder than on its own record buries the beat. ``keep`` limits it to the
+    samples a range render keeps."""
+    lo, hi = keep or (0, total)
     vocals = [r for r in rendered if r.clip.stem == "vocals" and r.clip.chop is None]
     if not vocals:
         return []
@@ -657,7 +659,7 @@ def vocal_balance(rendered: list["RenderedClip"], total: int) -> list[dict]:
             if r.clip.track == track:
                 vocal[r.start_sample: r.start_sample + r.audio.shape[0]] += r.audio
                 ids.append(r.clip.id)
-        measured = _balance_lu(vocal, rest)
+        measured = _balance_lu(vocal[lo:hi], rest[lo:hi])
         if measured is not None:
             out.append({"track": track, "clips": ids, "mix_lu": measured[0], "record_lu": record_balance(track),
                         "active_s": measured[1]})
@@ -1172,8 +1174,14 @@ def render_plan(plan: dict[str, Any], out_dir: Path, *, start_bar: float | None 
         s1 = int(round((res.tempo.time_at(bar * bpb) + timeline_offset) * A.SR))
         if 0 <= s0 < total:
             bar_spans.append((bar, (s0, min(s1, total))))
+    crop_start, crop_end = 0, total
+    if start_bar is not None or end_bar is not None:
+        lo_t = res.tempo.time_at(((start_bar or 1) - 1) * bpb) + timeline_offset
+        crop_start = max(0, int(round(lo_t * A.SR)))
+        crop_end = total if end_bar is None else min(total, int(round(
+            (res.tempo.time_at(end_bar * bpb) + timeline_offset) * A.SR)))
     presence = vocal_presence(rendered, total, bar_spans)
-    balance = vocal_balance(rendered, total)
+    balance = vocal_balance(rendered, total, keep=(crop_start, crop_end))
     vocal_sum = np.zeros((total, 2), dtype=np.float32)
     for r in rendered:
         if r.clip.stem == "vocals" and r.clip.chop is None:
@@ -1211,12 +1219,7 @@ def render_plan(plan: dict[str, Any], out_dir: Path, *, start_bar: float | None 
     if master_spec.get("tame_harshness", True):
         mix = tame_harshness(mix)
 
-    crop_start = 0
     if start_bar is not None or end_bar is not None:
-        lo_t = res.tempo.time_at(((start_bar or 1) - 1) * bpb) + timeline_offset
-        crop_start = max(0, int(round(lo_t * A.SR)))
-        crop_end = total if end_bar is None else min(total, int(round(
-            (res.tempo.time_at(end_bar * bpb) + timeline_offset) * A.SR)))
         mix = mix[crop_start:crop_end]
     premaster = mix
 

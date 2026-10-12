@@ -207,6 +207,25 @@ def test_vocal_balance_reads_loudness_only_where_the_vocal_sounds(workspace):
     assert record_balance("song") == pytest.approx(6.0, abs=0.3)
 
 
+def test_range_renders_measure_vocal_balance_only_inside_the_range():
+    from types import SimpleNamespace
+
+    from glass_harbor.render import vocal_balance
+
+    rng = np.random.default_rng(4)
+    beat = (0.05 * rng.standard_normal((20 * A.SR, 2))).astype(np.float32)
+    rap = np.zeros_like(beat)
+    rap[: 8 * A.SR] = 0.1 * rng.standard_normal((8 * A.SR, 2))  # the vocal only sounds in the first 8 s
+
+    def clip(cid, stem, audio):
+        return SimpleNamespace(clip=SimpleNamespace(id=cid, stem=stem, chop=None, track=cid), start_sample=0,
+                               audio=audio)
+
+    rendered = [clip("bed", "instrumental", beat), clip("rap", "vocals", rap)]
+    assert [b["track"] for b in vocal_balance(rendered, beat.shape[0])] == ["rap"]
+    assert vocal_balance(rendered, beat.shape[0], keep=(10 * A.SR, 20 * A.SR)) == []  # not in the preview
+
+
 def test_qa_flags_a_vocal_far_louder_than_on_its_own_record(tmp_path):
     rng = np.random.default_rng(2)
     A.save(tmp_path / "mix.wav", (0.1 * rng.standard_normal((8 * A.SR, 2))).astype(np.float32))
