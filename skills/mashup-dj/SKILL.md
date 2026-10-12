@@ -100,7 +100,8 @@ glass-harbor match <track> --role next            # what blends well after this 
 ## 4. Scaffold, then make it musical
 
 Start with `glass-harbor auto <vocal> <bed>` unless the user wants a specific arrangement: it runs steps 1-4 and
-the render/QA loop. Its draft rules: choruses on drops when the song has real choruses; otherwise the song's own
+the render/QA loop. Its draft rules: choruses on drops when the song has real choruses (at the same tempo or in
+half/double time), with a second chant such as GLOCK's "shoot, shoot" saved for the last drop; otherwise the song's own
 order with verse 1 on the beat's first full section, a pause for each breakdown and a chopped-chant build into the
 next drop; a verse reprise when the back half is thin; the beat's own shouts answering where the acapella is
 silent; a half-time switch for one verse run on DnB beds; no extra DJ intro when the beat already has one. Fix
@@ -113,8 +114,9 @@ glass-harbor mix new <slug> --kind set --tracks <a> <b> <c> [--styles blend,echo
 ```
 
 Mashup scaffolds are structure-aware when the acapella has lyrics and the beat has energy/drop analysis:
-choruses (the most repeated lyric line) land on the beat's drops and full sections and never straddle a drop,
-verses fill 8-bar phrases, chops fill low-energy breakdowns, a short title line goes a cappella into a near-silent
+choruses (the most repeated lyric line, from the published lyrics when LRCLIB has them) land on the beat's drops
+and full sections and never straddle a drop, the end of the song's own intro leads into the first drop, verses fill
+8-bar phrases starting and ending at line boundaries, chops fill low-energy breakdowns, a short title line goes a cappella into a near-silent
 break before a drop, and drops get builds. Without that structure they fall back to back-to-back phrases.
 
 The scaffold is a starting point. Edit `mixes/<slug>/<slug>.mix.json` (format: `docs/plan-format.md`) and record

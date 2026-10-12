@@ -3,6 +3,8 @@
 - ``song_order``: rap songs built on short chants rather than long choruses keep their own order. The first verse
   lands on the beat's first full section, the intro and chants before it ride the build, and when the beat breaks
   down the vocal stops at a line ending and picks up again on the next drop.
+- ``reference_material``: choruses, a second chant, the intro, and line-aligned verse chunks from the published
+  lyrics, sized in output bars so the chorus-on-drop arranger works for half- and double-time pairings too.
 - ``own_intro_bars``: beats that already open with a beatless DJ intro don't get a second one.
 - ``add_reprise``: a back half left without vocals gets the end of the first verse again on its biggest section.
 - ``add_bed_answers``: the beat's own vocal shouts answer the acapella where it is silent.
@@ -27,6 +29,9 @@ VOCAL_HIGHPASS_HZ = 100.0
 MAX_CLIP_BARS = 12  # vocal bars per clip at most (long verses are split at line starts)
 BREATH_BARS = 0.1  # a gap between lines long enough to cut at (about 270 ms at 90 bpm)
 DRUMLESS_DB = 15.0  # drums this far under their median before the first drop: the record's own beatless intro
+HOOK_GAP_BARS = 4.5  # hook lines this close together (vocal bars) belong to one chorus
+PICKUP_BARS = 0.25  # a line starting this close before a bar line is a pickup into that bar
+SPILL_OUT_BARS = 0.5  # output bars a verse chunk may run past its 8 to finish a line
 BAR_TOLERANCE = 0.05  # a line starting a few ms before a bar line (a pickup, or 25.9999 for 26) belongs to that bar
 
 
@@ -74,6 +79,129 @@ def _hook_texts(lines: list[dict[str, Any]], *, min_count: int = 2) -> set[str]:
 
 def _first_drop(beat: dict[str, Any]) -> int | None:
     return next((int(d) for d in sorted(beat.get("drops", [])) if d >= 9), None)
+
+
+def _beat_floor(bar: float, ratio: float) -> float:
+    """Round a vocal position down to where its output still lands on a whole beat (a line timed a few ms
+    before a beat, within BAR_TOLERANCE, belongs to that beat)."""
+    step = max(1.0, 1.0 / ratio) / 4
+    return math.floor(bar / step + BAR_TOLERANCE / step) * step
+
+
+def _anchor(start: float) -> int:
+    """The vocal bar a line belongs to: the next one when it is a pickup into it, else the one it starts in."""
+    up = math.ceil(start - 1e-6)
+    return up if up - start <= PICKUP_BARS else math.floor(start + 1e-6)
+
+
+def reference_material(track_id: str, grid, ratio: float) -> dict[str, Any] | None:
+    """Choruses, a second chant, intro and verse chunks from the published lyrics, as blocks in vocal bars:
+    {"anchor": the vocal bar that lands on the section's first bar, "start", "end": what plays}.
+
+    The main hook is the most repeated line of 3+ different words (3+ times); a chorus runs from one of its occurrences
+    through the repeated lines that follow, and ends at a whole cycle. A chant is another repeated line that
+    mostly sits away from the main hook (GLOCK's "shoot, shoot"); its cycles end after the chant, not on the
+    call line before the next one. Verses are the remaining lines in 8-output-bar windows, each starting at a
+    line and ending at the next window's first line, so chunks join seamlessly when placed back to back and never
+    cut a word when they are not. None without a reference or a main hook."""
+    from collections import Counter
+
+    from glass_harbor.lyrics_ref import load_reference
+
+    reference = load_reference(track_id)
+    if not reference or not reference.get("lines"):
+        return None
+    lines = [{"start": grid.bar_at_time(ln["time"]), "end": grid.bar_at_time(ln["end"]), "text": ln["norm"]}
+             for ln in reference["lines"] if ln.get("norm")]
+    counts = Counter(ln["text"] for ln in lines)
+    first_at: dict[str, float] = {}
+    for ln in lines:
+        first_at.setdefault(ln["text"], ln["start"])
+    ranked = sorted((t for t, n in counts.items() if n >= 3), key=lambda t: (-counts[t], first_at[t]))
+    primary = next((t for t in ranked if len(set(t.split())) >= 3), None)  # a one-word chant is not a chorus
+    if primary is None:
+        return None
+    primary_starts = [ln["start"] for ln in lines if ln["text"] == primary]
+
+    def apart(text: str) -> float:
+        starts = [ln["start"] for ln in lines if ln["text"] == text]
+        return sum(all(abs(s - p) > HOOK_GAP_BARS for p in primary_starts) for s in starts) / len(starts)
+
+    chant = next((t for t in ranked if t != primary and len(t.split()) >= 2 and apart(t) >= 0.5), None)
+
+    def sections(text: str, stop: set[str]) -> list[tuple[float, float, list[float]]]:
+        """(start, end, cycle cuts) of each run of ``text`` occurrences."""
+        clusters: list[list[int]] = []
+        for i, ln in enumerate(lines):
+            if ln["text"] != text:
+                continue
+            if clusters and ln["start"] - lines[clusters[-1][-1]]["start"] <= HOOK_GAP_BARS:
+                clusters[-1].append(i)
+            else:
+                clusters.append([i])
+        out = []
+        for cluster in clusters:
+            j = cluster[-1] + 1
+            while j < len(lines) and counts[lines[j]["text"]] >= 2 and lines[j]["text"] not in stop | {text}:
+                j += 1
+            cuts = []
+            for i in cluster[1:]:
+                # End a cycle before the next occurrence, or before its call line when that line is a one-off.
+                k = i - 1 if i - 1 > cluster[0] and counts[lines[i - 1]["text"]] == 1 else i
+                cuts.append(lines[k]["start"])
+            cuts.append(lines[j - 1]["end"])
+            out.append((lines[cluster[0]]["start"], lines[j - 1]["end"], cuts))
+        return out
+
+    def block(start: float, cuts: list[float], target_out: float) -> dict[str, float] | None:
+        anchor = _anchor(start)
+        cap = anchor + target_out / ratio
+        fitting = [c for c in cuts if c <= cap + 2 * SPILL_OUT_BARS / ratio]
+        if not fitting:
+            return None
+        end = min(_beat_floor(max(fitting), ratio), cap)
+        if (end - anchor) * ratio < 8:
+            return None
+        return {"anchor": anchor, "start": _beat_floor(start, ratio), "end": end}
+
+    hook_sections = sections(primary, {chant} if chant else set())
+    chant_sections = sections(chant, {primary}) if chant else []
+    choruses = [b for b in (block(s, cuts, 16) for s, _, cuts in hook_sections) if b]
+    if not choruses:
+        return None
+    chants = [[b for b in (block(s, cuts, target) for target in (24, 16)) if b] for s, _, cuts in chant_sections]
+    covered = [(s, e) for s, e, _ in hook_sections + chant_sections]
+
+    runs: list[list[dict[str, Any]]] = [[]]
+    for ln in lines:
+        if any(a - 1e-6 <= ln["start"] < b for a, b in covered):
+            if runs[-1]:
+                runs.append([])
+        else:
+            runs[-1].append(ln)
+    width = 8 / ratio
+
+    def chunks(run: list[dict[str, Any]]) -> list[dict[str, float]]:
+        anchor = _anchor(run[0]["start"])
+        groups: dict[int, list[dict[str, Any]]] = {}
+        for ln in run:
+            groups.setdefault(math.floor((ln["start"] + PICKUP_BARS - anchor) / width + 1e-6), []).append(ln)
+        keys = sorted(groups)
+        out = []
+        for n, k in enumerate(keys):
+            window = anchor + k * width
+            nxt = groups[keys[n + 1]][0]["start"] if n + 1 < len(keys) else groups[k][-1]["end"]
+            begin = _beat_floor(groups[k][0]["start"], ratio)
+            end = min(_beat_floor(nxt, ratio), window + width + SPILL_OUT_BARS / ratio)
+            if end > begin:
+                out.append({"anchor": window, "start": begin, "end": end})
+        return out
+
+    first_hook = min(s for s, _ in covered)
+    intro = [c for run in runs if run and run[0]["start"] < first_hook for c in chunks(run)]
+    verses = [c for run in runs if run and run[0]["start"] >= first_hook for c in chunks(run)]
+    return {"choruses": choruses, "chants": [c for c in chants if c], "intro": intro, "verses": verses,
+            "hook_text": primary, "chant_text": chant}
 
 
 def full_start(beat: dict[str, Any]) -> int | None:

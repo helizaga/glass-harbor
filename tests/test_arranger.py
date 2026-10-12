@@ -82,3 +82,70 @@ def test_hook_ending_on_the_next_drop_does_not_hang(workspace):
         signal.alarm(0)
         signal.signal(signal.SIGALRM, previous)
     assert resolve(plan).ok
+
+
+def _double_time_song(workspace):
+    """A 75 bpm vocal (3.2 s bars) with a published hook, a "shoot" chant answered by one-off call lines, an intro,
+    and verses; and a 150 bpm beat with drops at 17, 49, and 81."""
+    from glass_harbor.lyrics_ref import parse_synced, reference_path
+
+    taste = load_taste()
+    taste["defaults"]["dj_edge_bars"] = 0
+    save_taste(taste)
+    write_fake_track("vox", bpm=75, key="Am", bars=48)
+    write_fake_track("beat", bpm=150, key="Am", bars=96, stems=("instrumental",))
+    meta = library.load_meta("vox")
+    meta["title"] = "Glock Test"
+    library.save_meta("vox", meta)
+    at = lambda bar: (bar - 1) * 3.2  # noqa: E731
+    lines = [(1.0, "intro line number one"), (3.0, "intro line number two"), (5.0, "intro line number three"),
+             (7.0, "intro line number four")]
+    for cycle in (9.4, 13.4, 25.4, 29.4):
+        lines += [(cycle, "hold my glock in the club"), (cycle + 1, "they wanna show me love"), (cycle + 2.5, "oh oh")]
+    lines += [(17.4, "first verse line"), (19.4, "second verse line"), (21.4, "third verse line"),
+              (23.4, "fourth verse line"), (33.4, "a verse two line")]
+    for n, shoot in enumerate((35.9, 37.9, 39.9, 41.9, 43.9, 45.9)):
+        lines.append((shoot, "shoot shoot shoot"))
+        lines.append((shoot + 1.1, f"call line number {n}"))
+    lines[-1] = (47.0, "outro words here")
+    lines.sort()
+    lrc = "\n".join(f"[{int(at(b) // 60):02d}:{at(b) % 60:05.2f}] {text}" for b, text in lines)
+    reference_path("vox").write_text(json.dumps({"source": "test", "lines": parse_synced(lrc)}))
+    segments = [{"start": at(b), "end": at(b) + 1.0, "text": text,
+                 "words": [{"word": w, "start": at(b) + 0.2 * i, "end": at(b) + 0.2 * i + 0.15, "prob": 1}
+                           for i, w in enumerate(text.split())]} for b, text in lines]
+    lyrics_path("vox").write_text(json.dumps({"segments": segments}))
+    beat = library.load_analysis("beat")
+    beat["bar_db"] = [-11.0] * 16 + [-8.0] * 80
+    beat["drops"] = [17, 49, 81]
+    library.save_analysis("beat", beat)
+
+
+def test_published_lyrics_give_choruses_a_chant_and_line_aligned_verses(workspace):
+    from glass_harbor.arrange import reference_material
+    from glass_harbor.grid import Grid
+
+    _double_time_song(workspace)
+    material = reference_material("vox", Grid.from_dict(library.load_analysis("vox")["grid"]), 2.0)
+    assert material["hook_text"] == "hold my glock in the club" and material["chant_text"] == "shoot shoot shoot"
+    # Two whole cycles fill 16 output bars; the line just before bar 9 is not part of it (start at beat 2).
+    assert material["choruses"][0] == {"anchor": 9, "start": 9.25, "end": 17}
+    chant24, chant16 = material["chants"][0]
+    assert chant24["anchor"] == 36 and chant24["start"] == 35.75  # a pickup into bar 36
+    assert chant16["end"] == 43.0  # ends after a "shoot", never on the call line that sets up the next one
+    first, second = material["verses"][:2]
+    assert first["start"] == 17.25 and first["end"] == second["start"] == 21.25  # seamless back to back
+    assert material["intro"][-1]["anchor"] == 5
+
+
+def test_double_time_draft_puts_hooks_on_drops_and_the_chant_on_the_last(workspace):
+    _double_time_song(workspace)
+    plan = build_mashup("vox", "beat")
+    res = resolve(plan)
+    assert res.ok, [i.to_dict() for i in res.issues if i.level == "error"]
+    assert not [i for i in res.issues if "overlap" in i.message]
+    vocals = {c["id"]: c for c in plan["clips"] if c.get("stem") == "vocals"}
+    assert vocals["hook1"]["at_bar"] == 17.5 and vocals["hook2"]["at_bar"] == 49.5  # bar 9 on the drop, sung from beat 2
+    assert vocals["chant1"]["at_bar"] == 81 and vocals["chant1"]["pre_beats"] == 1
+    assert vocals["intro1"]["at_bar"] + vocals["intro1"]["bars"] * 2 <= 17.5  # the intro leads into the first drop
+    assert any("chant takes the bar-81 drop" in n for n in plan["notes"])
