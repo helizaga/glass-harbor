@@ -6,6 +6,8 @@ positions for chops. Transcripts stay in the gitignored library; never copy lyri
 
 from __future__ import annotations
 
+import functools
+
 import json
 import re
 from collections import Counter
@@ -70,18 +72,21 @@ def whisper_backend() -> str | None:
     return None
 
 
-def _segments_mlx(signal: np.ndarray, model: str, language: str | None) -> list[dict[str, Any]]:
+def _segments_mlx(signal: np.ndarray, model: str, language: str | None,
+                  no_speech_threshold: float | None = 0.6) -> list[dict[str, Any]]:
     import mlx_whisper
 
     result = mlx_whisper.transcribe(signal, path_or_hf_repo=model, word_timestamps=True, language=language,
                                     condition_on_previous_text=False, hallucination_silence_threshold=2.0,
-                                    verbose=None)
+                                    no_speech_threshold=no_speech_threshold, verbose=None)
     return [{"text": seg["text"], "words": [{"word": w["word"], "start": w["start"], "end": w["end"],
                                              "probability": w.get("probability", 0.0)} for w in seg.get("words", [])]}
             for seg in result.get("segments", [])]
 
 
-def _segments_faster(signal: np.ndarray, model: str, language: str | None) -> list[dict[str, Any]]:
+@functools.lru_cache(maxsize=2)
+def _faster_model(model: str) -> Any:
+    """Loaded once per process: the listening pass transcribes a mix in many short slices."""
     from faster_whisper import WhisperModel
 
     try:
@@ -90,17 +95,25 @@ def _segments_faster(signal: np.ndarray, model: str, language: str | None) -> li
         device = "cuda" if torch.cuda.is_available() else "cpu"
     except ImportError:
         device = "cpu"
-    whisper = WhisperModel(model, device=device, compute_type="float16" if device == "cuda" else "int8")
+    return WhisperModel(model, device=device, compute_type="float16" if device == "cuda" else "int8")
+
+
+def _segments_faster(signal: np.ndarray, model: str, language: str | None,
+                     no_speech_threshold: float | None = 0.6) -> list[dict[str, Any]]:
+    whisper = _faster_model(model)
     segments, _ = whisper.transcribe(signal, language=language, word_timestamps=True,
-                                     condition_on_previous_text=False, hallucination_silence_threshold=2.0)
+                                     condition_on_previous_text=False, hallucination_silence_threshold=2.0,
+                                     no_speech_threshold=no_speech_threshold)
     return [{"text": seg.text, "words": [{"word": w.word, "start": w.start, "end": w.end,
                                           "probability": w.probability} for w in (seg.words or [])]}
             for seg in segments]
 
 
 def transcribe_audio(audio: np.ndarray, *, model: str | None = None, language: str | None = "en",
-                     backend: str | None = None) -> tuple[list[dict[str, Any]], str, str]:
-    """Whisper with word timestamps on any audio at ``A.SR``. Returns (raw segments, model, backend)."""
+                     backend: str | None = None, no_speech_threshold: float | None = 0.6
+                     ) -> tuple[list[dict[str, Any]], str, str]:
+    """Whisper with word timestamps on any audio at ``A.SR``. Returns (raw segments, model, backend).
+    ``no_speech_threshold=None`` never skips a window as silent (vocals under a loud beat can look like music)."""
     import soxr
 
     backend = backend or whisper_backend()
@@ -109,9 +122,9 @@ def transcribe_audio(audio: np.ndarray, *, model: str | None = None, language: s
     signal = soxr.resample(A.mono(audio), A.SR, WHISPER_SR).astype(np.float32)
     if backend == "mlx":
         model = model or DEFAULT_MODEL
-        return _segments_mlx(signal, model, language), model, backend
+        return _segments_mlx(signal, model, language, no_speech_threshold), model, backend
     model = model or FASTER_WHISPER_MODEL
-    return _segments_faster(signal, model, language), model, backend
+    return _segments_faster(signal, model, language, no_speech_threshold), model, backend
 
 
 def transcribe(track_id: str, *, model: str | None = None, language: str | None = "en",

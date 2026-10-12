@@ -394,3 +394,43 @@ def test_a_single_weak_reading_gets_a_second_listen_before_it_counts(monkeypatch
     monkeypatch.setattr(auto, "_listen", second_reading(["hook1"]))
     changes, latest = auto.fix_round(plan, *clean, {"weak": ["hook1"]}, None, workspace, lambda m: None)
     assert plan["clips"][-1]["gain_db"] == 2.0 and latest == {"hook1"}  # confirmed by the second reading
+
+
+def test_hearing_works_slice_by_slice_and_takes_each_overlap_word_once():
+    import numpy as np
+
+    from glass_harbor import audio as A
+    from glass_harbor.listen import SLICE_S, hear, vocal_spans  # noqa: F401
+
+    calls = []
+
+    def fake_transcribe(audio):
+        calls.append(audio.shape[0] / A.SR)
+        # a word every second of the slice, named by its offset into the slice
+        return [{"text": "", "words": [{"word": f"w{int(s)}", "start": float(s), "end": s + 0.3}
+                                       for s in range(int(audio.shape[0] / A.SR))]}], "m", "b"
+
+    audio = np.zeros((int(80 * A.SR), 2), dtype=np.float32)
+    heard, model, backend = hear(audio, [(10.0, 50.0)], transcribe=fake_transcribe)
+    assert all(c <= SLICE_S + 1e-6 for c in calls) and len(calls) == 2  # 9-51 s heard as two slices
+    times = [t for _, t in heard]
+    assert times == sorted(times) and len(times) == len(set(times))  # nothing doubled where slices overlap
+    assert times[0] == 9.0 and times[-1] == 50.0 and model == "m"
+
+
+def test_a_shifted_reading_moves_the_slice_boundaries():
+    import numpy as np
+
+    from glass_harbor import audio as A
+    from glass_harbor.listen import hear
+
+    lengths = []
+
+    def fake_transcribe(audio):
+        lengths.append(round(audio.shape[0] / A.SR, 1))
+        return [], "m", "b"
+
+    audio = np.zeros((int(80 * A.SR), 2), dtype=np.float32)
+    hear(audio, [(10.0, 50.0)], transcribe=fake_transcribe)
+    hear(audio, [(10.0, 50.0)], shift_s=10.0, transcribe=fake_transcribe)
+    assert lengths[0] == 28.0 and lengths[2] == 18.0  # the second reading's first cut comes 10 s earlier

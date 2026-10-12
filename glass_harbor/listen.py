@@ -1,7 +1,9 @@
 """An AI listening pass with the model already on this machine (no extra download).
 
 Whisper transcribes the finished mix, and each vocal clip's own lyrics are checked against what it hears at that
-moment. A clip whose words Whisper cannot make out over the beat is masked for a listener too. ``vocal_presence``
+moment. It hears the vocal sections in slices shorter than its 30-second window: decoding a whole busy mix in one
+pass dropped entire stretches (the first 42 seconds of GLOCK over Stay With Me read as nothing, yet the same audio
+sliced read almost word for word). A clip whose words Whisper cannot make out over the beat is masked for a listener too. ``vocal_presence``
 measures level in the 1-4 kHz band; this measures whether the words actually survive the beat, the reverb, and the
 master. Results go to ``listen.json`` in the run folder; QA flags weak clips and ``glass-harbor auto`` lifts them.
 """
@@ -20,6 +22,57 @@ MATCH_WINDOW_S = 0.6  # a heard word counts if it is the same word within this d
 MIN_WORDS = 8  # clips with fewer expected words are too short to judge
 WEAK_RECALL = 0.5
 RELATIVE_DROP = 0.15
+SLICE_S = 28.0  # under Whisper's 30 s window, so each slice is decoded in one pass
+SLICE_OVERLAP_S = 1.0  # neighbouring slices overlap; a word in the overlap is taken from the earlier slice's half
+SLICE_PAD_S = 1.0  # audio kept around each vocal section
+MERGE_GAP_S = 2.0  # vocal sections closer than this are heard as one
+
+
+def vocal_spans(res: Any, offset_s: float) -> list[tuple[float, float]]:
+    """Output-time spans (seconds) that carry vocals, merged when they nearly touch."""
+    spans = sorted((res.tempo.time_at(c.out_start_beat) + offset_s,
+                    res.tempo.time_at(c.out_start_beat + c.src_beats * c.out_beats_per_src_beat) + offset_s)
+                   for c in res.clips if c.stem == "vocals" and c.chop is None and c.loop == 1)
+    merged: list[tuple[float, float]] = []
+    for a, b in spans:
+        if merged and a <= merged[-1][1] + MERGE_GAP_S:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], b))
+        else:
+            merged.append((a, b))
+    return merged
+
+
+def hear(audio: np.ndarray, spans: list[tuple[float, float]], *, shift_s: float = 0.0, transcribe=None
+         ) -> tuple[list[tuple[str, float]], str | None, str | None]:
+    """(word, output time) for everything Whisper hears inside ``spans``, slice by slice. ``shift_s`` shortens each
+    span's first slice, so a second reading of a long section cuts it at different places. Slices start at the
+    vocal: one that opens on a long instrumental stretch can be skipped as silent."""
+    import functools
+
+    from glass_harbor.lyrics import _normalize, transcribe_audio
+
+    transcribe = transcribe or functools.partial(transcribe_audio, no_speech_threshold=None)
+    duration = audio.shape[0] / A.SR
+    heard: list[tuple[str, float]] = []
+    model = backend = None
+    for a, b in spans:
+        a, b = max(0.0, a - SLICE_PAD_S), min(duration, b + SLICE_PAD_S)
+        t, first = a, True
+        while t < b - 1e-6:
+            length = SLICE_S - (shift_s % (SLICE_S / 2) if first else 0.0)
+            end = min(b, t + length)
+            keep_from = t if first else t + SLICE_OVERLAP_S / 2
+            keep_to = end - SLICE_OVERLAP_S / 2 if end < b else end
+            raw, model, backend = transcribe(audio[int(t * A.SR):int(end * A.SR)])
+            for seg in raw:
+                for w in seg["words"]:
+                    word, at = _normalize(w["word"]), t + float(w["start"])
+                    if word and keep_from <= at < keep_to:
+                        heard.append((word, at))
+            if end >= b:
+                break
+            t, first = end - SLICE_OVERLAP_S, False
+    return heard, model, backend
 
 
 def match_words(expected: list[tuple[str, float]], heard: list[tuple[str, float]], *,
@@ -82,9 +135,9 @@ def _expected_reference(res: Any, clip: Any, reference: dict[str, Any], offset_s
 
 
 def listen_run(run_dir: Path, *, log=print, shift_s: float = 0.0) -> dict[str, Any]:
-    """Transcribe ``run_dir``'s mix and score every vocal clip. Writes and returns listen.json. ``shift_s`` of
-    silence in front moves Whisper's 30-second windows, for an independent second reading of the same render."""
-    from glass_harbor.lyrics import _normalize, load_lyrics, transcribe_audio
+    """Transcribe ``run_dir``'s mix and score every vocal clip. Writes and returns listen.json. ``shift_s`` moves
+    where the slices start, for an independent second reading of the same render."""
+    from glass_harbor.lyrics import load_lyrics
     from glass_harbor.plan import resolve
 
     report = json.loads((run_dir / "render.json").read_text())
@@ -93,13 +146,8 @@ def listen_run(run_dir: Path, *, log=print, shift_s: float = 0.0) -> dict[str, A
     plan = json.loads((run_dir / "plan.json").read_text())
     res = resolve(plan)
     log(f"listening to {run_dir.name} (Whisper on the finished mix)")
-    audio = A.load(run_dir / report["files"]["wav"])
-    if shift_s > 0:
-        audio = np.concatenate([np.zeros((int(shift_s * A.SR), audio.shape[1]), dtype=audio.dtype), audio])
-    raw, model, backend = transcribe_audio(audio)
-    heard = [(_normalize(w["word"]), float(w["start"]) - shift_s) for seg in raw for w in seg["words"]
-             if _normalize(w["word"])]
     offset = float(report.get("timeline_offset_s", 0.0))
+    heard, model, backend = hear(A.load(run_dir / report["files"]["wav"]), vocal_spans(res, offset), shift_s=shift_s)
     clips = []
     lyrics_cache: dict[str, Any] = {}
     for clip in res.clips:
