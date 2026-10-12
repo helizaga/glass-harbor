@@ -32,7 +32,7 @@ def vocal_spans(res: Any, offset_s: float) -> list[tuple[float, float]]:
     """Output-time spans (seconds) that carry vocals, merged when they nearly touch."""
     spans = sorted((res.tempo.time_at(c.out_start_beat) + offset_s,
                     res.tempo.time_at(c.out_start_beat + c.src_beats * c.out_beats_per_src_beat) + offset_s)
-                   for c in res.clips if c.stem == "vocals" and c.chop is None and c.loop == 1)
+                   for c in res.clips if c.stem == "vocals" and c.source != "bed" and c.chop is None and c.loop == 1)
     merged: list[tuple[float, float]] = []
     for a, b in spans:
         if merged and a <= merged[-1][1] + MERGE_GAP_S:

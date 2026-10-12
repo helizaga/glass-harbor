@@ -158,3 +158,33 @@ def test_short_edit_trims_the_run_up_and_tail_and_drops_a_repeated_hook_section(
     assert edit["start_bar"] == 5 and edit["end_bar"] == 109  # 4 bars of run-up; 4 faded bars after the chant
     assert edit["cuts"] == [(65.5, 81.5)]  # drop 66's repeated hook goes; the chant's pickup into 82 stays
     assert edit["duration_s"] < edit["full_s"] and abs(edit["duration_s"] - (109 - 5 - 16) * 1.6) < 0.01
+
+
+def test_short_edit_never_cuts_the_last_copy_of_a_hook(workspace):
+    from glass_harbor.edit import plan_short_edit
+    from glass_harbor.plan import resolve
+    from conftest import write_fake_track
+
+    write_fake_track("vox", bpm=75, key="Am", bars=48)
+    write_fake_track("beat", bpm=150, key="Am", bars=160, stems=("instrumental",))
+
+    def vox(clip_id, frm, bars, at):
+        return {"id": clip_id, "source": "vox", "stem": "vocals", "from_bar": frm, "bars": bars, "at_bar": at}
+
+    plan = {"version": 1, "kind": "mashup", "bpm": 150, "sources": {"vox": {"track": "vox", "tempo_ratio": 2.0},
+                                                                    "bed": {"track": "beat"}},
+            "clips": [{"id": "bed", "source": "bed", "stem": "instrumental", "from_bar": 1, "bars": 150, "at_bar": 1},
+                      vox("verse1", 1, 8, 9),
+                      vox("hookA", 20, 8, 33), vox("hookB", 20, 8, 49),  # the only two copies of this hook
+                      vox("longer", 30, 8, 65), vox("shorter", 30, 4, 81),  # same start, the first one longer
+                      vox("verse2", 40, 8, 97)]
+            + [{"id": f"impact-{d}", "generate": "impact", "at_bar": d, "bars": 2} for d in (9, 33, 49, 65, 81, 97)]}
+    res = resolve(plan)
+    assert res.ok, [i.message for i in res.issues if i.level == "error"]
+    edit = plan_short_edit(plan, res, target_s=60)
+
+    def cut(bar):
+        return any(a <= bar < b for a, b in edit["cuts"])
+
+    assert edit["cuts"] and not (cut(33) and cut(49))  # one copy of the hook stays
+    assert not cut(65)  # "longer" carries material "shorter" does not

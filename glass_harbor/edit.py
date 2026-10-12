@@ -14,6 +14,7 @@ clip. Without enough to remove there is no short edit.
 
 from __future__ import annotations
 
+import json
 import math
 from typing import Any
 
@@ -33,7 +34,8 @@ def plan_short_edit(plan: dict[str, Any], res: Any, *, target_s: float = TARGET_
     "full_s"} or None."""
     bpb = res.beats_per_bar
     bar = lambda beat: 1 + beat / bpb  # noqa: E731
-    vocal = sorted((bar(c.out_start_beat), bar(c.out_end_beat), c) for c in res.clips if c.stem == "vocals")
+    vocal = sorted(((bar(c.out_start_beat), bar(c.out_end_beat), c) for c in res.clips if c.stem == "vocals"),
+                   key=lambda v: (v[0], v[1]))
     if not vocal or not res.clips:
         return None
     end_all = max(bar(c.out_end_beat) for c in res.clips)
@@ -46,11 +48,27 @@ def plan_short_edit(plan: dict[str, Any], res: Any, *, target_s: float = TARGET_
     end = min(end_all, 1 + 4 * math.ceil((last - 1) / 4 - 1e-9) + TAIL_BARS)
     total = seconds(start, end)
 
-    def repeats(clip: Any, kept: list[Any]) -> bool:
+    def material(clip: Any) -> tuple[Any, ...]:
+        """What a clip plays: its source range in vocal bars, or its exact chop slices."""
+        spec = clip.spec
+        if "chop" in spec:
+            return ("chop", clip.source, json.dumps(spec["chop"], sort_keys=True))
+        start = float(spec.get("from_bar", 0)) - float(spec.get("pre_beats", 0)) / 4
+        return ("range", clip.source, spec.get("stem"), start, float(spec.get("from_bar", 0)) + float(spec["bars"]))
+
+    def heard_elsewhere(clip: Any, kept: list[Any]) -> bool:
+        """The clip's material plays in full in a clip that stays."""
         if clip.source == "bed":
             return True  # the beat's own shouts are effects, not content
-        key = (clip.source, clip.spec.get("from_bar"), clip.spec.get("stem"))
-        return any((k.source, k.spec.get("from_bar"), k.spec.get("stem")) == key for k in kept)
+        mine = material(clip)
+        for other in kept:
+            theirs = material(other)
+            if mine[0] == "chop" and theirs == mine:
+                return True
+            if mine[0] == "range" and theirs[:3] == mine[:3] and theirs[3] <= mine[3] + 1e-6 \
+                    and theirs[4] >= mine[4] - 1e-6:
+                return True
+        return False
 
     drops = sorted(float(c["at_bar"]) for c in plan["clips"] if c.get("generate") == "impact")
     candidates = []
@@ -59,16 +77,19 @@ def plan_short_edit(plan: dict[str, Any], res: Any, *, target_s: float = TARGET_
         a, b = d0 - lead, d1 - lead
         if not start < a < b < end or any(s < x < e - 1e-6 for s, e, _ in vocal for x in (a, b)):
             continue
-        inside = [c for s, e, c in vocal if a <= s and e <= b]
-        kept = [c for s, e, c in vocal if not (a <= s and e <= b)]
-        if all(repeats(c, kept) for c in inside):
-            candidates.append((a, b))
-    cuts = []
+        candidates.append((a, b))
+    cuts: list[tuple[float, float]] = []
+    removed = lambda s, e: e <= start or s >= end or any(a <= s and e <= b for a, b in cuts)  # noqa: E731
     for a, b in sorted(candidates, key=lambda ab: ab[0] - ab[1]):  # biggest first
         if total <= target_s:
             break
-        cuts.append((a, b))
-        total -= seconds(a, b)
+        # Judge against what will still play once the cuts already taken are made, so the last copy of a hook
+        # is never cut.
+        inside = [c for s, e, c in vocal if a <= s and e <= b]
+        kept = [c for s, e, c in vocal if not removed(s, e) and not (a <= s and e <= b)]
+        if all(heard_elsewhere(c, kept) for c in inside):
+            cuts.append((a, b))
+            total -= seconds(a, b)
     if full_s - total < MIN_SAVING_S:
         return None
     cuts.sort()
