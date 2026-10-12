@@ -278,15 +278,23 @@ def _chant_build(lyrics: dict[str, Any], lines: list[dict[str, Any]], hooks: set
 
 def own_intro_bars(beat: dict[str, Any]) -> int:
     """Bars of beatless intro the record opens with (no kick or bass), rounded down to 8s. With a drum stem: the
-    bars before the first drop when the drums there sit DRUMLESS_DB under their usual level (a light shaker or a
-    pad-only bass doesn't make a beat)."""
+    bars from the start (up to the first drop) where the drums sit DRUMLESS_DB under their usual level, allowing
+    a one-bar fill into the drop (a light shaker or a pad-only bass doesn't make a beat)."""
     low = beat.get("low_db") or []
     if len(low) < 16:
         return 0
     drums = ((beat.get("stems") or {}).get("drums") or {}).get("bar_db") or []
     first_drop = _first_drop(beat)
-    if drums and first_drop and np.mean(drums[:first_drop - 1]) <= np.median(drums) - DRUMLESS_DB:
-        return ((first_drop - 1) // 8) * 8
+    if drums and first_drop:
+        quiet_below = float(np.median(drums)) - DRUMLESS_DB
+        limit = min(first_drop - 1, len(drums))
+        quiet = 0
+        while quiet < limit and drums[quiet] <= quiet_below:
+            quiet += 1
+        if quiet == limit - 1:
+            quiet = limit  # a one-bar drum fill into the drop still belongs to the intro
+        if quiet >= 8:
+            return (quiet // 8) * 8
     median = float(np.median(low))
     bars = 0
     while bars < len(low) and low[bars] < median - 10:

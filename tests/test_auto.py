@@ -46,6 +46,11 @@ def test_own_intro_bars():
     assert arrange.own_intro_bars(soft) == 16
     busy = {**soft, "stems": {"drums": {"bar_db": [-22.0] * 16 + [-13.0] * 100}}}  # SWARM: real drums before it
     assert arrange.own_intro_bars(busy) == 0
+    fill = {**soft, "stems": {"drums": {"bar_db": [-45.0] * 15 + [-27.0] + [-21.0] * 100}}}  # a fill into the drop
+    assert arrange.own_intro_bars(fill) == 16
+    groove = {"low_db": [-27.0] * 32 + [-17.0] * 100, "drops": [33],
+              "stems": {"drums": {"bar_db": [-45.0] * 24 + [-21.0] * 108}}}  # drums in 8 bars before the drop
+    assert arrange.own_intro_bars(groove) == 24
 
 
 def test_a_verse_groove_after_the_first_drop_is_full():
@@ -365,3 +370,27 @@ def test_a_clip_counts_as_masked_only_when_it_reads_weak_twice_running():
     assert steady_weak({"hook5"}, {"weak": ["verse2"]}) == {"weak": []}  # a different clip each time: noise
     assert steady_weak({"hook5", "verse2"}, {"weak": ["verse2"]}) == {"weak": ["verse2"]}
     assert steady_weak({"verse2"}, None) == {"weak": []}
+
+
+def test_a_single_weak_reading_gets_a_second_listen_before_it_counts(monkeypatch, workspace):
+    from glass_harbor import auto
+
+    _chant_song(workspace)
+    plan = _plan_with_stems(workspace)
+    plan["clips"].append({"id": "hook1", "source": "vox", "stem": "vocals", "from_bar": 1, "bars": 5, "at_bar": 23,
+                          "chain": "hook"})
+    shifts = []
+
+    def second_reading(weak):
+        def fake_listen(run_dir, log, *, shift_s=0.0):
+            shifts.append(shift_s)
+            return {"weak": weak}
+        return fake_listen
+
+    clean = {"vocal_presence": []}, {"flags": []}
+    monkeypatch.setattr(auto, "_listen", second_reading([]))
+    changes, latest = auto.fix_round(plan, *clean, {"weak": ["hook1"]}, None, workspace, lambda m: None)
+    assert changes == [] and latest == set() and shifts == [auto.LISTEN_SHIFT_S]  # noise: the re-listen disagreed
+    monkeypatch.setattr(auto, "_listen", second_reading(["hook1"]))
+    changes, latest = auto.fix_round(plan, *clean, {"weak": ["hook1"]}, None, workspace, lambda m: None)
+    assert plan["clips"][-1]["gain_db"] == 2.0 and latest == {"hook1"}  # confirmed by the second reading

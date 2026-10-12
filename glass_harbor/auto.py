@@ -181,7 +181,24 @@ def steady_weak(previous: set[str] | None, heard: dict[str, Any] | None) -> dict
     return {"weak": sorted(weak & previous) if previous is not None else []}
 
 
-def _listen(run_dir: Path, log: Log) -> dict[str, Any] | None:
+def fix_round(plan: dict[str, Any], report: dict[str, Any], qa: dict[str, Any], heard: dict[str, Any] | None,
+              previous_weak: set[str] | None, run_dir: Path, log: Log) -> tuple[list[str], set[str]]:
+    """One round of QA fixes. Returns (changes, the weak clips of the latest reading)."""
+    steady = steady_weak(previous_weak, heard)
+    latest = heard
+    changes = apply_qa_fixes(plan, report, qa, steady)
+    if not changes and set((heard or {}).get("weak", [])) - set(steady["weak"]):
+        # A clip read weak once and nothing else changes this round: listen to the same render again with Whisper's
+        # windows shifted before calling it noise (re-rendering an unchanged plan would give the same audio).
+        latest = _listen(run_dir, log, shift_s=LISTEN_SHIFT_S)
+        changes = apply_qa_fixes(plan, report, qa, steady_weak(set(heard["weak"]), latest))
+    return changes, set((latest or {}).get("weak", []))
+
+
+LISTEN_SHIFT_S = 15.0  # half a Whisper window: the second reading cuts the audio at different places
+
+
+def _listen(run_dir: Path, log: Log, *, shift_s: float = 0.0) -> dict[str, Any] | None:
     """Whisper intelligibility of the finished mix (skipped when no Whisper backend is installed)."""
     from glass_harbor.listen import listen_run
     from glass_harbor.lyrics import whisper_backend
@@ -189,7 +206,7 @@ def _listen(run_dir: Path, log: Log) -> dict[str, Any] | None:
     if whisper_backend() is None:
         log("no Whisper backend installed: skipping the listening pass")
         return None
-    return listen_run(run_dir, log=log)
+    return listen_run(run_dir, log=log, shift_s=shift_s)
 
 
 # ---------------------------------------------------------------- brief
@@ -282,9 +299,7 @@ def run_auto(vocal: str, bed: str, *, slug: str | None = None, title: str = "", 
         qa = check_run(run_dir)
         if round_index == rounds:
             break
-        steady = steady_weak(previous_weak, heard)
-        previous_weak = set((heard or {}).get("weak", []))
-        changes = apply_qa_fixes(plan, report, qa, steady)
+        changes, previous_weak = fix_round(plan, report, qa, heard, previous_weak, run_dir, log)
         history.append(changes)
         if not changes:
             break

@@ -81,8 +81,9 @@ def _expected_reference(res: Any, clip: Any, reference: dict[str, Any], offset_s
     return [(w, to_out(a), to_out(b)) for w, a, b in expected_words(reference, src[0], src[-1])]
 
 
-def listen_run(run_dir: Path, *, log=print) -> dict[str, Any]:
-    """Transcribe ``run_dir``'s mix and score every vocal clip. Writes and returns listen.json."""
+def listen_run(run_dir: Path, *, log=print, shift_s: float = 0.0) -> dict[str, Any]:
+    """Transcribe ``run_dir``'s mix and score every vocal clip. Writes and returns listen.json. ``shift_s`` of
+    silence in front moves Whisper's 30-second windows, for an independent second reading of the same render."""
     from glass_harbor.lyrics import _normalize, load_lyrics, transcribe_audio
     from glass_harbor.plan import resolve
 
@@ -92,8 +93,12 @@ def listen_run(run_dir: Path, *, log=print) -> dict[str, Any]:
     plan = json.loads((run_dir / "plan.json").read_text())
     res = resolve(plan)
     log(f"listening to {run_dir.name} (Whisper on the finished mix)")
-    raw, model, backend = transcribe_audio(A.load(run_dir / report["files"]["wav"]))
-    heard = [(_normalize(w["word"]), float(w["start"])) for seg in raw for w in seg["words"] if _normalize(w["word"])]
+    audio = A.load(run_dir / report["files"]["wav"])
+    if shift_s > 0:
+        audio = np.concatenate([np.zeros((int(shift_s * A.SR), audio.shape[1]), dtype=audio.dtype), audio])
+    raw, model, backend = transcribe_audio(audio)
+    heard = [(_normalize(w["word"]), float(w["start"]) - shift_s) for seg in raw for w in seg["words"]
+             if _normalize(w["word"])]
     offset = float(report.get("timeline_offset_s", 0.0))
     clips = []
     lyrics_cache: dict[str, Any] = {}
