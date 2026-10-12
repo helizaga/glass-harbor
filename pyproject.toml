@@ -27,7 +27,7 @@ ml = [
   "tqdm",
   "einops",
   "rotary-embedding-torch",
-  "audio-separator[cpu]>=0.30",
+  "audio-separator[cpu]>=0.47",  # reads AUDIO_SEPARATOR_MPS_BUFFER_BUDGET_GIB (separate.py retries with it)
   "nnAudio==0.3.3",  # S-KEY key model (vendored in glass_harbor/vendor/skey)
   "requests",
 ]
