@@ -108,6 +108,25 @@ def load_grid(track_id: str) -> Grid:
     return Grid.from_dict(load_analysis(track_id)["grid"])
 
 
+FFPROBE_TIMEOUT_S = 15
+
+
+def file_tags(path: Path) -> dict[str, str]:
+    """Artist and title from the file's own tags (ffprobe), lowercase keys; empty when unavailable."""
+    import subprocess
+
+    ffprobe = shutil.which("ffprobe")
+    if not ffprobe:
+        return {}
+    try:
+        result = subprocess.run([ffprobe, "-v", "error", "-show_entries", "format_tags=artist,title", "-of", "json",
+                                 str(path)], capture_output=True, text=True, check=False, timeout=FFPROBE_TIMEOUT_S)
+        tags = json.loads(result.stdout or "{}").get("format", {}).get("tags", {})
+    except (subprocess.TimeoutExpired, ValueError):
+        return {}
+    return {k.lower(): v.strip() for k, v in tags.items() if k.lower() in ("artist", "title") and v.strip()}
+
+
 def add_track(
     source: Path,
     *,
@@ -133,6 +152,9 @@ def add_track(
     folder.mkdir(parents=True, exist_ok=True)
     meta = load_meta(track_id) if existing else {}
     if not existing:
+        tags = file_tags(source)
+        title = title or tags.get("title")
+        artist = artist or tags.get("artist")
         audio = A.load(source)
         A.save(audio_path(track_id), audio, subtype="PCM_24")
         meta = {

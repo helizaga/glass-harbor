@@ -292,6 +292,109 @@ def vocal_phrases(bar_db: list[float], *, min_bars: int = 2) -> list[dict[str, i
     return phrases
 
 
+ONSET_GRID_TOLERANCE_S = 0.015
+ONSET_GRID_SHARE = 0.8
+ONSET_GRID_SEARCH = 0.015  # +-1.5% around each candidate period
+
+
+def _onset_grid(strong: np.ndarray, period_guess: float) -> tuple[float, float, float]:
+    """The constant 16th grid within ONSET_GRID_SEARCH of ``period_guess`` that the most strong onsets sit on:
+    (t0, period, share). t0 is only known to a 16th here; the caller picks the beat phase."""
+    best = (-1.0, 0.0, period_guess)
+    for period in period_guess * np.linspace(1 - ONSET_GRID_SEARCH, 1 + ONSET_GRID_SEARCH, 301):
+        sixteenth = period / 4
+        phases = np.arange(0.0, sixteenth, 0.002)
+        position = (strong[None, :] - phases[:, None]) / sixteenth
+        share = (np.abs(position - np.round(position)) * sixteenth < ONSET_GRID_TOLERANCE_S).mean(axis=1)
+        i = int(np.argmax(share))
+        if share[i] > best[0]:
+            best = (float(share[i]), float(phases[i]), float(period))
+    share, t0, period = best
+    index = np.round((strong - t0) / (period / 4))
+    on = np.abs(strong - t0 - index * period / 4) < ONSET_GRID_TOLERANCE_S
+    if on.sum() >= 8:  # least squares on the hits that landed, for a period finer than the search step
+        slope, t0 = np.polyfit(index[on], strong[on], 1)
+        period = float(slope) * 4
+        position = (strong - t0) / (period / 4)  # the share the returned grid itself earns
+        share = float((np.abs(position - np.round(position)) * period / 4 < ONSET_GRID_TOLERANCE_S).mean())
+    return float(t0), float(period), share
+
+
+def confirm_fixed_tempo(percussion: np.ndarray, beats: np.ndarray, *, period_hint: float | None = None
+                        ) -> tuple[float, float] | None:
+    """When the beat tracker drifts (half-time locks, syncopated 808s, or plain garbage through a drop), test
+    constant grids against the audio: if the strong drum hits sit on one grid's 16ths, the track is fixed tempo.
+    Candidates are the fastest steady pulse in the tracker's beats, then ``period_hint`` (the tracker's typical
+    beat length). Returns (t0, period) or None."""
+    import librosa
+
+    from glass_harbor.grid import hinted_fit
+
+    candidates = [c[1] for c in [hinted_fit(beats)] if c is not None] + ([period_hint] if period_hint else [])
+    if not candidates:
+        return None
+    sr, hop = 22050, 256
+    y = librosa.resample(A.mono(percussion), orig_sr=A.SR, target_sr=sr)
+    envelope = librosa.onset.onset_strength(y=y, sr=sr, hop_length=hop)
+    peaks = librosa.onset.onset_detect(onset_envelope=envelope, sr=sr, hop_length=hop, units="time")
+    if peaks.size < 16:
+        return None
+    strength = envelope[librosa.time_to_frames(peaks, sr=sr, hop_length=hop)]
+    strong = peaks[strength > np.percentile(strength, 70)]
+    for guess in candidates:
+        t0, period, share = _onset_grid(strong, guess)
+        if share < ONSET_GRID_SHARE:
+            continue
+        # Which 16th is the beat: the one where the kick-range onsets are strongest (hats sit on the offbeats).
+        from scipy.signal import butter, sosfiltfilt
+
+        low = sosfiltfilt(butter(4, 150, "lowpass", fs=sr, output="sos"), y)
+        kick = librosa.onset.onset_strength(y=low, sr=sr, hop_length=hop)
+
+        def kick_energy(offset: float) -> float:
+            times = np.arange(offset % period, y.size / sr, period)
+            frames = librosa.time_to_frames(times, sr=sr, hop_length=hop)
+            frames = frames[frames < kick.size - 1]
+            return float(np.maximum(kick[frames], kick[frames + 1]).sum())
+
+        t0 = max((t0 + k * period / 4 for k in range(4)), key=kick_energy) % period
+        return t0, period
+    return None
+
+
+def phase_from_drops(audio: np.ndarray, grid: Grid, *, top: int = 4) -> Grid:
+    """Put bar 1 where the biggest low-end entrances fall (drops land on bar lines). Used when the tracker's own
+    downbeats were unreliable; leaves the grid alone unless most of the biggest entrances agree on one phase."""
+    from scipy.signal import butter, sosfiltfilt
+
+    from glass_harbor.grid import shift_downbeat
+
+    low = sosfiltfilt(butter(4, 150, "lowpass", fs=A.SR, output="sos"), A.mono(audio))
+    beats = grid.beats
+    levels = []
+    for a, b in zip(beats[:-1], beats[1:]):
+        chunk = low[int(a * A.SR):int(b * A.SR)]
+        levels.append(20 * np.log10(np.sqrt(np.mean(chunk ** 2)) + 1e-9) if chunk.size else -120.0)
+    levels = np.array(levels)
+    if levels.size < 16:
+        return grid
+    jumps = np.array([levels[i:i + 4].mean() - levels[i - 4:i].mean() for i in range(4, levels.size - 4)])
+    strongest: list[int] = []
+    for index in np.argsort(jumps)[::-1]:  # one entrance per drop: neighbours of a peak are the same drop
+        if jumps[index] <= 0 or len(strongest) == top:
+            break
+        if all(abs(index + 4 - other) >= 8 for other in strongest):
+            strongest.append(int(index + 4))
+    if len(strongest) < 2:
+        return grid
+    strongest = np.array(strongest)
+    phases = np.bincount(strongest % grid.beats_per_bar, minlength=grid.beats_per_bar)
+    phase = int(np.argmax(phases))
+    if phases[phase] < 0.6 * len(strongest) or phase == grid.first_downbeat % grid.beats_per_bar:
+        return grid
+    return shift_downbeat(grid, phase - grid.first_downbeat)
+
+
 def analyze_track(
     audio: np.ndarray,
     *,
@@ -305,6 +408,11 @@ def analyze_track(
     beats, downbeats, backend = detect_beats(audio, beat_backend)
     grid = build_grid(beats, downbeats, duration)
     stems = stems or {}
+    if grid.mode == "variable":
+        confirmed = confirm_fixed_tempo(stems.get("drums", audio), beats, period_hint=60.0 / grid.bpm)
+        if confirmed is not None:
+            grid = build_grid(beats, downbeats, duration, fit=confirmed)
+            grid = phase_from_drops(audio, grid)
 
     harmonic_source = stems.get("instrumental", audio)
     chroma = mean_chroma(harmonic_source)
@@ -358,3 +466,24 @@ def analyze_track(
             entry["phrases"] = vocal_phrases(stem_db)
         result["stems"][name] = entry
     return result
+
+
+def analyze_library_track(track_id: str, *, backend: str = "auto", log=print,
+                          sections: str | None = None) -> dict[str, Any]:
+    """Analyze a library track with all its stems and save it (lyric phrases and hooks are kept)."""
+    from glass_harbor import library
+    from glass_harbor.lyrics import load_lyrics, update_analysis
+
+    audio = library.load_audio(track_id)
+    stems = {name: library.load_audio(track_id, name) for name in library.available_stems(track_id)}
+    if sections is None:  # keep whatever section backend the track was analyzed with last time
+        previous = library.load_analysis(track_id) if library.analysis_path(track_id).exists() else {}
+        sections = previous.get("sections_backend", "novelty")
+    log(f"analyzing {track_id} ({', '.join(stems) or 'no stems'}; sections: {sections})")
+    analysis = analyze_track(audio, beat_backend=backend, stems=stems, sections_backend=sections,
+                             source_path=library.audio_path(track_id))
+    library.save_analysis(track_id, analysis)
+    lyrics = load_lyrics(track_id)
+    if lyrics is not None:
+        analysis = update_analysis(track_id, lyrics)
+    return analysis

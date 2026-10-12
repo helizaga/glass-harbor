@@ -189,3 +189,39 @@ def test_window_render_keeps_a_clip_whose_tail_rings_into_it(workspace, synth_fi
     report = render_plan(plan, tmp_path / "w", start_bar=5, end_bar=6, mp3=False, log=lambda m: None,
                          use_cache=False)
     assert "echoed" in {c["id"] for c in report["clips"]}  # ends at bar 5, its 8-beat tail runs into bar 5-6
+
+
+def test_separator_retries_the_demucs_device_bug_with_buffers_on_mps(monkeypatch, tmp_path):
+    import os
+
+    from glass_harbor import separate
+
+    monkeypatch.delenv(separate.MPS_BUDGET_ENV, raising=False)
+    calls = []
+
+    def flaky(source, out_dir, model, preset, cpu=False):
+        calls.append(os.environ.get(separate.MPS_BUDGET_ENV))
+        if len(calls) == 1:
+            raise RuntimeError("Expected all tensors to be on the same device, but found at least two devices")
+        return [str(out_dir / "song_(Bass)_htdemucs.flac")]
+
+    monkeypatch.setattr(separate, "_separate_once", flaky)
+    found = separate._run_audio_separator(tmp_path / "song.flac", tmp_path, model="htdemucs_ft.yaml")
+    assert calls == [None, separate.MPS_RETRY_BUDGET_GIB] and "bass" in found
+    assert separate.MPS_BUDGET_ENV not in os.environ
+
+    cpu_runs = []
+
+    def stubborn(source, out_dir, model, preset, cpu=False):
+        cpu_runs.append(cpu)
+        if not cpu:
+            raise RuntimeError("Expected all tensors to be on the same device, but found mps:0 and cpu")
+        return [str(out_dir / "song_(Bass)_htdemucs.flac")]
+
+    monkeypatch.setattr(separate, "_separate_once", stubborn)
+    assert "bass" in separate._run_audio_separator(tmp_path / "song.flac", tmp_path, model="htdemucs_ft.yaml")
+    assert cpu_runs == [False, False, True]  # MPS, MPS with the budget override, then the CPU
+
+    monkeypatch.setattr(separate, "_separate_once", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("out of memory")))
+    with pytest.raises(RuntimeError, match="out of memory"):
+        separate._run_audio_separator(tmp_path / "song.flac", tmp_path, model="htdemucs_ft.yaml")

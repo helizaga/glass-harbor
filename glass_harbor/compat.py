@@ -50,10 +50,16 @@ def tempo_score(stretch_pct: float) -> float:
     return 0.0
 
 
-def key_score(distance: int, similarity: float, semitones: int, confidence: float) -> float:
+PARALLEL_SCORE = 0.6  # same home note, other mode (E major over E minor): a mood change DJs mix on purpose
+
+
+def key_score(distance: int, similarity: float, semitones: int, confidence: float, *, parallel: bool = False) -> float:
     by_wheel = {0: 1.0, 1: 0.85, 2: 0.45}.get(distance, 0.1)
+    if parallel:
+        by_wheel = max(by_wheel, PARALLEL_SCORE)
     blended = (0.5 + 0.2 * confidence) * by_wheel + (0.5 - 0.2 * confidence) * max(0.0, similarity)
-    return blended - 0.06 * abs(semitones)
+    # Every semitone costs a little; past two, a shifted voice starts to sound unnatural, so it costs a lot more.
+    return blended - 0.06 * abs(semitones) - 0.15 * max(0, abs(semitones) - 2)
 
 
 def _key(analysis: dict) -> Key:
@@ -86,7 +92,8 @@ def score_pair(a_id: str, a: dict, b_id: str, b: dict, *, a_stem: str | None = "
         shifted = key_a.shifted(shift)
         distance = camelot_distance(shifted, key_b)
         similarity = chroma_similarity(chroma_a, chroma_b, shift)
-        k_score = key_score(distance, similarity, shift, confidence)
+        k_score = key_score(distance, similarity, shift, confidence,
+                            parallel=shifted.tonic == key_b.tonic and shifted.mode != key_b.mode)
         fits.append(Fit(
             a=a_id,
             b=b_id,

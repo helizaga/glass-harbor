@@ -98,23 +98,28 @@ def _segments_faster(signal: np.ndarray, model: str, language: str | None) -> li
             for seg in segments]
 
 
-def transcribe(track_id: str, *, model: str | None = None, language: str | None = "en",
-               backend: str | None = None) -> dict[str, Any]:
+def transcribe_audio(audio: np.ndarray, *, model: str | None = None, language: str | None = "en",
+                     backend: str | None = None) -> tuple[list[dict[str, Any]], str, str]:
+    """Whisper with word timestamps on any audio at ``A.SR``. Returns (raw segments, model, backend)."""
     import soxr
 
     backend = backend or whisper_backend()
     if backend is None:
         raise RuntimeError("lyrics need mlx-whisper (Apple Silicon) or faster-whisper: pip install -e '.[lyrics]'")
+    signal = soxr.resample(A.mono(audio), A.SR, WHISPER_SR).astype(np.float32)
+    if backend == "mlx":
+        model = model or DEFAULT_MODEL
+        return _segments_mlx(signal, model, language), model, backend
+    model = model or FASTER_WHISPER_MODEL
+    return _segments_faster(signal, model, language), model, backend
+
+
+def transcribe(track_id: str, *, model: str | None = None, language: str | None = "en",
+               backend: str | None = None) -> dict[str, Any]:
     stems = library.available_stems(track_id)
     stem = "vocals" if "vocals" in stems else "mix"
     vocal = library.load_audio(track_id, stem)
-    signal = soxr.resample(A.mono(vocal), A.SR, WHISPER_SR).astype(np.float32)
-    if backend == "mlx":
-        model = model or DEFAULT_MODEL
-        raw = _segments_mlx(signal, model, language)
-    else:
-        model = model or FASTER_WHISPER_MODEL
-        raw = _segments_faster(signal, model, language)
+    raw, model, backend = transcribe_audio(vocal, model=model, language=language, backend=backend)
     segments = []
     for seg in raw:
         words = [{"word": w["word"].strip(), "start": round(float(w["start"]), 3), "end": round(float(w["end"]), 3),

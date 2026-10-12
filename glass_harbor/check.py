@@ -204,6 +204,14 @@ def check_run(run_dir: Path) -> dict[str, Any]:
                  "bass under them (the beat's bassline differs from the one the vocal was written over); "
                  f"glass-harbor mix follow {Path(run_dir).parent.name} makes the bass follow the vocal")
 
+    listened = run_dir / "listen.json"
+    if listened.exists():
+        heard = json.loads(listened.read_text())
+        for item in heard.get("clips", []):
+            if item["clip"] in heard.get("weak", []):
+                flag("warning", item["clip"], f"Whisper made out only {item['recall']:.0%} of its {item['expected']} "
+                     f"words in the finished mix (the track's average is {heard['overall_recall']:.0%}): the beat masks it")
+
     buried = [item["bar"] for item in report.get("vocal_presence", []) if item["db"] < -3.0]
     if buried:
         spans = _spans(buried)

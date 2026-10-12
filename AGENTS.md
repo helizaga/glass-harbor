@@ -20,6 +20,11 @@
   brief.
 
 ## Canonical workflow
+The default for a new mashup is one command: `glass-harbor auto <vocal file or id> <beat file or id>`. It ingests,
+separates, transcribes, drafts (structure, stems, drops, fills, call and response, half-time switch, bass that
+follows the vocal), renders, and runs QA fix rounds, then writes the brief. Hand the user `mix-phone.m4a` and the
+brief; step in with the manual steps below only to change what the draft decided or when the user asks.
+
 1. Turn the request into a slug and a brief; list the tracks and the intended moment (energy, setting).
    Read `taste.json` (defaults, preferences, past verdicts) before planning. When suggesting songs, follow
    "Choosing songs" in the skill (Beatport + kworb first, 1001Tracklists to check a pairing is proven, not overdone).
@@ -51,6 +56,16 @@ Use a Python build with SSL (Homebrew); the pyenv 3.11.3 build on this machine l
 
 ## Commands
 - `glass-harbor doctor`
+- `glass-harbor queue add <vocal words> <beat words>` / `glass-harbor watch [--folder ~/Downloads] [--once]` (watch
+  folder: when both files land it runs the fit check, and the full mix only if the beat passes; a poor fit is
+  recorded with its reasons; the watcher runs until Ctrl-C, or one pass and exits with --once)
+- `glass-harbor fetch <soundcloud url>` (only the artist's own free download; refuses anything else)
+- `glass-harbor fit <vocal> <bed>` (one-minute check: key, tempo, and whether the beat leaves the vocal room;
+  run it right after the user downloads a beat, before the full mix. It also prints an advisory hit-potential
+  score: Deezer popularity and release date, the hook from the published lyrics, and crossover. It ranks the
+  ingredients; it cannot predict virality)
+- `glass-harbor auto <vocal> <bed> [--slug] [--title] [--rounds 2] [--force]` (files or track ids; the whole
+  pipeline; stops when the fit check says poor unless --force)
 - `glass-harbor track add <files...> [--id] [--stem name=path] [--separate stems] [--quality fast|balanced|best] [--sections novelty|allin1]`
 - `glass-harbor track analyze <ids...>|--all [--force] [--beats auto|beat_this|librosa] [--sections novelty|allin1]`
 - `glass-harbor track separate <id> [--stems vocals,instrumental,drums,bass,other] [--quality ...]`

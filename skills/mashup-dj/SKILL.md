@@ -20,8 +20,31 @@ Pick from what is working right now, not from memory:
   its track pages list which tracks get played next to which.
 - **Mashup ideas**: Beatport's "DJ Edits" category shows which rap songs DJs already put over house, and at what BPM.
 
-Use 1001Tracklists to check whether a pairing is proven or already overdone before committing to it. Chart BPM/key
+Use 1001Tracklists to check whether a pairing is proven or already overdone before committing to it. For sung
+vocals, skip dark club-trap and riddim beds and look for melodic, key-matched beds (melodic bass, R&B); once the
+user has the files, `glass-harbor fit <vocal> <beat>` measures vocal room (1-4 kHz crowding), harshness, and
+out-of-key harmony in a minute, plus an advisory hit-potential score (a known song on either side, a beat from
+the last six months, a short hook that repeats early, a rap/R&B vocal on a club beat). Treat a low score as a
+reason to look for a fresher or better-known beat, not as a verdict. Lyrics come from Whisper for timing and from LRCLIB (free, synced lines) for
+the right words and which lines really repeat; both stay in the gitignored library. Chart BPM/key
 are hints; trust `glass-harbor track show` once the user supplies the files.
+
+## Where the files come from (ranked)
+
+The user downloads; the engine never rips streams. Point them to, in order:
+
+1. **Free and legit, lossless when possible**: Bandcamp free or name-your-price downloads (WAV/FLAC);
+   SoundCloud tracks whose artist turned on downloads (`glass-harbor fetch <soundcloud url>` takes the artist's
+   original file and refuses tracks without one); remix-contest stem packs (Skio, Metapop, label contests), which
+   give official acapellas and instrumental parts that beat any AI separation.
+2. **Paid, the mashup standard**: DJ record pools (DJcity, BPM Supreme, ZipDJ, Club Killers) for official
+   acapellas, instrumentals, and intro edits; Beatport or Qobuz for single WAV/lossless purchases. Only when the
+   user says so.
+3. **Avoid**: low-bitrate copies (separation and mastering expose their artifacts) and stream rips.
+
+Then queue the pairing so it runs itself: `glass-harbor queue add "<vocal words>" "<beat words>"` and
+`glass-harbor watch` (fit check first; a poor fit stops with its reasons; otherwise the full mix and a
+notification).
 
 ## 0. Source audio
 
@@ -75,6 +98,13 @@ glass-harbor match <track> --role next            # what blends well after this 
 ```
 
 ## 4. Scaffold, then make it musical
+
+Start with `glass-harbor auto <vocal> <bed>` unless the user wants a specific arrangement: it runs steps 1-4 and
+the render/QA loop. Its draft rules: choruses on drops when the song has real choruses; otherwise the song's own
+order with verse 1 on the beat's first full section, a pause for each breakdown and a chopped-chant build into the
+next drop; a verse reprise when the back half is thin; the beat's own shouts answering where the acapella is
+silent; a half-time switch for one verse run on DnB beds; no extra DJ intro when the beat already has one. Fix
+rounds lift buried vocals, strip the bar before a flat drop, and make the bass follow clashing sung notes.
 
 ```sh
 glass-harbor mix new <slug> --kind mashup --vocals <a> --bed <b>

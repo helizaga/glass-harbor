@@ -80,23 +80,9 @@ def _summary(track_id: str) -> dict[str, Any]:
 
 
 def _analyze(track_id: str, backend: str, log, sections: str | None = None) -> dict[str, Any]:
-    from glass_harbor.analyze import analyze_track
+    from glass_harbor.analyze import analyze_library_track
 
-    audio = library.load_audio(track_id)
-    stems = {name: library.load_audio(track_id, name) for name in library.available_stems(track_id)}
-    if sections is None:  # keep whatever section backend the track was analyzed with last time
-        previous = library.load_analysis(track_id) if library.analysis_path(track_id).exists() else {}
-        sections = previous.get("sections_backend", "novelty")
-    log(f"analyzing {track_id} ({', '.join(stems) or 'no stems'}; sections: {sections})")
-    analysis = analyze_track(audio, beat_backend=backend, stems=stems, sections_backend=sections,
-                             source_path=library.audio_path(track_id))
-    library.save_analysis(track_id, analysis)
-    from glass_harbor.lyrics import load_lyrics, update_analysis
-
-    lyrics = load_lyrics(track_id)
-    if lyrics is not None:
-        analysis = update_analysis(track_id, lyrics)
-    return analysis
+    return analyze_library_track(track_id, backend=backend, log=log, sections=sections)
 
 
 def cmd_track_add(args: argparse.Namespace) -> int:
@@ -164,6 +150,10 @@ def cmd_track_lyrics(args: argparse.Namespace) -> int:
         log(f"transcribing {args.id} (first run downloads the model)")
         lyrics = transcribe(args.id, model=args.model, backend=args.backend)
     update_analysis(args.id, lyrics)
+    from glass_harbor.lyrics_ref import fetch_reference, load_reference
+
+    if args.force or load_reference(args.id) is None:
+        fetch_reference(args.id, log=log)
     grid = Grid.from_dict(library.load_analysis(args.id)["grid"])
     lines = bar_lines(lyrics, grid)
     found = hooks(lyrics, grid)
@@ -566,6 +556,32 @@ def cmd_mix_follow(args: argparse.Namespace) -> int:
     return _validate_and_report(args, slug, prefix="\n".join(lines) + "\n")
 
 
+def _latest_full_render(slug: str) -> Path:
+    """The newest render of the whole plan (bar-range previews can't be listened to against the full lyrics)."""
+    from glass_harbor.feedback import list_runs
+
+    for run in sorted(list_runs(slug), key=lambda r: r.name, reverse=True):
+        report = run / "render.json"
+        bounds = (json.loads(report.read_text()).get("range") or {}).values() if report.exists() else [None]
+        if report.exists() and all(bound is None for bound in bounds):
+            return run
+    raise FileNotFoundError(f"no full render of {slug} yet: glass-harbor mix render {slug}")
+
+
+def cmd_mix_listen(args: argparse.Namespace) -> int:
+    from glass_harbor.listen import listen_run
+
+    slug = require_slug(args.slug)
+    run = _run_for(slug, args.run) if args.run else _latest_full_render(slug)
+    result = listen_run(run, log=_log(args))
+    lines = [f"{run.name}: Whisper made out {result['overall_recall']:.0%} of the lyrics in the finished mix"
+             if result["overall_recall"] is not None else f"{run.name}: no lyrics to check"]
+    lines += [f"  {c['clip']:18s} {c['heard']:>3}/{c['expected']:<3} {c['recall']:.0%}"
+              + ("  <- masked" if c["clip"] in result["weak"] else "") for c in result["clips"]]
+    _emit(args, result, "\n".join(lines))
+    return 0
+
+
 def cmd_mix_fills(args: argparse.Namespace) -> int:
     from glass_harbor.scaffold import add_fills
 
@@ -590,6 +606,89 @@ def cmd_mix_list(args: argparse.Namespace) -> int:
 
 
 # ---------------------------------------------------------------- parser
+
+def cmd_queue(args: argparse.Namespace) -> int:
+    from glass_harbor import watch
+
+    if args.action == "add":
+        if not (args.vocal and args.bed):
+            raise ValueError("queue add needs <vocal> <beat> (words from the file names, paths, or track ids)")
+        item = watch.add(args.vocal, args.bed, slug=args.slug, title=args.title or "")
+        _emit(args, item, f"{item['id']}: waiting for '{item['vocal']}' over '{item['beat']}' "
+                          "(glass-harbor watch picks it up when both files are in the folder)")
+        return 0
+    items = watch.load_queue()
+    lines = [f"{i['id']:4s} {i['status']:9s} {i['vocal']} over {i['beat']}"
+             + (f" -> {i['phone']}" if i.get("phone") else "") + (f" ({i['reason']})" if i.get("reason") else "")
+             for i in items] or ["queue is empty"]
+    _emit(args, items, "\n".join(lines))
+    return 0
+
+
+def cmd_watch(args: argparse.Namespace) -> int:
+    from pathlib import Path as _Path
+
+    from glass_harbor import watch
+
+    folder = _Path(args.folder).expanduser()
+    if args.once:
+        handled = watch.run_once(folder=folder, log=_log(args))
+        _emit(args, handled, "\n".join(f"{i['id']}: {i['status']}" + (f" -> {i.get('phone')}" if i.get("phone") else "")
+                                       for i in handled) or "nothing ready yet")
+        return 0
+    try:
+        watch.watch(folder=folder, interval=args.interval, log=_log(args))
+    except KeyboardInterrupt:
+        print("stopped watching")
+    return 0
+
+
+def cmd_fetch(args: argparse.Namespace) -> int:
+    from pathlib import Path as _Path
+
+    from glass_harbor.fetch import fetch
+
+    path = fetch(args.url, folder=_Path(args.folder).expanduser(), log=_log(args))
+    _emit(args, {"file": str(path)}, f"saved {path}")
+    return 0
+
+
+def cmd_fit(args: argparse.Namespace) -> int:
+    from glass_harbor.auto import bed_sections, ingest, separate_vocal_only
+    from glass_harbor.fit import assess
+
+    log = _log(args)
+    vocal = ingest(args.vocal, sections="novelty", log=log)
+    bed = ingest(args.bed, sections=bed_sections(), log=log)
+    separate_vocal_only(vocal, log)
+    result = assess(vocal, bed, log=log)
+    fit = result["fit"]
+    lines = [f"{vocal} over {bed}: {result['verdict'].upper()} ({result['vocal_type']} vocal, beat measured on "
+             f"{result['measured_on']})",
+             f"  key: {fit['relation']}, {fit['semitones']:+d} st; tempo x{fit['tempo_ratio']:g}, "
+             f"{fit['stretch_pct']:+.1f}% stretch"]
+    lines += [f"  {c['check']:11s} {c['value']}  {c['level']}" for c in result["checks"]]
+    lines += [f"  - {reason}" for reason in result["reasons"]]
+    hit = result["potential"]
+    lines += [f"hit potential: {hit['level'].upper()} ({hit['score']}/100)"] + [f"  - {r}" for r in hit["reasons"]]
+    _emit(args, result, "\n".join(lines))
+    return 0 if result["verdict"] != "poor" else 1
+
+
+def cmd_auto(args: argparse.Namespace) -> int:
+    from glass_harbor.auto import run_auto
+
+    result = run_auto(args.vocal, args.bed, slug=args.slug, title=args.title or "", rounds=args.rounds,
+                      force=args.force, log=_log(args))
+    lines = [f"{result['slug']}: {result['verdict']}",
+             f"  send to a phone: {result['phone']}", f"  full quality:    {result['mp3']}",
+             f"  plan: {result['plan']}", f"  brief: {result['brief']}"]
+    lines += [f"  fix round {i + 1}: {'; '.join(r) if r else 'nothing left to fix'}"
+              for i, r in enumerate(result["rounds"])]
+    lines += [f"  {f['level']}: {f['where']}: {f['message']}" for f in result["flags"]]
+    _emit(args, result, "\n".join(lines))
+    return 0
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="glass-harbor", description=__doc__)
@@ -733,6 +832,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--verbose", action="store_true")
     p.set_defaults(func=cmd_mix_follow)
 
+    p = common(mix.add_parser("listen", help="Whisper listens to a render: which vocal clips' words survive the beat"))
+    p.add_argument("slug")
+    p.add_argument("--run", help="run folder name (default: latest)")
+    p.set_defaults(func=cmd_mix_listen)
+
     p = common(mix.add_parser("fills", help="crashes on hook entries and drops, reverse swells into hooks"))
     p.add_argument("slug")
     p.add_argument("--no-crashes", action="store_true")
@@ -802,6 +906,40 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--start-bar", type=float, help="cut a short clip starting at this bar")
     p.add_argument("--end-bar", type=float)
     p.set_defaults(func=cmd_mix_video)
+
+    p = common(sub.add_parser("auto", help="two audio files (or track ids) in, a finished mashup out: separate, "
+                                           "draft, render, and fix what QA finds"))
+    p.add_argument("vocal", help="the song whose vocal you want (audio file or track id)")
+    p.add_argument("bed", help="the song whose beat you want (audio file or track id)")
+    p.add_argument("--slug", help="mix name (default: <vocal>-x-<bed>)")
+    p.add_argument("--title")
+    p.add_argument("--rounds", type=int, default=2, help="QA fix rounds after the first render (default 2)")
+    p.add_argument("--force", action="store_true", help="make it even if the fit check says the beat is a poor fit")
+    p.set_defaults(func=cmd_auto)
+
+    p = common(sub.add_parser("queue", help="queue a pairing for the watch folder"))
+    p.add_argument("action", nargs="?", choices=("add", "list"), default="list")
+    p.add_argument("vocal", nargs="?", help="words from the vocal song's file name, a path, or a track id")
+    p.add_argument("bed", nargs="?", help="words from the beat's file name, a path, or a track id")
+    p.add_argument("--slug")
+    p.add_argument("--title")
+    p.set_defaults(func=cmd_queue)
+
+    p = common(sub.add_parser("watch", help="when a queued pairing's files land in the folder, fit-check and mix it"))
+    p.add_argument("--folder", default="~/Downloads")
+    p.add_argument("--interval", type=float, default=10.0, help="seconds between checks")
+    p.add_argument("--once", action="store_true", help="one pass, then exit")
+    p.set_defaults(func=cmd_watch)
+
+    p = common(sub.add_parser("fetch", help="download a SoundCloud track only if the artist enabled free downloads"))
+    p.add_argument("url")
+    p.add_argument("--folder", default="~/Downloads")
+    p.set_defaults(func=cmd_fetch)
+
+    p = common(sub.add_parser("fit", help="one-minute check: will this vocal sit on this beat? (files or track ids)"))
+    p.add_argument("vocal")
+    p.add_argument("bed")
+    p.set_defaults(func=cmd_fit)
 
     p = common(sub.add_parser("taste", help="your mixing defaults and preferences (read by scaffolds and agents)"))
     p.add_argument("action", nargs="?", choices=("show", "set", "add"), default="show")
