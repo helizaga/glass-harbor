@@ -257,3 +257,5 @@ def test_reference_search_only_accepts_the_same_song():
                   {"trackName": "Swarm", "artistName": "Risk, Viperactive", "duration": 141, "syncedLyrics": "x"}]
     assert pick_search_result(same_title, "", "SWARM", 142.9) is None  # no artist and two different songs
     assert pick_search_result(same_title[:1], "", "SWARM", 142.9)["artistName"] == "Elden"
+    featured = [{"trackName": "yeah bop 2", "artistName": "Lil Yee", "duration": 151, "syncedLyrics": "x"}]
+    assert pick_search_result(featured, "Lil Bean feat. Lil Yee", "yeah bop 2", 151) is None  # the lead must match

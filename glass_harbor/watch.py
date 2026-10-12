@@ -49,25 +49,51 @@ def save_queue(items: list[dict[str, Any]]) -> None:
     os.replace(tmp, path)
 
 
+def _try_lock(fd: int) -> None:
+    """Take the lock without waiting (OSError when another holder has it). The OS drops it if the holder dies."""
+    if os.name == "nt":
+        import msvcrt
+
+        msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+    else:
+        import fcntl
+
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+
+def _unlock(fd: int) -> None:
+    if os.name == "nt":
+        import msvcrt
+
+        msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+    else:
+        import fcntl
+
+        fcntl.flock(fd, fcntl.LOCK_UN)
+
+
 @contextlib.contextmanager
 def locked() -> Iterator[None]:
-    """Serialize read-modify-write of the queue across processes (a lock file created exclusively)."""
+    """Serialize read-modify-write of the queue across processes. The lock belongs to the open file, so the OS
+    releases it when its owner exits, even on a crash or kill; the lock file itself stays (deleting it would race)."""
     lock = queue_path().with_name(queue_path().name + ".lock")
-    deadline = time.monotonic() + LOCK_TIMEOUT_S
-    while True:
-        try:
-            fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-            break
-        except FileExistsError:
-            if time.monotonic() > deadline:
-                raise TimeoutError(f"the queue is locked by another process ({lock})") from None
-            time.sleep(0.05)
+    fd = os.open(lock, os.O_CREAT | os.O_RDWR)
     try:
-        os.write(fd, str(os.getpid()).encode())
-        yield
+        deadline = time.monotonic() + LOCK_TIMEOUT_S
+        while True:
+            try:
+                _try_lock(fd)
+                break
+            except OSError:
+                if time.monotonic() > deadline:
+                    raise TimeoutError(f"the queue is locked by another process ({lock})") from None
+                time.sleep(0.05)
+        try:
+            yield
+        finally:
+            _unlock(fd)
     finally:
         os.close(fd)
-        lock.unlink(missing_ok=True)
 
 
 def _update(item_id: str, **fields: Any) -> dict[str, Any]:
@@ -78,6 +104,18 @@ def _update(item_id: str, **fields: Any) -> dict[str, Any]:
         item.update(fields)
         save_queue(items)
         return dict(item)
+
+
+def _claim(item_id: str, **fields: Any) -> bool:
+    """Mark a waiting pairing running, in one locked step; False when another watcher claimed it first."""
+    with locked():
+        items = load_queue()
+        item = next((i for i in items if i["id"] == item_id), None)
+        if item is None or item["status"] != "waiting":
+            return False
+        item.update(status="running", **fields)
+        save_queue(items)
+        return True
 
 
 def add(vocal: str, beat: str, *, slug: str | None = None, title: str = "") -> dict[str, Any]:
@@ -177,8 +215,9 @@ def run_once(*, folder: Path = DEFAULT_FOLDER, settle_s: float = 2.0, log: Log =
             continue
         if vocal == beat and _words(item["vocal"]) != _words(item["beat"]):
             continue  # both names matched one file: wait for the other one to arrive
-        _update(item["id"], status="running", vocal_file=vocal, beat_file=beat, pid=os.getpid(),
-                started_at=dt.datetime.now().isoformat(timespec="seconds"))
+        if not _claim(item["id"], vocal_file=vocal, beat_file=beat, pid=os.getpid(),
+                      started_at=dt.datetime.now().isoformat(timespec="seconds")):
+            continue  # another watcher took it between our read and now
         log(f"{item['id']}: {Path(vocal).name} over {Path(beat).name}")
         try:
             result = runner(vocal, beat, slug=item.get("slug"), title=item.get("title") or "", log=log)

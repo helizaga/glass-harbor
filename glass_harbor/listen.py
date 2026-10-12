@@ -87,7 +87,7 @@ def listen_run(run_dir: Path, *, log=print) -> dict[str, Any]:
     from glass_harbor.plan import resolve
 
     report = json.loads((run_dir / "render.json").read_text())
-    if (report.get("range") or {}).get("start_bar"):
+    if any(bound is not None for bound in (report.get("range") or {}).values()):
         raise ValueError("listen works on full renders, not bar-range previews")
     plan = json.loads((run_dir / "plan.json").read_text())
     res = resolve(plan)

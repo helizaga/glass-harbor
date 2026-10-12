@@ -14,5 +14,6 @@ runs/
 
 # Watch-folder queue (local state)
 queue.json
+queue.json.lock
 
 .DS_Store

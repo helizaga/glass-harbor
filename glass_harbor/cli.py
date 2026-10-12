@@ -562,7 +562,8 @@ def _latest_full_render(slug: str) -> Path:
 
     for run in sorted(list_runs(slug), key=lambda r: r.name, reverse=True):
         report = run / "render.json"
-        if report.exists() and not any((json.loads(report.read_text()).get("range") or {}).values()):
+        bounds = (json.loads(report.read_text()).get("range") or {}).values() if report.exists() else [None]
+        if report.exists() and all(bound is None for bound in bounds):
             return run
     raise FileNotFoundError(f"no full render of {slug} yet: glass-harbor mix render {slug}")
 

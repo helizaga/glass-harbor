@@ -81,7 +81,7 @@ def test_concurrent_adds_keep_every_pairing(workspace):
     [t.join() for t in threads]
     items = watch.load_queue()
     assert len(items) == 12 and len({i["id"] for i in items}) == 12
-    assert not list(watch.queue_path().parent.glob("queue.json.*"))  # no temp or lock files left behind
+    assert not list(watch.queue_path().parent.glob("queue.json.*.tmp"))  # no temp files left behind
 
 
 def test_hints_that_match_one_file_wait_for_the_other(workspace, tmp_path):
@@ -122,3 +122,34 @@ def test_listen_defaults_to_the_latest_full_render(workspace):
         (run / "render.json").write_text(_json.dumps({"range": rng}))
         (run / "mix.wav").write_bytes(b"")
     assert _latest_full_render("mix").name == "20260101-000000"  # the newer one is only a preview
+
+
+def test_a_lock_left_by_a_dead_process_does_not_block_the_queue(workspace, monkeypatch):
+    import sys
+
+    watch.queue_path().parent.mkdir(parents=True, exist_ok=True)
+    holder = subprocess.Popen([sys.executable, "-c", "import time\nfrom glass_harbor import watch\n"
+                               "with watch.locked():\n    print('held', flush=True)\n    time.sleep(60)"],
+                              stdout=subprocess.PIPE, text=True)
+    assert holder.stdout.readline().strip() == "held"
+    monkeypatch.setattr(watch, "LOCK_TIMEOUT_S", 0.2)
+    with pytest.raises(TimeoutError):
+        watch.add("vocal", "beat")  # a live holder blocks
+    holder.kill()
+    holder.wait()
+    assert watch.add("vocal", "beat")["id"] == "q1"  # its death released the lock
+
+
+def test_only_one_watcher_claims_a_pairing(workspace):
+    item = watch.add("glock", "beat")
+    assert watch._claim(item["id"], pid=1)
+    assert not watch._claim(item["id"], pid=2)
+    assert watch.load_queue()[0]["pid"] == 1
+
+
+def test_listen_refuses_end_only_previews(tmp_path):
+    from glass_harbor.listen import listen_run
+
+    (tmp_path / "render.json").write_text(json.dumps({"range": {"start_bar": None, "end_bar": 17}}))
+    with pytest.raises(ValueError, match="full renders"):
+        listen_run(tmp_path, log=lambda m: None)
