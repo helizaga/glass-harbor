@@ -147,6 +147,9 @@ intent in `<slug>.brief.md` (what came from analysis vs your musical inference).
 - **Make room, don't just turn down**: spectral ducking (default) cuts the beat only where it competes with the
   vocal; percussive beds also need the drums ducked (`mix arrange` sets 4 dB). Check `vocal_presence` per section in
   `render.json`: aim for roughly +7 dB or more in the 1-4 kHz band.
+- **Don't bury the beat either**: `vocal_balance` in `render.json` gives each vocal's loudness over the beat where it
+  plays (LU) next to the same measure on its own record. Hit records keep the lead within a few dB of the band;
+  QA flags a vocal more than 6 LU louder than on its own record, and fix rounds pull it back.
 - **Groove**: on house/EDM beds, pump the melodic layer (`pump`, ~3 dB) and the vocal reverb/echo returns
   (`groove.pump_fx`, ~5 dB) so they breathe with the kick.
 - **Master against the release**: mashup scaffolds set `master.reference` to the bed's original track.
