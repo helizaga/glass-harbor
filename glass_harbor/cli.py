@@ -594,6 +594,49 @@ def cmd_mix_list(args: argparse.Namespace) -> int:
 
 # ---------------------------------------------------------------- parser
 
+def cmd_queue(args: argparse.Namespace) -> int:
+    from glass_harbor import watch
+
+    if args.action == "add":
+        if not (args.vocal and args.bed):
+            raise ValueError("queue add needs <vocal> <beat> (words from the file names, paths, or track ids)")
+        item = watch.add(args.vocal, args.bed, slug=args.slug, title=args.title or "")
+        _emit(args, item, f"{item['id']}: waiting for '{item['vocal']}' over '{item['beat']}' "
+                          "(glass-harbor watch picks it up when both files are in the folder)")
+        return 0
+    items = watch.load_queue()
+    lines = [f"{i['id']:4s} {i['status']:9s} {i['vocal']} over {i['beat']}"
+             + (f" -> {i['phone']}" if i.get("phone") else "") + (f" ({i['reason']})" if i.get("reason") else "")
+             for i in items] or ["queue is empty"]
+    _emit(args, items, "\n".join(lines))
+    return 0
+
+
+def cmd_watch(args: argparse.Namespace) -> int:
+    from pathlib import Path as _Path
+
+    from glass_harbor import watch
+
+    folder = _Path(args.folder).expanduser()
+    if args.once:
+        handled = watch.run_once(folder=folder, log=_log(args))
+        _emit(args, handled, "\n".join(f"{i['id']}: {i['status']}" + (f" -> {i.get('phone')}" if i.get("phone") else "")
+                                       for i in handled) or "nothing ready yet")
+        return 0
+    watch.watch(folder=folder, interval=args.interval, log=_log(args))
+    return 0
+
+
+def cmd_fetch(args: argparse.Namespace) -> int:
+    from pathlib import Path as _Path
+
+    from glass_harbor.fetch import fetch
+
+    path = fetch(args.url, folder=_Path(args.folder).expanduser(), log=_log(args))
+    _emit(args, {"file": str(path)}, f"saved {path}")
+    return 0
+
+
 def cmd_fit(args: argparse.Namespace) -> int:
     from glass_harbor.auto import bed_sections, ingest, separate_vocal_only
     from glass_harbor.fit import assess
@@ -855,6 +898,25 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--rounds", type=int, default=2, help="QA fix rounds after the first render (default 2)")
     p.add_argument("--force", action="store_true", help="make it even if the fit check says the beat is a poor fit")
     p.set_defaults(func=cmd_auto)
+
+    p = common(sub.add_parser("queue", help="queue a pairing for the watch folder"))
+    p.add_argument("action", nargs="?", choices=("add", "list"), default="list")
+    p.add_argument("vocal", nargs="?", help="words from the vocal song's file name, a path, or a track id")
+    p.add_argument("bed", nargs="?", help="words from the beat's file name, a path, or a track id")
+    p.add_argument("--slug")
+    p.add_argument("--title")
+    p.set_defaults(func=cmd_queue)
+
+    p = common(sub.add_parser("watch", help="when a queued pairing's files land in the folder, fit-check and mix it"))
+    p.add_argument("--folder", default="~/Downloads")
+    p.add_argument("--interval", type=float, default=10.0, help="seconds between checks")
+    p.add_argument("--once", action="store_true", help="one pass, then exit")
+    p.set_defaults(func=cmd_watch)
+
+    p = common(sub.add_parser("fetch", help="download a SoundCloud track only if the artist enabled free downloads"))
+    p.add_argument("url")
+    p.add_argument("--folder", default="~/Downloads")
+    p.set_defaults(func=cmd_fetch)
 
     p = common(sub.add_parser("fit", help="one-minute check: will this vocal sit on this beat? (files or track ids)"))
     p.add_argument("vocal")

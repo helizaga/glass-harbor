@@ -56,6 +56,9 @@ Use a Python build with SSL (Homebrew); the pyenv 3.11.3 build on this machine l
 
 ## Commands
 - `glass-harbor doctor`
+- `glass-harbor queue add <vocal words> <beat words>` / `glass-harbor watch [--folder ~/Downloads] [--once]` (watch
+  folder: fit check, then the full mix, when both files land)
+- `glass-harbor fetch <soundcloud url>` (only the artist's own free download; refuses anything else)
 - `glass-harbor fit <vocal> <bed>` (one-minute check: key, tempo, and whether the beat leaves the vocal room;
   run it right after the user downloads a beat, before the full mix)
 - `glass-harbor auto <vocal> <bed> [--slug] [--title] [--rounds 2] [--force]` (files or track ids; the whole

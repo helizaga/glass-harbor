@@ -27,6 +27,23 @@ out-of-key harmony in a minute. Lyrics come from Whisper for timing and from LRC
 the right words and which lines really repeat; both stay in the gitignored library. Chart BPM/key
 are hints; trust `glass-harbor track show` once the user supplies the files.
 
+## Where the files come from (ranked)
+
+The user downloads; the engine never rips streams. Point them to, in order:
+
+1. **Free and legit, lossless when possible**: Bandcamp free or name-your-price downloads (WAV/FLAC);
+   SoundCloud tracks whose artist turned on downloads (`glass-harbor fetch <soundcloud url>` takes the artist's
+   original file and refuses tracks without one); remix-contest stem packs (Skio, Metapop, label contests), which
+   give official acapellas and instrumental parts that beat any AI separation.
+2. **Paid, the mashup standard**: DJ record pools (DJcity, BPM Supreme, ZipDJ, Club Killers) for official
+   acapellas, instrumentals, and intro edits; Beatport or Qobuz for single WAV/lossless purchases. Only when the
+   user says so.
+3. **Avoid**: low-bitrate copies (separation and mastering expose their artifacts) and stream rips.
+
+Then queue the pairing so it runs itself: `glass-harbor queue add "<vocal words>" "<beat words>"` and
+`glass-harbor watch` (fit check first; a poor fit stops with its reasons; otherwise the full mix and a
+notification).
+
 ## 0. Source audio
 
 - Work only from audio files the user provides (local paths). Never download copyrighted music; ask the user to
