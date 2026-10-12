@@ -24,6 +24,7 @@ from glass_harbor import library
 VOCAL_HIGHPASS_HZ = 100.0
 
 
+MAX_CLIP_BARS = 12  # vocal bars per clip at most (long verses are split at line starts)
 BREATH_BARS = 0.1  # a gap between lines long enough to cut at (about 270 ms at 90 bpm)
 BAR_TOLERANCE = 0.05  # a line starting a few ms before a bar line (a pickup, or 25.9999 for 26) belongs to that bar
 
@@ -46,7 +47,7 @@ def _lines(lyrics: dict[str, Any], grid) -> list[dict[str, Any]]:
     return out
 
 
-def _hook_texts(lines: list[dict[str, Any]], *, min_count: int = 3) -> set[str]:
+def _hook_texts(lines: list[dict[str, Any]], *, min_count: int = 2) -> set[str]:
     """Short repeated lines (chants and tags count, not just full choruses)."""
     counts: dict[str, int] = {}
     for line in lines:
@@ -161,10 +162,22 @@ def song_order(vocals: str, beat: dict[str, Any], ratio: float, lyrics: dict[str
             b = stop_v if i + 1 == len(roles) else _floor(roles[i + 1][0][0]["start"])
             if b <= a:
                 continue
-            clips.append({"id": f"{'hook' if hooky else 'verse'}{len(clips) + 1}", "source": "vox",
-                          "stem": "vocals", "from_bar": int(a), "bars": int(b - a), "at_bar": out_of(a),
-                          **({"chain": "hook"} if hooky else {}),
-                          "automation": {"highpass_hz": [[0, VOCAL_HIGHPASS_HZ]]}})
+            # Long runs split at line starts into pieces of at most MAX_CLIP_BARS, so a beat shorter than the
+            # song keeps as much as fits (ending on a whole line) instead of losing the whole run.
+            starts = [_floor(ln["start"]) for ln in run[1:]]
+            pieces, piece_start = [], a
+            for cut in starts:
+                if cut - piece_start >= MAX_CLIP_BARS and cut > piece_start:
+                    pieces.append((piece_start, cut))
+                    piece_start = cut
+            pieces.append((piece_start, b))
+            for pa, pb in pieces:
+                if pb <= pa:
+                    continue
+                clips.append({"id": f"{'hook' if hooky else 'verse'}{len(clips) + 1}", "source": "vox",
+                              "stem": "vocals", "from_bar": int(pa), "bars": int(pb - pa), "at_bar": out_of(pa),
+                              **({"chain": "hook"} if hooky else {}),
+                              "automation": {"highpass_hz": [[0, VOCAL_HIGHPASS_HZ]]}})
         if stop_v >= end_v or pause is None:
             break
         resume = next((d for d in drops if d >= pause[1]), pause[1])
@@ -179,7 +192,11 @@ def song_order(vocals: str, beat: dict[str, Any], ratio: float, lyrics: dict[str
         if build:
             clips.append(build)
             notes.append(f"the chant is chopped into a build over bars {resume - 8}-{resume - 1}")
-    clips = [c for c in clips if c["at_bar"] + c["bars"] * ratio <= last_bar + 1]
+    kept = [c for c in clips if c["at_bar"] + c.get("bars", 0) * (ratio if "from_bar" in c else 1) <= last_bar + 1]
+    if len(kept) < len(clips):
+        notes.append(f"the beat ends before the song: the draft keeps {len(kept)} of {len(clips)} vocal pieces "
+                     "(extend the beat or pick a longer one to use the rest)")
+    clips = kept
     for clip in clips:
         clip["at_bar"] = round(clip["at_bar"], 4)
     if not clips:

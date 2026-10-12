@@ -151,19 +151,35 @@ def _fit_line(beats: np.ndarray, period: float) -> tuple[float, float, np.ndarra
     return float(t0), float(slope), indices, residuals[keep]
 
 
-def _fit_majority(beats: np.ndarray, *, window: int = 32) -> tuple[float, float, float] | None:
+def _fast_pulse(beats: np.ndarray) -> float | None:
+    """The fastest steady pulse among the tracker's intervals (the bar-level detail the tracker sometimes drops)."""
+    intervals = np.diff(beats)
+    if intervals.size < 16:
+        return None
+    fast = float(np.percentile(intervals, 20))
+    close = intervals[np.abs(intervals / fast - 1.0) < 0.12]
+    return float(np.median(close)) if close.size >= 8 else None
+
+
+def _fit_majority(beats: np.ndarray, *, window: int = 32,
+                  period_hint: float | None = None) -> tuple[float, float, float] | None:
     """Constant-tempo fit that trusts the steady majority of the track: electronic records are one fixed tempo, but
     trackers drift through breakdowns and beatless intros, and those stretches pull a plain fit off. The period comes
     from the median tempo of 32-beat windows; beats are numbered against that global grid (not one by one), so a
     drifting stretch shows up as outliers instead of shifting everything after it. Returns (t0, period, share of
     beats on the grid) or None when there are too few beats."""
-    if beats.size < 2 * window:
+    if beats.size < (16 if period_hint else 2 * window):
         return None
-    spans = (beats[window:] - beats[:-window]) / window
-    period = float(np.median(spans))
+    if period_hint:
+        period = period_hint
+    else:
+        spans = (beats[window:] - beats[:-window]) / window
+        period = float(np.median(spans))
     # Over a few hundred beats a 0.05% period error drifts a whole beat, so refine the period to the one where the
     # most beats share a phase (a comb search within +-1.5% of the windowed estimate).
-    candidates = period * (1 + np.linspace(-0.015, 0.015, 3001))
+    # A hint from raw intervals is coarser (frame-quantized, skewed by syncopation): search it more widely.
+    spread = 0.06 if period_hint else 0.015
+    candidates = period * (1 + np.linspace(-spread, spread, 3001))
     batch = max(1, 2_000_000 // beats.size)  # bounded memory on hour-long recordings
     coherence = np.concatenate([np.abs(np.exp(2j * np.pi * beats[None, :] / candidates[i:i + batch, None]).mean(axis=1))
                                 for i in range(0, candidates.size, batch)])
@@ -212,19 +228,29 @@ def _downbeat_phase(beat_times: np.ndarray, downbeats: np.ndarray, beats_per_bar
     return int(votes.argmax())
 
 
+def hinted_fit(beats: np.ndarray | list[float]) -> tuple[float, float, float] | None:
+    """Constant grid at the fastest steady pulse of raw tracker beats: (t0, period, share of beats on it)."""
+    raw = np.asarray(sorted(beats), dtype=float)
+    hint = _fast_pulse(raw)
+    return _fit_majority(raw, period_hint=hint) if hint else None
+
+
 def build_grid(
     beats: np.ndarray | list[float],
     downbeats: np.ndarray | list[float],
     duration: float,
     *,
     force_mode: str | None = None,
+    fit: tuple[float, float] | None = None,
 ) -> Grid:
+    """``fit`` = (t0, period) forces a fixed grid on that line (for a fit confirmed against the audio)."""
     beats = np.asarray(sorted(beats), dtype=float)
     downbeats = np.asarray(sorted(downbeats), dtype=float)
     notes: list[str] = []
     if beats.size < 4:
         raise ValueError("Too few beats detected to build a grid (need at least 4).")
 
+    raw = beats.copy()
     beats, filled = normalize_metrical_level(beats)
     if filled:
         notes.append("beat tracker switched metrical level; normalized to the faster pulse")
@@ -236,8 +262,21 @@ def build_grid(
     t0, period, _, residuals = _fit_line(beats, period)
     residual_rms = float(np.sqrt(np.mean(residuals**2))) if residuals.size else 0.0
     steady = residual_rms / period < STEADY_RESIDUAL_RATIO
+    if fit is not None:
+        t0, period = fit
+        steady = True
+        residual_rms = 0.0
+        notes.append("fixed tempo: the drum hits sit on one constant grid (the beat tracker drifted)")
     if not steady and force_mode != "variable":
         majority = _fit_majority(beats)
+        if majority is None or majority[2] < MAJORITY_SHARE:
+            # Trackers can lock onto a half-time pulse or syncopated hits through a drop, and filling the gaps in
+            # then puts beats in the wrong places. Fit the raw beats to the fastest steady pulse instead: half-time
+            # detections still land on its grid lines, and syncopated ones only count as misses.
+            hint = _fast_pulse(raw)
+            alternative = _fit_majority(raw, period_hint=hint) if hint else None
+            if alternative is not None and (majority is None or alternative[2] > majority[2]):
+                majority = alternative
         if majority is not None and majority[2] >= MAJORITY_SHARE:
             t0, period, share = majority
             k = np.round((beats - t0) / period)

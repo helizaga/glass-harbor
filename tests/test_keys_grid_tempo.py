@@ -133,3 +133,22 @@ def test_beat_a_hair_before_zero_stays_bar_one():
     beats = -0.006 + period * np.arange(1, 400)  # tracker misses the very first beat, fit lands 6 ms before 0 s
     grid = build_grid(beats, beats[3::4], 140.0)
     assert grid.beats[0] == 0.0 and grid.bar_time(1) == pytest.approx(0.0, abs=1e-9)
+
+
+def test_raw_beats_locked_to_half_time_still_find_the_fixed_pulse():
+    from glass_harbor.grid import hinted_fit
+
+    period = 0.4  # 150 bpm
+    intro = list(np.arange(0.15, 0.15 + 32 * period, period))
+    # Through the drop the tracker reports every other beat, some of them pulled 90 ms late by a syncopated 808.
+    drop = [intro[-1] + 2 * period * (i + 1) + (0.09 if i % 5 == 0 else 0.0) for i in range(40)]
+    t0, found, share = hinted_fit(intro + drop)
+    assert abs(found - period) < 0.0005 and share > 0.7
+
+
+def test_parallel_keys_beat_a_big_vocal_shift():
+    from glass_harbor.compat import key_score
+
+    same_home_note = key_score(3, 0.6, 0, 0.7, parallel=True)  # E major vocal over E minor beat, unshifted
+    shifted_up_three = key_score(0, 0.6, 3, 0.7)  # G major over E minor: relative, but a +3 vocal shift
+    assert same_home_note > shifted_up_three

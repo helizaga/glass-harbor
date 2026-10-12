@@ -292,6 +292,68 @@ def vocal_phrases(bar_db: list[float], *, min_bars: int = 2) -> list[dict[str, i
     return phrases
 
 
+ONSET_GRID_TOLERANCE_S = 0.015
+ONSET_GRID_SHARE = 0.8
+
+
+def confirm_fixed_tempo(percussion: np.ndarray, beats: np.ndarray) -> tuple[float, float] | None:
+    """When the beat tracker drifts (half-time locks, syncopated 808s), test the fastest steady pulse it found
+    against the audio: if the strong drum hits sit on that constant grid's 16ths, the track is fixed tempo.
+    Returns (t0, period) or None."""
+    import librosa
+
+    from glass_harbor.grid import hinted_fit
+
+    candidate = hinted_fit(beats)
+    if candidate is None:
+        return None
+    t0, period, _ = candidate
+    sr, hop = 22050, 256
+    y = librosa.resample(A.mono(percussion), orig_sr=A.SR, target_sr=sr)
+    envelope = librosa.onset.onset_strength(y=y, sr=sr, hop_length=hop)
+    peaks = librosa.onset.onset_detect(onset_envelope=envelope, sr=sr, hop_length=hop, units="time")
+    if peaks.size < 16:
+        return None
+    strength = envelope[librosa.time_to_frames(peaks, sr=sr, hop_length=hop)]
+    strong = peaks[strength > np.percentile(strength, 70)]
+    sixteenth = period / 4
+    offset = np.abs((strong - t0) / sixteenth - np.round((strong - t0) / sixteenth)) * sixteenth
+    return (t0, period) if np.mean(offset < ONSET_GRID_TOLERANCE_S) >= ONSET_GRID_SHARE else None
+
+
+def phase_from_drops(audio: np.ndarray, grid: Grid, *, top: int = 4) -> Grid:
+    """Put bar 1 where the biggest low-end entrances fall (drops land on bar lines). Used when the tracker's own
+    downbeats were unreliable; leaves the grid alone unless most of the biggest entrances agree on one phase."""
+    from scipy.signal import butter, sosfiltfilt
+
+    from glass_harbor.grid import shift_downbeat
+
+    low = sosfiltfilt(butter(4, 150, "lowpass", fs=A.SR, output="sos"), A.mono(audio))
+    beats = grid.beats
+    levels = []
+    for a, b in zip(beats[:-1], beats[1:]):
+        chunk = low[int(a * A.SR):int(b * A.SR)]
+        levels.append(20 * np.log10(np.sqrt(np.mean(chunk ** 2)) + 1e-9) if chunk.size else -120.0)
+    levels = np.array(levels)
+    if levels.size < 16:
+        return grid
+    jumps = np.array([levels[i:i + 4].mean() - levels[i - 4:i].mean() for i in range(4, levels.size - 4)])
+    strongest: list[int] = []
+    for index in np.argsort(jumps)[::-1]:  # one entrance per drop: neighbours of a peak are the same drop
+        if jumps[index] <= 0 or len(strongest) == top:
+            break
+        if all(abs(index + 4 - other) >= 8 for other in strongest):
+            strongest.append(int(index + 4))
+    if len(strongest) < 2:
+        return grid
+    strongest = np.array(strongest)
+    phases = np.bincount(strongest % grid.beats_per_bar, minlength=grid.beats_per_bar)
+    phase = int(np.argmax(phases))
+    if phases[phase] < 0.6 * len(strongest) or phase == grid.first_downbeat % grid.beats_per_bar:
+        return grid
+    return shift_downbeat(grid, phase - grid.first_downbeat)
+
+
 def analyze_track(
     audio: np.ndarray,
     *,
@@ -305,6 +367,11 @@ def analyze_track(
     beats, downbeats, backend = detect_beats(audio, beat_backend)
     grid = build_grid(beats, downbeats, duration)
     stems = stems or {}
+    if grid.mode == "variable":
+        confirmed = confirm_fixed_tempo(stems.get("drums", audio), beats)
+        if confirmed is not None:
+            grid = build_grid(beats, downbeats, duration, fit=confirmed)
+            grid = phase_from_drops(audio, grid)
 
     harmonic_source = stems.get("instrumental", audio)
     chroma = mean_chroma(harmonic_source)

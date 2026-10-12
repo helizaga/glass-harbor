@@ -94,6 +94,8 @@ def harmonic_relation(a: Key, b: Key) -> str:
     nb, lb = camelot_parts(b)
     if na == nb:
         return "relative major/minor"
+    if a.tonic == b.tonic:
+        return "parallel major/minor (same home note)"
     if distance == 1:
         return "adjacent (fifth)"
     if distance == 2 and la == lb:
