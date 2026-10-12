@@ -669,6 +669,8 @@ def cmd_fit(args: argparse.Namespace) -> int:
              f"{fit['stretch_pct']:+.1f}% stretch"]
     lines += [f"  {c['check']:11s} {c['value']}  {c['level']}" for c in result["checks"]]
     lines += [f"  - {reason}" for reason in result["reasons"]]
+    hit = result["potential"]
+    lines += [f"hit potential: {hit['level'].upper()} ({hit['score']}/100)"] + [f"  - {r}" for r in hit["reasons"]]
     _emit(args, result, "\n".join(lines))
     return 0 if result["verdict"] != "poor" else 1
 

@@ -127,7 +127,10 @@ def assess(vocal: str, beat: str, *, log=print) -> dict[str, Any]:
         "tempo": "the vocal needs a big tempo change",
         "key": "the keys clash or need a large vocal pitch shift",
     }
+    from glass_harbor import potential
+
     return {"vocal": vocal, "beat": beat, "vocal_type": kind, "sung_share": sung, "measured_on": measured_on,
+            "potential": potential.assess(vocal, beat),
             "fit": {"relation": fit.relation, "semitones": fit.semitones, "tempo_ratio": fit.tempo_ratio,
                     "stretch_pct": fit.stretch_pct, "score": fit.score},
             "checks": checks, "verdict": verdict,

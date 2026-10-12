@@ -10,6 +10,17 @@ from glass_harbor.keys import Key
 SR = A.SR
 
 
+@pytest.fixture(autouse=True)
+def offline_popularity(monkeypatch):
+    """Tests never reach Deezer; a test that wants popularity data stubs ``potential._get`` itself."""
+    from glass_harbor import potential
+
+    def offline(*args, **kwargs):
+        raise OSError("no network in tests")
+
+    monkeypatch.setattr(potential, "_get", offline)
+
+
 @pytest.fixture()
 def workspace(tmp_path, monkeypatch):
     monkeypatch.setenv("GLASS_HARBOR_HOME", str(tmp_path))

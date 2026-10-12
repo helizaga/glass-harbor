@@ -208,7 +208,9 @@ def write_brief(slug: str, plan: dict[str, Any], vocal: str, bed: str, qa: dict[
              "## Fit check", "",
              *([f"- verdict: {check['verdict']} ({check['vocal_type']} vocal); "
                 + ", ".join(f"{c['check']} {c['value']} ({c['level']})" for c in check["checks"])]
-               + [f"- {r}" for r in check["reasons"]] if check else ["- not run"]), "",
+               + [f"- {r}" for r in check["reasons"]]
+               + [f"- hit potential: {check['potential']['level']} ({check['potential']['score']}/100)"]
+               + [f"  - {r}" for r in check["potential"]["reasons"]] if check else ["- not run"]), "",
              "## Decisions (the draft's rules; edit the plan to change them)", ""]
     lines += [f"- {note}" for note in plan.get("notes", [])]
     lines += ["", "## Fix rounds", ""]
@@ -245,7 +247,8 @@ def run_auto(vocal: str, bed: str, *, slug: str | None = None, title: str = "", 
     bed_id = ingest(bed, sections=bed_sections(), log=log)
     separate_vocal_only(vocal_id, log)
     check = assess(vocal_id, bed_id, log=log)
-    log(f"fit check: {check['verdict']}" + (f" ({'; '.join(check['reasons'])})" if check["reasons"] else ""))
+    log(f"fit check: {check['verdict']}" + (f" ({'; '.join(check['reasons'])})" if check["reasons"] else "")
+        + f"; hit potential {check['potential']['level']} ({check['potential']['score']}/100)")
     if check["verdict"] == "poor" and not force:
         raise PoorFit(f"{vocal_id} over {bed_id} fails the fit check: {'; '.join(check['reasons'])}. Pick another "
                       "beat, or pass --force to make it anyway.")

@@ -61,7 +61,9 @@ Use a Python build with SSL (Homebrew); the pyenv 3.11.3 build on this machine l
   recorded with its reasons; the watcher runs until Ctrl-C, or one pass and exits with --once)
 - `glass-harbor fetch <soundcloud url>` (only the artist's own free download; refuses anything else)
 - `glass-harbor fit <vocal> <bed>` (one-minute check: key, tempo, and whether the beat leaves the vocal room;
-  run it right after the user downloads a beat, before the full mix)
+  run it right after the user downloads a beat, before the full mix. It also prints an advisory hit-potential
+  score: Deezer popularity and release date, the hook from the published lyrics, and crossover. It ranks the
+  ingredients; it cannot predict virality)
 - `glass-harbor auto <vocal> <bed> [--slug] [--title] [--rounds 2] [--force]` (files or track ids; the whole
   pipeline; stops when the fit check says poor unless --force)
 - `glass-harbor track add <files...> [--id] [--stem name=path] [--separate stems] [--quality fast|balanced|best] [--sections novelty|allin1]`

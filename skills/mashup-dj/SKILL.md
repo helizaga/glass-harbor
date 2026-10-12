@@ -23,7 +23,9 @@ Pick from what is working right now, not from memory:
 Use 1001Tracklists to check whether a pairing is proven or already overdone before committing to it. For sung
 vocals, skip dark club-trap and riddim beds and look for melodic, key-matched beds (melodic bass, R&B); once the
 user has the files, `glass-harbor fit <vocal> <beat>` measures vocal room (1-4 kHz crowding), harshness, and
-out-of-key harmony in a minute. Lyrics come from Whisper for timing and from LRCLIB (free, synced lines) for
+out-of-key harmony in a minute, plus an advisory hit-potential score (a known song on either side, a beat from
+the last six months, a short hook that repeats early, a rap/R&B vocal on a club beat). Treat a low score as a
+reason to look for a fresher or better-known beat, not as a verdict. Lyrics come from Whisper for timing and from LRCLIB (free, synced lines) for
 the right words and which lines really repeat; both stay in the gitignored library. Chart BPM/key
 are hints; trust `glass-harbor track show` once the user supplies the files.
 

@@ -259,3 +259,75 @@ def test_reference_search_only_accepts_the_same_song():
     assert pick_search_result(same_title[:1], "", "SWARM", 142.9)["artistName"] == "Elden"
     featured = [{"trackName": "yeah bop 2", "artistName": "Lil Yee", "duration": 151, "syncedLyrics": "x"}]
     assert pick_search_result(featured, "Lil Bean feat. Lil Yee", "yeah bop 2", 151) is None  # the lead must match
+
+
+def _deezer(results, released):
+    calls = []
+
+    def fake(path, params=None):
+        calls.append(path)
+        if path == "search":
+            return {"data": results[params["q"]]}
+        return {"release_date": released[path]}
+
+    return fake, calls
+
+
+def test_hit_potential_scores_the_ingredients(monkeypatch, workspace):
+    import datetime as dt
+
+    from glass_harbor import potential
+    from glass_harbor.lyrics_ref import parse_synced, reference_path
+
+    write_fake_track("v", bpm=76, key="E", bars=16)
+    write_fake_track("b", bpm=150, key="E", bars=32)
+    for track, artist, title in (("v", "Don Toliver", "GLOCK"), ("b", "DABIN", "Stay With Me (feat. VELVETEARS)")):
+        library.save_meta(track, {**library.load_meta(track), "artist": artist, "title": title})
+    days = lambda n: (dt.date.today() - dt.timedelta(days=n)).isoformat()  # noqa: E731
+    fake, calls = _deezer(
+        {"Don Toliver GLOCK": [{"id": 1, "title": "GLOCK", "rank": 450_000, "artist": {"name": "Don Toliver"}}],
+         "DABIN Stay With Me (feat. VELVETEARS)": [
+             {"id": 9, "title": "Stay With Me", "rank": 990_000, "artist": {"name": "Calvin Harris"}},
+             {"id": 2, "title": "Stay With Me", "rank": 700_000, "artist": {"name": "Dabin"}}]},
+        {"track/1": days(900), "track/2": days(60)})
+    monkeypatch.setattr(potential, "_get", fake)
+    reference_path("v").write_text(json.dumps({"lines": parse_synced(
+        "[00:20.00] Glock in my hand\n[00:30.00] a long verse line that is not the hook at all\n"
+        "[00:40.00] Glock in my hand\n[00:60.00] Glock in my hand")}))
+
+    result = potential.assess("v", "b")
+    # popular vocal + hit beat 36.25, fresh beat 15 + old vocal 1.25, 4-word hook x3 at 20 s 18.75, crossover 10
+    assert result["score"] == 81 and result["level"] == "high"
+    assert result["beat"]["artist"] == "Dabin"  # the same title by another artist is not this song
+    assert result["hook"] == {"repeats": 3, "words": 4, "first_s": 20.0}
+    assert any("crossover" in r for r in result["reasons"])
+    potential.assess("v", "b")
+    assert calls.count("search") == 2  # cached for a week
+
+
+def test_hit_potential_treats_ambiguous_and_offline_lookups_as_unknown(monkeypatch, workspace):
+    from glass_harbor import potential
+
+    write_fake_track("swarm", bpm=150, key="E", bars=32)
+    library.save_meta("swarm", {**library.load_meta("swarm"), "artist": "", "title": "SWARM"})
+    fake, _ = _deezer({"SWARM": [{"id": 1, "title": "Swarm", "rank": 335_000, "artist": {"name": "elden"}},
+                                 {"id": 2, "title": "Swarm", "rank": 50_000, "artist": {"name": "Risk"}}]}, {})
+    monkeypatch.setattr(potential, "_get", fake)
+    assert potential.popularity("swarm") is None  # two artists share the title: unknown beats wrong
+
+    write_fake_track("v", bpm=76, key="E", bars=16)
+    monkeypatch.setattr(potential, "_get", lambda *a, **k: (_ for _ in ()).throw(OSError("offline")))
+    assert potential.popularity("v") is None and not (library.track_dir("v") / "popularity.json").exists()
+    assert "unknown popularity" in potential.assess("v", "swarm", crossover=False)["reasons"][0]
+
+
+def test_track_add_reads_artist_and_title_tags(workspace, tmp_path):
+    import shutil
+    import subprocess
+
+    if not shutil.which("ffmpeg"):
+        pytest.skip("needs ffmpeg")
+    source = tmp_path / "SWARM.flac"
+    subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-t", "1",
+                    "-metadata", "artist=elden", "-metadata", "title=SWARM", str(source)], check=True)
+    assert library.file_tags(source) == {"artist": "elden", "title": "SWARM"}
