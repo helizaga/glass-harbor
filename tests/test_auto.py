@@ -271,6 +271,7 @@ def test_reference_search_only_accepts_the_same_song():
     assert pick_search_result(lookalikes, "Drake", "Janice STFU", 237) is None  # nor a substring of one
     collab = [{"trackName": "yeah bop 2", "artistName": "Lil Bean, Lil Yee", "duration": 151, "syncedLyrics": "x"}]
     assert pick_search_result(collab, "Lil Bean", "yeah bop 2", 151) is not None  # one of the credited artists
+    assert pick_search_result(collab, "Lil Bean; Lil Yee", "yeah bop 2", 151) is not None  # a file tag's "A; B"
     same_title = [{"trackName": "Swarm", "artistName": "Elden", "duration": 143, "syncedLyrics": "x"},
                   {"trackName": "Swarm", "artistName": "Risk, Viperactive", "duration": 141, "syncedLyrics": "x"}]
     assert pick_search_result(same_title, "", "SWARM", 142.9) is None  # no artist and two different songs
@@ -323,6 +324,19 @@ def test_hit_potential_scores_the_ingredients(monkeypatch, workspace):
     assert calls.count("search") == 2  # cached for a week
     (library.track_dir("b") / "popularity.json").write_text('{"checked": "20')  # a half-written cache
     assert potential.popularity("b")["artist"] == "Dabin" and calls.count("search") == 3  # looked up again
+
+
+def test_popularity_reads_a_multi_artist_file_tag(monkeypatch, workspace):
+    from glass_harbor import potential
+
+    write_fake_track("b", bpm=130, key="Bm", bars=32)
+    library.save_meta("b", {**library.load_meta("b"), "artist": "Calvin Harris; Clementine Douglas",
+                            "title": "Blessings"})
+    fake, _ = _deezer({"Calvin Harris; Clementine Douglas Blessings": [
+        {"id": 1, "title": "Blessings", "rank": 875_690, "artist": {"name": "Calvin Harris"}}]},
+        {"track/1": "2025-05-09"})
+    monkeypatch.setattr(potential, "_get", fake)
+    assert potential.popularity("b")["rank"] == 875_690  # the lead of "A; B" is A
 
 
 def test_crossover_needs_a_club_tempo_beat(workspace):
