@@ -136,10 +136,16 @@ steps 1 and 11, snare on 9, hats on 8ths; override with `"pattern": {"kick": "x.
 classic DnB/rap half-time switch.
 They take `automation`, `fx`, `duck`, and `gain_db` like any clip; macros duck every fill under the vocals.
 
-`glass-harbor mix drop <slug> --at-bar 92 [--build-bars 8] [--silence-beats 1]` writes a whole drop into the plan:
-a high-pass sweep (20 Hz to 700 Hz) on every bed clip across the build, a beat of silence before the one, a
-riser that ends on the downbeat, and an impact on the drop. `track show` lists detected drops (bars where kick and
-bass come back hard).
+`glass-harbor mix drop <slug> --at-bar 92 [--style edm|hiphop] [--build-bars N] [--silence-beats N]` writes a whole
+drop into the plan, styled by the plan's tempo unless `--style` says otherwise:
+
+- EDM (115 bpm and up): an 8-bar high-pass sweep (20 Hz to 700 Hz) on every bed clip, a beat of silence before the
+  one, a riser that ends on the downbeat, and an impact on the drop.
+- Hip-hop (under 115 bpm: hip-hop, R&B, dancehall, reggaeton beats): a bar of the beat filtering down (low-pass to
+  300 Hz), a bar with the beat cut while the vocal carries on alone, then the beat back on the one with an impact.
+  No riser or snare roll unless asked for.
+
+`track show` lists detected drops (bars where kick and bass come back hard).
 
 ## DJ edges, fills, and edits
 

@@ -1,5 +1,6 @@
-"""Word timings from the published lyrics: CTC forced alignment (torchaudio's MMS aligner) of the LRCLIB text to the
-acapella, with Whisper kept where the published text has nothing (spoken intros, ad-libs).
+"""Word timings from the published lyrics: CTC forced alignment (torchaudio's MMS aligner) of the synced text (the
+file's own tags or LRCLIB) to the acapella, with Whisper kept where the published text has nothing (spoken intros,
+ad-libs).
 
 Whisper's word starts are coarse on rap. On Kodak Black's "Thankful" it heard 308 of the 430 published words and put
 their starts a median 122 ms early: 79 ms from the nearest vocal onset against 41 ms for the aligned starts, which
@@ -25,7 +26,7 @@ Log = Callable[[str], None]
 MIN_AGREEMENT = 0.5  # share of the published words Whisper also heard; below it the text may be another version
 CHUNK_S = 20.0  # the aligner's model runs on 20 s pieces (memory); each line is then aligned in its own window
 MARGIN_S = 0.25  # Whisper words this close to an aligned line belong to it
-WINDOW_PAD_S = 1.0  # each line is searched for this far around where it was heard (or its LRCLIB timestamp)
+WINDOW_PAD_S = 1.0  # each line is searched for this far around where it was heard (or its published timestamp)
 NEIGHBOUR_S = 0.15  # ...but no further than this into where Whisper heard the next or previous line
 MAX_OFFSET_S = 0.5  # aligned starts further than this from Whisper's (median) mean the alignment went wrong
 MIN_LINE_SHARE = 0.8  # fewer published lines than this aligned: the text and the recording disagree, keep Whisper
@@ -62,7 +63,7 @@ def text_agreement(lines: list[dict[str, Any]], segments: list[dict[str, Any]]) 
 
 def line_windows(lines: list[dict[str, Any]], segments: list[dict[str, Any]], duration: float
                  ) -> list[tuple[float, float]]:
-    """Where to look for each published line (s): around the words of it Whisper heard, else between its LRCLIB
+    """Where to look for each published line (s): around the words of it Whisper heard, else between its published
     timestamp and the next line's. One song-wide alignment let Thankful's first line drift into the spoken intro
     (which also says "I'm thankful"); a window per line keeps every line near where it was actually sung."""
     published, heard = _published(lines), _heard(segments)

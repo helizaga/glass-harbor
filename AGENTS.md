@@ -66,18 +66,24 @@ Use a Python build with SSL (Homebrew); the pyenv 3.11.3 build on this machine l
   run it right after the user downloads a beat, before the full mix. It also prints an advisory hit-potential
   score: Deezer popularity and release date, the hook from the published lyrics, and crossover. It ranks the
   ingredients; it cannot predict virality)
+- `glass-harbor lookup "<Artist - Title>"... [--vocal <id or file>] [--bpm N --key K]` (before the user buys a
+  beat: tempo, key, and mode from songbpm, popularity and release date from Deezer, and with --vocal the fit
+  check's tempo and key gates, candidates ranked best first; chart BPM tags are often wrong, so run this before
+  recommending a beat. It cannot hear the beat: `fit` on the file still decides)
 - `glass-harbor auto <vocal> <bed> [--slug] [--title] [--rounds 2] [--force]` (files or track ids; the whole
   pipeline; stops when the fit check says poor unless --force)
 - `glass-harbor track add <files...> [--id] [--stem name=path] [--separate stems] [--quality fast|balanced|best] [--sections novelty|allin1]`
 - `glass-harbor track analyze <ids...>|--all [--force] [--beats auto|beat_this|librosa] [--sections novelty|allin1]`
 - `glass-harbor track separate <id> [--stems vocals,instrumental,drums,bass,other] [--quality ...]`
 - `glass-harbor track clean <id> [--stem vocals] [--mode dereverb|dereverb-gentle|deecho|denoise|lead] [--restart] [--force]` (steps stack; `lead` drops backing vocals and keeps them in `stems/raw/<stem>-backing.flac`, and refuses a split whose lead loses more than 6 dB in over 25% of the half-second windows where the vocal sounds, as on a double-tracked rap verse, unless `--force`)
-- `glass-harbor track lyrics <id> [--force]` (Whisper, then the published LRCLIB text force-aligned to the acapella for word timings when Whisper heard at least half of it; Whisper's own output stays in `lyrics_whisper.json`)
+- `glass-harbor track lyrics <id> [--force]` (Whisper, then the published synced lyrics, the file's own or LRCLIB's, force-aligned to the acapella for word timings when Whisper heard at least half of it; Whisper's own output stays in `lyrics_whisper.json`)
 - `glass-harbor track list` / `glass-harbor track show <id>`
 - `glass-harbor match <id> [--role vocals|bed|next] [--against ids...]`
 - `glass-harbor set order <ids...> [--start <id>]`
 - `glass-harbor mix new <slug> --kind mashup|transition|set ...`
-- `glass-harbor mix drop <slug> --at-bar N [--build-bars 8] [--silence-beats 1] [--clips ids]`
+- `glass-harbor mix drop <slug> --at-bar N [--style edm|hiphop] [--build-bars N] [--silence-beats N] [--clips ids]`
+  (styled by tempo: 115+ bpm gets the 8-bar EDM build with a riser, slower beats a bar of filter-down and a bar
+  of beat cut)
 - `glass-harbor mix follow <slug> [--clips ids]` (bass follows the chords each sung vocal was written over)
 - `glass-harbor mix validate <slug>`
 - `glass-harbor mix render <slug> [--start-bar N --end-bar M] [--clips] [--no-mp3]`

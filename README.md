@@ -7,7 +7,7 @@ agent writes a short plan in bars; the `glass-harbor` CLI does the audio work lo
   flips, key + Camelot ([S-KEY](https://github.com/deezer/skey), vendored), loudness, per-bar energy, drops
   (kick + bass returns), sections (novelty, or verse/chorus labels from
   [allin1](https://github.com/mir-aidj/all-in-one)), lyrics with word timings (local Whisper, re-timed by forced
-  alignment of the published LRCLIB text with torchaudio's MMS aligner, whose weights are CC-BY-NC 4.0) and hooks
+  alignment of the published synced lyrics with torchaudio's MMS aligner, whose weights are CC-BY-NC 4.0) and hooks
 - **stems**: [python-audio-separator](https://github.com/nomadkaraoke/python-audio-separator) with unwa's
   Resurrection BS-RoFormer models (default) or the community RoFormer ensembles, BS-RoFormer SW for drums/bass/other,
   RoFormer de-reverb for acapellas

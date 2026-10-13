@@ -68,13 +68,18 @@ def separate_vocal_only(track_id: str, log: Log) -> None:
     separate_track(track_id, stems=["vocals"], quality="best", log=log)
 
 
-def prepare_vocal(track_id: str, log: Log) -> None:
-    """Best-quality acapella, gently de-reverbed; the original bass (so the beat's bass can follow the vocal's
-    chords); word-timed lyrics."""
+def prepare_vocal(track_id: str, log: Log, *, kind: str | None = None) -> None:
+    """Best-quality acapella, gently de-reverbed; word-timed lyrics; and for a sung vocal the original bass, so the
+    beat's bass can follow the chords it was written over. A rapped vocal has no chords to follow, so its bass is
+    not separated: that skips the slowest step (an instrumental ensemble plus a stem split, about 8 minutes).
+    ``kind`` is the fit check's "sung" or "rap"; without it the vocal is measured here."""
     from glass_harbor.analyze import analyze_library_track
+    from glass_harbor.fit import vocal_kind
     from glass_harbor.separate import clean_stem, separate_track
 
-    produced = separate_track(track_id, stems=["vocals", "bass"], quality="best", log=log)
+    kind = kind or vocal_kind(track_id)[0]
+    produced = separate_track(track_id, stems=["vocals", "bass"] if kind == "sung" else ["vocals"], quality="best",
+                              log=log)
     info = library.load_meta(track_id).get("stems", {}).get("vocals", {})
     if not info.get("cleaned"):
         clean_stem(track_id, "vocals", "dereverb-gentle", log=log)
@@ -305,7 +310,7 @@ def run_auto(vocal: str, bed: str, *, slug: str | None = None, title: str = "", 
     if check["verdict"] == "poor" and not force:
         raise PoorFit(f"{vocal_id} over {bed_id} fails the fit check: {'; '.join(check['reasons'])}. Pick another "
                       "beat, or pass --force to make it anyway.")
-    prepare_vocal(vocal_id, log)
+    prepare_vocal(vocal_id, log, kind=check["vocal_type"])
     prepare_bed(bed_id, log)
     slug = require_slug(slug or f"{vocal_id}-x-{bed_id}")
     names = [library.load_meta(t).get("title", t) for t in (vocal_id, bed_id)]

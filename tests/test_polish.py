@@ -131,6 +131,44 @@ def test_dj_edges_shift_and_wrap_the_edit(workspace):
     assert ids["bed"]["automation"]["gain_db"] == [[24, 0]]  # the fade-out gave way to the outro
 
 
+def _with_levels(silent_bars, breaks):
+    """The _mashup bed with its drums and bass silent on ``silent_bars`` and dropping out on ``breaks``."""
+    plan = _mashup()
+    analysis = library.load_analysis("bed")
+    for stem in ("drums", "bass"):
+        levels = [-10.0] * 48
+        for bar in silent_bars:
+            levels[bar - 1] = -70.0
+        for bar in breaks:
+            levels[bar - 1] = -25.0
+        analysis["stems"][stem]["bar_db"] = levels
+    library.save_analysis("bed", analysis)
+    return plan
+
+
+def test_dj_edges_loop_skips_the_beats_break_and_bridge_its_dead_air(workspace):
+    plan = add_dj_edges(_with_levels(silent_bars=[1], breaks=[15, 16]), intro_bars=16, outro_bars=16)
+    assert resolve(plan).ok
+    ids = {c["id"]: c for c in plan["clips"]}
+    # bars 9-16 run into the break, so the loop is the drop's first 4 bars, played 4 times (bass twice)
+    assert (ids["intro-drums"]["from_bar"], ids["intro-drums"]["bars"], ids["intro-drums"]["loop"]) == (9, 4, 4)
+    assert (ids["intro-bass"]["loop"], ids["outro-drums"]["loop"], ids["outro-bass"]["loop"]) == (2, 4, 2)
+    # the bed's silent first bar (now bar 17) gets the intro's groove instead of a hole
+    bridge = ids["intro-drums-bridge"]
+    assert (bridge["at_bar"], bridge["bars"], bridge["from_bar"]) == (17, 1, 9) and "intro-bass-bridge" in ids
+    assert any("1 silent opening bar" in n for n in plan["notes"])
+    # the record's own low end steps aside under the bridge: never two basslines at once
+    assert ids["bed"]["automation"]["eq_low_db"] == [[0, -24.0], [0.998, -24.0], [1, 0.0]]
+    assert not any("two basslines" in i.message for i in resolve(plan).issues)
+
+
+def test_dj_edges_loop_moves_past_a_break_inside_the_drop(workspace):
+    plan = add_dj_edges(_with_levels(silent_bars=[], breaks=[11]), intro_bars=16, outro_bars=16)
+    ids = {c["id"]: c for c in plan["clips"]}
+    assert (ids["intro-drums"]["from_bar"], ids["intro-drums"]["bars"]) == (12, 8)  # first clean 8 bars after it
+    assert not any(i.endswith("-bridge") for i in ids)
+
+
 def test_fills_and_edits(workspace):
     plan = add_fills(_mashup())
     gens = {c["id"]: c for c in plan["clips"] if "generate" in c}

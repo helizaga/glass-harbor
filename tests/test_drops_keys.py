@@ -46,6 +46,31 @@ def test_drop_macro_adds_build_silence_and_fx(workspace):
         add_drop(plan, 4, build_bars=8)
 
 
+def test_drops_on_slow_beats_filter_down_and_cut_instead_of_rising(workspace):
+    write_fake_track("bed", bpm=93, key="Am", bars=48, stems=("instrumental",))
+    plan = {"version": 1, "kind": "mashup", "bpm": 93, "sources": {"bed": {"track": "bed"}},
+            "clips": [{"id": "bed", "source": "bed", "stem": "instrumental", "from_bar": 1, "bars": 40, "at_bar": 1}]}
+    add_drop(plan, 25)
+    assert resolve(plan).ok
+    auto = plan["clips"][0]["automation"]
+    # bar 23 filters down, bar 24 is the beat cut (the vocal alone), the beat is back whole on 25
+    assert "highpass_hz" not in auto and auto["lowpass_hz"] == [[22, 20000.0], [23, 300.0], [23.998, 300.0],
+                                                                [24, 20000.0]]
+    assert [23, -60] in auto["gain_db"] and auto["gain_db"][-1] == [24, 0]
+    ids = {c["id"] for c in plan["clips"]}
+    assert "impact-25" in ids and not any(i.startswith(("riser", "roll")) for i in ids)
+    assert "2-bar hip-hop build (filter down)" in plan["notes"][-1]
+
+    waltz = {**plan, "beats_per_bar": 3, "clips": [{**plan["clips"][0], "automation": {}}]}
+    add_drop(waltz, 25)  # in 3/4 the cut is one bar of three beats, not 1 1/3 bars
+    assert waltz["clips"][0]["automation"]["gain_db"][1] == [23, -60] and "3 beat(s) of silence" in waltz["notes"][-1]
+
+    add_drop(plan, 41, style="edm")  # asked for: the EDM build on a slow beat
+    assert "riser-41" in {c["id"] for c in plan["clips"]} and auto["highpass_hz"][0] == [32, 20]
+    with pytest.raises(ValueError):
+        add_drop(plan, 33, build_bars=1)  # a bar of silence inside a one-bar build
+
+
 def test_generated_clips_render(workspace, synth_files, tmp_path):
     from glass_harbor import library
     from glass_harbor.analyze import analyze_track

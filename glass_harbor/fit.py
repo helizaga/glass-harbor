@@ -32,6 +32,41 @@ LIMITS = {
     "sung": {"vocal_room": (0.03, 0.07), "harshness": (0.03, 0.05), "out_of_key": (0.36, 0.42)},
     "rap": {"vocal_room": (0.05, 0.10), "harshness": (0.035, 0.06), "out_of_key": (0.40, 0.48)},
 }
+TEMPO_LIMITS = (3, 6)  # % the vocal is stretched to the beat's tempo: risky above the first, poor above the second
+MAX_SEMITONES = 2  # past this, a pitch-shifted voice starts to sound unnatural
+
+REASONS = {
+    "vocal_room": "the beat is crowded in the 1-4 kHz vocal range (busy synths/hats will mask the vocal)",
+    "harshness": "the beat's vocal range is noisy or distorted (aggressive, gritty sound design)",
+    "out_of_key": "a lot of the beat's harmony sits outside the vocal's key (dark/chromatic)",
+    "tempo": "the vocal needs a big tempo change",
+    "key": "the keys clash or need a large vocal pitch shift",
+}
+
+
+def match_checks(stretch_pct: float, semitones: int, relation: str, kind: str) -> list[dict[str, Any]]:
+    """Tempo and key gates on how the matcher lays the vocal over the beat (shared with ``lookup``)."""
+    risky, poor = TEMPO_LIMITS
+    checks = []
+    if abs(stretch_pct) > poor:
+        checks.append({"check": "tempo", "value": stretch_pct, "level": "poor", "limits": [risky, poor]})
+    elif abs(stretch_pct) > risky:
+        checks.append({"check": "tempo", "value": stretch_pct, "level": "risky", "limits": [risky, poor]})
+    if abs(semitones) > MAX_SEMITONES or relation == "clash":
+        checks.append({"check": "key", "value": relation, "level": "poor" if kind == "sung" else "risky",
+                       "limits": None})
+    return checks
+
+
+def verdict(checks: list[dict[str, Any]]) -> str:
+    levels = [c["level"] for c in checks]
+    return "poor" if "poor" in levels else "risky" if "risky" in levels else "good"
+
+
+def vocal_kind(track_id: str) -> tuple[str, float | None]:
+    """("sung" or "rap", sung share). A vocal that isn't separated yet counts as rap, the looser limits."""
+    sung = sung_share(track_id)
+    return ("sung" if (sung or 0) >= SUNG_SHARE else "rap"), sung
 
 
 def _excerpt(audio: np.ndarray) -> np.ndarray:
@@ -101,8 +136,7 @@ def assess(vocal: str, beat: str, *, log=print) -> dict[str, Any]:
 
     vox, bed = library.load_analysis(vocal), library.load_analysis(beat)
     fit = compat.score_pair(vocal, vox, beat, bed)[0]
-    sung = sung_share(vocal)
-    kind = "sung" if (sung or 0) >= SUNG_SHARE else "rap"
+    kind, sung = vocal_kind(vocal)
     key = Key(int(vox["key"]["tonic"]), vox["key"]["mode"]).shifted(fit.semitones)
     audio, measured_on = _beat_without_vocal(beat, log)
     profile = beat_profile(audio, key.tonic, key.mode)
@@ -111,27 +145,12 @@ def assess(vocal: str, beat: str, *, log=print) -> dict[str, Any]:
         risky, poor = LIMITS[kind][name]
         level = "poor" if value > poor else "risky" if value > risky else "good"
         checks.append({"check": name, "value": value, "level": level, "limits": [risky, poor]})
-    if abs(fit.stretch_pct) > 6:
-        checks.append({"check": "tempo", "value": fit.stretch_pct, "level": "poor", "limits": [3, 6]})
-    elif abs(fit.stretch_pct) > 3:
-        checks.append({"check": "tempo", "value": fit.stretch_pct, "level": "risky", "limits": [3, 6]})
-    if abs(fit.semitones) > 2 or fit.relation == "clash":
-        checks.append({"check": "key", "value": fit.relation, "level": "poor" if kind == "sung" else "risky",
-                       "limits": None})
-    levels = [c["level"] for c in checks]
-    verdict = "poor" if "poor" in levels else "risky" if "risky" in levels else "good"
-    reasons = {
-        "vocal_room": "the beat is crowded in the 1-4 kHz vocal range (busy synths/hats will mask the vocal)",
-        "harshness": "the beat's vocal range is noisy or distorted (aggressive, gritty sound design)",
-        "out_of_key": "a lot of the beat's harmony sits outside the vocal's key (dark/chromatic)",
-        "tempo": "the vocal needs a big tempo change",
-        "key": "the keys clash or need a large vocal pitch shift",
-    }
+    checks += match_checks(fit.stretch_pct, fit.semitones, fit.relation, kind)
     from glass_harbor import potential
 
     return {"vocal": vocal, "beat": beat, "vocal_type": kind, "sung_share": sung, "measured_on": measured_on,
             "potential": potential.assess(vocal, beat),
             "fit": {"relation": fit.relation, "semitones": fit.semitones, "tempo_ratio": fit.tempo_ratio,
                     "stretch_pct": fit.stretch_pct, "score": fit.score},
-            "checks": checks, "verdict": verdict,
-            "reasons": [reasons[c["check"]] for c in checks if c["level"] != "good"]}
+            "checks": checks, "verdict": verdict(checks),
+            "reasons": [REASONS[c["check"]] for c in checks if c["level"] != "good"]}
