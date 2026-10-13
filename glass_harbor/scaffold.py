@@ -872,6 +872,10 @@ def add_dj_edges(plan: dict[str, Any], *, intro_bars: int = 16, outro_bars: int 
         plan.setdefault("notes", []).append(f"the beat's own {tail}-bar fade-out is cut; the DJ outro follows on")
         res = resolve(plan)
     last_bar = max(1 + c.out_end_beat / res.beats_per_bar for c in res.clips if c.stem != "fx")
+    # A vocal that runs on past the end of the beat would sit on silence until the outro (1 Umbrella's last verse
+    # ran a bar past Starboy's end): the outro starts where the beat ends and its groove plays under the overhang.
+    last_bar = min(last_bar, max((1 + c.out_end_beat / res.beats_per_bar for c in res.clips
+                                  if c.source == bed.source and c.stem != "fx"), default=last_bar))
     for clip in plan["clips"]:
         clip["at_bar"] = clip["at_bar"] + intro_bars
         gains = (clip.get("automation") or {}).get("gain_db")

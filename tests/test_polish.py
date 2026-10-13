@@ -162,6 +162,15 @@ def test_dj_edges_loop_skips_the_beats_break_and_bridge_its_dead_air(workspace):
     assert not any("two basslines" in i.message for i in resolve(plan).issues)
 
 
+def test_dj_outro_starts_where_the_beat_ends_under_a_vocal_that_runs_on(workspace):
+    plan = _mashup()
+    plan["clips"][2]["at_bar"] = 29  # the hook runs to bar 37, four bars past the beat's end at 33
+    plan = add_dj_edges(plan, intro_bars=0, outro_bars=16)
+    assert resolve(plan).ok
+    ids = {c["id"]: c for c in plan["clips"]}
+    assert ids["outro-drums"]["at_bar"] == 33 and ids["outro-bass"]["at_bar"] == 33  # no bars of vocal on silence
+
+
 def test_dj_edges_loop_moves_past_a_break_inside_the_drop(workspace):
     plan = add_dj_edges(_with_levels(silent_bars=[], breaks=[11]), intro_bars=16, outro_bars=16)
     ids = {c["id"]: c for c in plan["clips"]}
