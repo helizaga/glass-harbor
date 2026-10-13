@@ -132,3 +132,19 @@ def test_align_track_rejects_mostly_skipped_lines_and_records_the_rest(workspace
     monkeypatch.setattr(align, "align_lines", keep({0, 1, 2, 3}))  # 4 of 5: kept, the gap recorded
     merged = align.align_track("rap", log=lambda m: None)
     assert merged["skipped_lines"] == [4] and merged["aligned_lines"] == 4
+
+
+def test_align_track_keeps_whisper_when_the_aligner_model_cannot_download(workspace, monkeypatch):
+    from urllib.error import URLError
+
+    write_fake_track("rap", bpm=90, key="Am", bars=8)
+    whisper = _whisper()
+    lyrics_path("rap").write_text(json.dumps(whisper))
+    reference_path("rap").write_text(json.dumps(_reference()))
+
+    def offline(vocal, lines, windows):
+        raise URLError("no network")  # what torch.hub raises when the checkpoint download fails
+
+    monkeypatch.setattr(align, "align_lines", offline)
+    assert align.align_track("rap", log=lambda m: None) is None
+    assert load_lyrics("rap") == whisper and not align.whisper_path("rap").exists()

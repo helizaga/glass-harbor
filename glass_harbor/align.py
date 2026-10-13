@@ -188,6 +188,9 @@ def align_track(track_id: str, *, log: Log = print) -> dict[str, Any] | None:
     except ImportError:
         log("word alignment needs torch and torchaudio (pip install -e '.[ml]'); kept Whisper's timings")
         return None
+    except OSError as error:  # the first run downloads the aligner's model; offline, Whisper's timings stay
+        log(f"could not load the word aligner ({error.__class__.__name__}); kept Whisper's timings")
+        return None
     alignable = [i for i, line in enumerate(reference["lines"]) if any(_token(w) for w in line["text"].split())]
     done = {line["index"] for line in aligned}
     skipped = [i for i in alignable if i not in done]
