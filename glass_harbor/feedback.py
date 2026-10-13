@@ -26,6 +26,9 @@ TASTE_DEFAULTS: dict[str, Any] = {
     "vocal_highpass_hz": 110,
     "duck_db": 5.0,  # spectral ducking: the most it cuts, only where the vocal competes
     "dj_edge_bars": 16,  # beat-only intro/outro on new mashups so DJs can mix them (0 = off)
+    # beat-only bars before the first vocal on new mashups: 0 keeps the beat's own run-up and the DJ intro; N trims
+    # the run-up to about N bars (from a section start of the beat) and skips the DJ intro (the outro stays)
+    "run_up_bars": 0,
     "short_edit_seconds": 150,  # length the phone short edit (mix-short.m4a) aims for (0 = no short edit)
 }
 

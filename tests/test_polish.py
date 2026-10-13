@@ -169,6 +169,43 @@ def test_dj_edges_loop_moves_past_a_break_inside_the_drop(workspace):
     assert not any(i.endswith("-bridge") for i in ids)
 
 
+def test_trim_run_up_starts_on_a_section_of_the_beat_and_keeps_the_vocal_on_its_bar(workspace):
+    from glass_harbor.scaffold import trim_run_up
+
+    plan = _mashup()
+    plan["clips"][1]["at_bar"], plan["clips"][2]["at_bar"] = 13, 21  # 12 bars of beat before the verse
+    plan["clips"].append({"id": "early-fx", "generate": "riser", "at_bar": 3, "bars": 2})
+    beat = {"sections": [{"start_bar": 1}, {"start_bar": 7}, {"start_bar": 17}], "drops": []}
+    trim_run_up(plan, beat, keep_bars=4)
+    assert resolve(plan).ok
+    ids = {c["id"]: c for c in plan["clips"]}
+    # bar 7 is the latest section start at least 4 bars before the verse: the edit starts there
+    assert (ids["verse"]["at_bar"], ids["hook"]["at_bar"]) == (7, 15)
+    assert (ids["bed"]["at_bar"], ids["bed"]["from_bar"], ids["bed"]["bars"]) == (1, 7, 26)  # same beat bar under it
+    assert ids["bed"]["automation"]["gain_db"] == [[0, 0.0], [18, 0], [26, -40]]  # the fade moves with it
+    assert "early-fx" not in ids  # it only played in the cut run-up
+
+    plan = _mashup()  # without a section start in reach, exactly keep_bars before the vocal
+    trim_run_up(plan, {"sections": [{"start_bar": 1}]}, keep_bars=4)
+    assert {c["id"]: c["at_bar"] for c in plan["clips"]}["verse"] == 5
+
+
+def test_a_vocal_first_taste_skips_the_dj_intro(workspace):
+    from glass_harbor.feedback import load_taste, save_taste
+    from glass_harbor.scaffold import build_mashup
+
+    _mashup()  # the tracks
+    plan_default = build_mashup("vox", "bed")
+    taste = load_taste()
+    taste["defaults"]["run_up_bars"] = 4
+    save_taste(taste)
+    plan = build_mashup("vox", "bed")
+    first = lambda p: min(c["at_bar"] for c in p["clips"] if c.get("stem") == "vocals")  # noqa: E731
+    assert not any(c["id"].startswith("intro-") for c in plan["clips"])  # no DJ intro
+    assert any(c["id"].startswith("outro-") for c in plan["clips"])  # the outro stays
+    assert first(plan) <= 5 < first(plan_default)
+
+
 def test_fills_and_edits(workspace):
     plan = add_fills(_mashup())
     gens = {c["id"]: c for c in plan["clips"] if "generate" in c}

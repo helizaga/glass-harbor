@@ -429,12 +429,17 @@ def build_mashup(vocals: str, bed: str, *, semitones: int | None = None, intro_b
         plan = arrange.add_bed_answers(plan, bed)
         plan = arrange.add_halftime_switch(plan)
     plan = add_fills(plan)
+    run_up = int(taste_default("run_up_bars"))
+    if run_up:
+        plan = trim_run_up(plan, beat, keep_bars=run_up)
     edges = int(taste_default("dj_edge_bars"))
     if edges:
         own_intro = arrange.own_intro_bars(beat)
-        intro = 0 if own_intro >= 16 else edges
+        intro = 0 if own_intro >= 16 or run_up else edges
         if intro == 0:
-            plan.setdefault("notes", []).append(f"no extra DJ intro: the beat opens with {own_intro} bars of its own")
+            plan.setdefault("notes", []).append(
+                f"no extra DJ intro: the vocal comes in within {run_up} bars (taste run_up_bars)" if run_up
+                else f"no extra DJ intro: the beat opens with {own_intro} bars of its own")
         plan = add_dj_edges(plan, intro_bars=intro, outro_bars=edges)
     plan, _ = follow_vocal_roots(plan)
     return plan
@@ -738,6 +743,61 @@ def _quiet_tail_bars(analysis: dict[str, Any]) -> int:
     while bars < len(levels) // 4 and levels[-1 - bars] < median - 10:
         bars += 1
     return bars
+
+
+def trim_run_up(plan: dict[str, Any], beat: dict[str, Any], *, keep_bars: int = 4) -> dict[str, Any]:
+    """Cut the beat-only run-up before the first vocal down to about ``keep_bars`` bars. The edit starts on the
+    latest section start (or drop) of the beat that leaves at least that many bars before the vocal, else exactly
+    that many bars before it. Whole bars only, so every vocal stays on the beat bar it was placed on; the beat's
+    clips start later in the record, and anything that only played in the cut run-up goes. 1 Umbrella over
+    Starboy ran 28 seconds of Starboy before the first word (70 with the DJ intro)."""
+    from glass_harbor.plan import AUTOMATABLE, FREQUENCY_PARAMS, automation_value, resolve
+
+    res = resolve(plan)
+    if not res.ok:
+        raise ValueError("fix plan errors before trimming the run-up")
+    vocal_starts = [c.out_start_beat for c in res.clips if c.stem == "vocals"]
+    if not vocal_starts:
+        return plan
+    first = 1 + min(vocal_starts) / res.beats_per_bar
+    latest = math.floor(first - keep_bars)
+    if latest <= 1:
+        return plan
+    # Output bar of each place the beat itself turns a corner, through the earliest clip of the beat.
+    bed = min((c for c in plan["clips"] if c.get("source") == "bed" and "from_bar" in c), key=lambda c: c["at_bar"],
+              default=None)
+    ratio = float((plan["sources"].get("bed") or {}).get("tempo_ratio", 1.0))
+    corners = [s["start_bar"] for s in beat.get("sections", [])] + list(beat.get("drops") or [])
+    starts = [bed["at_bar"] + (c - bed["from_bar"]) * ratio for c in corners] if bed else []
+    start = max((s for s in starts if 1 < s <= latest and float(s).is_integer()), default=latest)
+    cut = int(start) - 1
+    kept = []
+    for clip in plan["clips"]:
+        if clip["at_bar"] >= start:
+            clip["at_bar"] = round(clip["at_bar"] - cut, 4)
+            kept.append(clip)
+            continue
+        scale = float((plan["sources"].get(clip.get("source")) or {}).get("tempo_ratio", 1.0))
+        if "from_bar" not in clip or clip.get("loop", 1) != 1 or clip["at_bar"] + clip["bars"] * scale <= start:
+            continue  # it only played in the run-up
+        into = start - clip["at_bar"]  # output bars of this clip that fall in the run-up
+        clip["from_bar"] = round(clip["from_bar"] + into / scale, 4)
+        clip["bars"] = round(clip["bars"] - into / scale, 4)
+        clip["at_bar"] = 1
+        for lane, points in (clip.get("automation") or {}).items():
+            if not points:
+                continue
+            value = automation_value(points, into, AUTOMATABLE.get(lane, 0.0), log_scale=lane in FREQUENCY_PARAMS)
+            clip["automation"][lane] = [[0, value]] + [[round(p[0] - into, 4), p[1]] for p in points if p[0] > into]
+        kept.append(clip)
+    plan["clips"] = kept
+    for point in (plan.get("tempo") or [])[1:]:
+        point["bar"] = max(1, point["bar"] - cut)
+    plan["edits"] = [{**e, "at_bar": e["at_bar"] - cut} for e in plan.get("edits", []) if e["at_bar"] - cut >= 1]
+    notes = plan.setdefault("notes", [])
+    notes.append(f"run-up trimmed: the edit starts on bar {start:g} of the draft, {first - start:g} bars before the "
+                 f"first vocal (taste run_up_bars={keep_bars}); subtract {cut} from bar numbers in the notes above")
+    return plan
 
 
 LOOP_QUIET_DB = 6.0  # a bar this far under a stem's usual level is a fill or a break: not loop material

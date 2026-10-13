@@ -151,7 +151,11 @@ drop into the plan, styled by the plan's tempo unless `--style` says otherwise:
 
 - `glass-harbor mix edges <slug> [--intro-bars 16 --outro-bars 16]`: a beat-only intro (drums, bass in halfway)
   and outro looped from the beat's first drop, so DJs can mix the edit; everything else moves later. New mashups
-  get 16 bars by default (`taste set dj_edge_bars=0` turns it off).
+  get 16 bars by default (`taste set dj_edge_bars=0` turns it off). The loop covers only bars where the beat plays
+  in full, and the intro's groove bridges up to two silent bars at the beat's own start.
+- `taste set run_up_bars=4`: new mashups get to the vocal fast. The beat-only run-up before the first vocal is cut
+  to about 4 bars, starting on a section start of the beat, and there is no DJ intro (the outro stays). The default
+  0 keeps the beat's whole run-up and the DJ intro.
 - `glass-harbor mix fills <slug>`: a crash on drops and on hook entries at least 16 bars apart, and a one-bar
   reverse swell of each marked hook's first word into it. New mashups get these by default.
 - `glass-harbor mix drop <slug> --at-bar N --roll --riser vocal:janice`: the drop builder can add a snare roll from
