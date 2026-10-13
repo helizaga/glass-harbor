@@ -470,3 +470,31 @@ def test_a_shifted_reading_moves_the_slice_boundaries():
     hear(audio, [(10.0, 50.0)], transcribe=fake_transcribe)
     hear(audio, [(10.0, 50.0)], shift_s=10.0, transcribe=fake_transcribe)
     assert lengths[0] == 28.0 and lengths[2] == 18.0  # the second reading's first cut comes 10 s earlier
+
+
+def test_fix_rounds_pull_back_a_vocal_that_buries_the_beat(workspace):
+    from glass_harbor.auto import apply_qa_fixes
+
+    _chant_song(workspace)
+    plan = _plan_with_stems(workspace)
+    plan["clips"].append({"id": "verse1", "source": "vox", "stem": "vocals", "from_bar": 6, "bars": 12, "at_bar": 33})
+    buried = [{"bar": b, "db": -5.0} for b in (40, 41, 42)]
+    balance = lambda mix: [{"track": "vox", "clips": ["verse1"], "mix_lu": mix, "record_lu": -4.0}]  # noqa: E731
+    changes = apply_qa_fixes(plan, {"vocal_presence": buried, "vocal_balance": balance(5.0)}, {"flags": []})
+    verse = next(c for c in plan["clips"] if c["id"] == "verse1")
+    # 9 LU over its own record is 3 past the 6 LU limit: back down to it, and the buried bars do not lift it
+    assert verse["gain_db"] == -3.0 and any("own record" in c for c in changes)
+    assert not any("buried" in c for c in changes)
+    verse.pop("gain_db")
+    plan.pop("auto")
+    # 1 dB of room left: a +2 dB lift would cross the limit, so the buried bars are left to the ears
+    assert apply_qa_fixes(plan, {"vocal_presence": buried, "vocal_balance": balance(1.0)}, {"flags": []}) == []
+    assert "gain_db" not in verse
+    # Any excess QA warns about gets corrected, rounded down so the vocal lands under the limit
+    apply_qa_fixes(plan, {"vocal_presence": [], "vocal_balance": balance(2.04)}, {"flags": []})
+    assert verse["gain_db"] == -0.1
+    # The beat's own vocal is measured like any other, so it is pulled back too (though never lifted)
+    plan["clips"].append({"id": "bed-hook", "source": "bed", "stem": "vocals", "from_bar": 40, "bars": 8, "at_bar": 81})
+    over = [{"track": "bed", "clips": ["bed-hook"], "mix_lu": 3.0, "record_lu": -4.0}]
+    apply_qa_fixes(plan, {"vocal_presence": [], "vocal_balance": over}, {"flags": []})
+    assert next(c for c in plan["clips"] if c["id"] == "bed-hook")["gain_db"] == -1.0
