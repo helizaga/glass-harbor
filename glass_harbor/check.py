@@ -13,6 +13,10 @@ from glass_harbor import audio as A
 SOURCE_GRID_TOLERANCE_MS = 35.0
 WARP_TOLERANCE_MS = 15.0
 BASS_CLASH_PCT = 10.0  # the vocal over its own bass measures 0-4%
+# A vocal this much louder over the beat than on its own record buries the beat. Listeners like the lead a little
+# above the released mix (Knoll & Siedenburg, Music & Science 2022), not 10 LU above it: Thankful x Blessings read
+# +6.2 LU against -3.3 LU on Kodak Black's own record before its beat was brought back up.
+VOCAL_OVER_RECORD_LU = 6.0
 
 
 def _bar_levels(audio: np.ndarray, plan: dict, report: dict) -> list[float]:
@@ -219,6 +223,13 @@ def check_run(run_dir: Path) -> dict[str, Any]:
         spans = _spans(buried)
         flag("warning", f"bars {spans}", "vocal is buried under the beat in the 1-4 kHz band; raise the vocal, add duck"
              " to the bed, or cut the bed's mids")
+
+    for item in report.get("vocal_balance", []):
+        record = item.get("record_lu")
+        if record is not None and item["mix_lu"] - record > VOCAL_OVER_RECORD_LU:
+            flag("warning", item["track"], f"the vocal sits {item['mix_lu']:+.1f} LU over the beat where it plays, "
+                 f"{item['mix_lu'] - record:.1f} LU louder than on its own record ({record:+.1f} LU): the beat is "
+                 "buried; lower the vocal or duck the beat less")
 
     for issue in report.get("issues", []):
         if issue["level"] == "warning":

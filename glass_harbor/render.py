@@ -606,6 +606,66 @@ def vocal_presence(rendered: list["RenderedClip"], total: int, bar_starts: list[
     return out
 
 
+def _balance_lu(vocal: np.ndarray, rest: np.ndarray, min_seconds: float = 5.0) -> tuple[float, float] | None:
+    """Loudness of ``vocal`` over ``rest`` (LU, BS.1770) on the 100 ms frames where the vocal sounds (within 30 dB of
+    its loudest frame), and how long that is. None when the vocal sounds for less than ``min_seconds``."""
+    frame = int(0.1 * A.SR)
+    k = min(vocal.shape[0], rest.shape[0]) // frame
+    if k == 0:
+        return None
+    v = vocal[: k * frame].reshape(k, frame, -1)
+    r = rest[: k * frame].reshape(k, frame, -1)
+    level = np.sqrt(np.mean(v**2, axis=(1, 2)))
+    active = level > max(1e-6, level.max() * 10 ** (-30 / 20))
+    seconds = float(active.sum() * frame / A.SR)
+    if seconds < min_seconds:
+        return None
+    v_lufs = A.integrated_lufs(v[active].reshape(-1, v.shape[2]))
+    r_lufs = A.integrated_lufs(r[active].reshape(-1, r.shape[2]))
+    if not (math.isfinite(v_lufs) and math.isfinite(r_lufs)):
+        return None
+    return round(v_lufs - r_lufs, 1), round(seconds, 1)
+
+
+def record_balance(track_id: str) -> float | None:
+    """The same measure on the vocal's own record: its separated vocals (before any cleanup) over its instrumental."""
+    vocals = library.stem_path(track_id, "vocals")
+    raw = vocals.parent / "raw" / vocals.name
+    instrumental = library.stem_path(track_id, "instrumental")
+    if not (vocals.exists() and instrumental.exists()):
+        return None
+    measured = _balance_lu(A.load(raw if raw.exists() else vocals), A.load(instrumental))
+    return measured[0] if measured else None
+
+
+def vocal_balance(rendered: list["RenderedClip"], total: int, keep: tuple[int, int] | None = None) -> list[dict]:
+    """Per vocal track: how loud it sits over everything that is not a vocal, where it sounds (LU), next to the same
+    measure on its own record. Hit records keep the lead within a few dB of the band (Gerdes & Siedenburg, JASA
+    Express Letters 2023), so a vocal far louder than on its own record buries the beat. ``keep`` limits it to the
+    samples a range render keeps."""
+    lo, hi = keep or (0, total)
+    vocals = [r for r in rendered if r.clip.stem == "vocals" and r.clip.chop is None]
+    if not vocals:
+        return []
+    rest = np.zeros((total, 2), dtype=np.float32)
+    for r in rendered:
+        if r.clip.stem != "vocals":
+            rest[r.start_sample: r.start_sample + r.audio.shape[0]] += r.audio
+    out = []
+    for track in sorted({r.clip.track for r in vocals}):
+        vocal = np.zeros((total, 2), dtype=np.float32)
+        ids = []
+        for r in vocals:
+            if r.clip.track == track:
+                vocal[r.start_sample: r.start_sample + r.audio.shape[0]] += r.audio
+                ids.append(r.clip.id)
+        measured = _balance_lu(vocal[lo:hi], rest[lo:hi])
+        if measured is not None:
+            out.append({"track": track, "clips": ids, "mix_lu": measured[0], "record_lu": record_balance(track),
+                        "active_s": measured[1]})
+    return out
+
+
 def glue(mix: np.ndarray) -> np.ndarray:
     """Gentle bus compression (about 1-2 dB) so stems from different records sit together."""
     import pedalboard
@@ -1114,7 +1174,14 @@ def render_plan(plan: dict[str, Any], out_dir: Path, *, start_bar: float | None 
         s1 = int(round((res.tempo.time_at(bar * bpb) + timeline_offset) * A.SR))
         if 0 <= s0 < total:
             bar_spans.append((bar, (s0, min(s1, total))))
+    crop_start, crop_end = 0, total
+    if start_bar is not None or end_bar is not None:
+        lo_t = res.tempo.time_at(((start_bar or 1) - 1) * bpb) + timeline_offset
+        crop_start = max(0, int(round(lo_t * A.SR)))
+        crop_end = total if end_bar is None else min(total, int(round(
+            (res.tempo.time_at(end_bar * bpb) + timeline_offset) * A.SR)))
     presence = vocal_presence(rendered, total, bar_spans)
+    balance = vocal_balance(rendered, total, keep=(crop_start, crop_end))
     vocal_sum = np.zeros((total, 2), dtype=np.float32)
     for r in rendered:
         if r.clip.stem == "vocals" and r.clip.chop is None:
@@ -1152,12 +1219,7 @@ def render_plan(plan: dict[str, Any], out_dir: Path, *, start_bar: float | None 
     if master_spec.get("tame_harshness", True):
         mix = tame_harshness(mix)
 
-    crop_start = 0
     if start_bar is not None or end_bar is not None:
-        lo_t = res.tempo.time_at(((start_bar or 1) - 1) * bpb) + timeline_offset
-        crop_start = max(0, int(round(lo_t * A.SR)))
-        crop_end = total if end_bar is None else min(total, int(round(
-            (res.tempo.time_at(end_bar * bpb) + timeline_offset) * A.SR)))
         mix = mix[crop_start:crop_end]
     premaster = mix
 
@@ -1238,6 +1300,7 @@ def render_plan(plan: dict[str, Any], out_dir: Path, *, start_bar: float | None 
         "phone_master": phone_stats,
         "issues": [i.to_dict() for i in res.issues],
         "vocal_presence": presence,
+        "vocal_balance": balance,
         "pitch_clash": pitch_clash,
         "bass_clash": vs_bass,
         "clips": [

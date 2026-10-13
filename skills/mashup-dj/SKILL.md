@@ -26,8 +26,13 @@ user has the files, `glass-harbor fit <vocal> <beat>` measures vocal room (1-4 k
 out-of-key harmony in a minute, plus an advisory hit-potential score (a known song on either side, a beat from
 the last six months, a short hook that repeats early, a rap/R&B vocal on a club beat). Treat a low score as a
 reason to look for a fresher or better-known beat, not as a verdict. Lyrics come from Whisper for timing and from LRCLIB (free, synced lines) for
-the right words and which lines really repeat; both stay in the gitignored library. Chart BPM/key
-are hints; trust `glass-harbor track show` once the user supplies the files.
+the right words and which lines really repeat; both stay in the gitignored library.
+
+**Measure before you rank.** Chart and streaming-derived keys are hints and can be wrong: Spotify's data lists
+Kodak Black's "Thankful" in C major, while the file measures B minor (S-KEY 0.71 on the instrumental stem, the 808
+root on B), which turned every C-major pick into a clash. When the user already has the vocal, `track add` it
+first and shortlist beats against its measured key and tempo. When they don't, present chart-based picks as
+provisional and say which numbers are unverified. Rank a shortlist only after `fit` has measured both files.
 
 ## Where the files come from (ranked)
 
@@ -83,6 +88,7 @@ community two-model RoFormer ensembles (~10 min/track) for the final acapella. E
 ```sh
 glass-harbor track clean <vocal-track>     # de-reverb: drier acapellas sit tighter on dry club beats
 glass-harbor track clean <vocal-track> --mode lead   # if harmonies/backing vocals clash with the new beat's chords
+                                                     # (refused on a double-tracked lead: it would strip the lead)
 glass-harbor track lyrics <vocal-track>    # word timings, lyric-based phrases, repeated lines = hooks
 ```
 
@@ -146,6 +152,9 @@ intent in `<slug>.brief.md` (what came from analysis vs your musical inference).
 - **Make room, don't just turn down**: spectral ducking (default) cuts the beat only where it competes with the
   vocal; percussive beds also need the drums ducked (`mix arrange` sets 4 dB). Check `vocal_presence` per section in
   `render.json`: aim for roughly +7 dB or more in the 1-4 kHz band.
+- **Don't bury the beat either**: `vocal_balance` in `render.json` gives each vocal's loudness over the beat where it
+  plays (LU) next to the same measure on its own record. Hit records keep the lead within a few dB of the band;
+  QA flags a vocal more than 6 LU louder than on its own record, and fix rounds pull it back.
 - **Groove**: on house/EDM beds, pump the melodic layer (`pump`, ~3 dB) and the vocal reverb/echo returns
   (`groove.pump_fx`, ~5 dB) so they breathe with the kick.
 - **Master against the release**: mashup scaffolds set `master.reference` to the bed's original track.
