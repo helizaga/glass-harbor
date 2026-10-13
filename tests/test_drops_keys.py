@@ -87,6 +87,24 @@ def test_fast_separation_writes_only_requested_stems(workspace, monkeypatch, tmp
     assert not library.stem_path("song", "bass").exists()
 
 
+def test_six_stem_split_folds_the_melodic_stems_into_other(workspace, monkeypatch, tmp_path):
+    from glass_harbor import library, separate
+
+    write_fake_track("beat", bpm=120, key="Am", bars=8, stems=("vocals", "instrumental"))
+    level = {"drums": 0.1, "bass": 0.2, "other": 0.01, "guitar": 0.02, "piano": 0.03, "vocals": 0.04}
+    fake = {name: A.save(tmp_path / f"beat_({name})_sw.flac", np.full((A.SR, 2), value, dtype=np.float32))
+            for name, value in level.items()}
+    calls = []
+    monkeypatch.setattr(separate, "_run_audio_separator", lambda *a, **k: calls.append(k) or fake)
+    produced = separate.separate_track("beat", stems=["drums", "bass", "other"], quality="balanced",
+                                       log=lambda m: None)
+    assert calls == [{"model": "BS-Roformer-SW.ckpt"}]
+    other = A.load(library.stem_path("beat", "other"))
+    assert other[100, 0] == pytest.approx(0.1, abs=1e-3)  # other + guitar + piano + vocal residue
+    assert A.load(library.stem_path("beat", "bass"))[100, 0] == pytest.approx(0.2, abs=1e-3)
+    assert produced["other"]["derived"] == "guitar + other + piano + vocals"
+
+
 def test_clean_steps_stack_and_lead_keeps_backing(workspace, monkeypatch):
     import sys
     import types

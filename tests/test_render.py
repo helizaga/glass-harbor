@@ -190,6 +190,17 @@ def test_short_edit_never_cuts_the_last_copy_of_a_hook(workspace):
     assert not cut(65)  # "longer" carries material "shorter" does not
 
 
+def test_grid_warning_trusts_drums_not_sustained_bass(tmp_path):
+    rng = np.random.default_rng(5)
+    A.save(tmp_path / "mix.wav", (0.1 * rng.standard_normal((8 * A.SR, 2))).astype(np.float32))
+    (tmp_path / "plan.json").write_text(json.dumps({"bpm": 130, "beats_per_bar": 4, "clips": []}))
+    clips = [{"id": f"loop-{stem}", "track": "beat", "stem": stem, "start_s": 0.0, "length_s": 8.0,
+              "stretch_pct": 0.0, "semitones": 0, "source_grid_offset_ms": -62.0} for stem in ("bass", "drums")]
+    (tmp_path / "render.json").write_text(json.dumps({"files": {"wav": "mix.wav"}, "clips": clips}))
+    grid = [f["where"] for f in check_run(tmp_path)["flags"] if "source beat grid" in f["message"]]
+    assert grid == ["loop-drums"]  # an off-beat bassline's decaying notes say nothing about the grid
+
+
 def test_vocal_balance_reads_loudness_only_where_the_vocal_sounds(workspace):
     from glass_harbor.render import _balance_lu, record_balance
     from conftest import write_fake_track

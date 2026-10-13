@@ -23,16 +23,22 @@ from glass_harbor import audio as A
 from glass_harbor import library
 from glass_harbor.paths import model_dir
 
+# Drums/bass/other come from jarredou's BS-RoFormer SW (six stems: other, guitar, piano, and a vocal residue are
+# summed back into "other"). On MVSEP's multisong set it leads HT-Demucs by about 2 dB SDR on drums (14.11 vs 12.04)
+# and bass (14.62 vs 12.52); on drums, BS-RoFormer keeps attacks as well as HT-Demucs and the envelope far better
+# ("Beyond SDR", arXiv 2609.04224: attack-slope error 1.33 vs 1.27 dB, variation 1.78 vs 4.09 dB).
+FOUR_STEM = {"model": "BS-Roformer-SW.ckpt"}
+
 PROFILES = {
     "balanced": {
         "vocals": {"model": "bs_roformer_vocals_resurrection_unwa.ckpt"},
         "instrumental": {"model": "bs_roformer_instrumental_resurrection_unwa.ckpt"},
-        "four_stem": {"model": "htdemucs_ft.yaml"},
+        "four_stem": FOUR_STEM,
     },
     "best": {
         "vocals": {"ensemble_preset": "vocal_balanced"},
         "instrumental": {"ensemble_preset": "instrumental_clean"},
-        "four_stem": {"model": "htdemucs_ft.yaml"},
+        "four_stem": FOUR_STEM,
     },
     "fast": {"all": {"model": "htdemucs.yaml"}},
 }
@@ -58,6 +64,8 @@ _LABELS = {
     "other": "other",
     "drums": "drums",
     "bass": "bass",
+    "guitar": "guitar",
+    "piano": "piano",
 }
 
 Log = Callable[[str], None]
@@ -212,9 +220,17 @@ def separate_local(track_id: str, wanted: set[str], quality: str, log: Log) -> d
             spec = profile["four_stem"]
             log(f"splitting the instrumental into drums/bass/other with {spec}")
             outputs = _run_audio_separator(library.stem_path(track_id, "instrumental"), tmp_dir / "four", **spec)
+            melodic = sorted(label for label in outputs if label not in ("drums", "bass"))
             for name in sorted(four):
                 library.copy_stem_file(track_id, name, outputs[name])
                 produced[name] = {"quality": quality, "input": "instrumental", **spec}
+            if "other" in four and len(melodic) > 1:
+                # A six-stem model splits the melodic layer further; the beat's "other" is all of it, so drums +
+                # bass + other still add up to the instrumental.
+                parts = [A.load(outputs[label]) for label in melodic]
+                frames = min(part.shape[0] for part in parts)
+                A.save(library.stem_path(track_id, "other"), sum(part[:frames] for part in parts), subtype="PCM_24")
+                produced["other"]["derived"] = " + ".join(melodic)
     return produced
 
 
