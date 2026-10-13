@@ -9,7 +9,7 @@ agent writes a short plan in bars; the `glass-harbor` CLI does the audio work lo
   [allin1](https://github.com/mir-aidj/all-in-one)), lyrics with word timings (local Whisper, re-timed by forced
   alignment of the published LRCLIB text with torchaudio's MMS aligner, whose weights are CC-BY-NC 4.0) and hooks
 - **stems**: [python-audio-separator](https://github.com/nomadkaraoke/python-audio-separator) with unwa's
-  Resurrection BS-RoFormer models (default) or the community RoFormer ensembles, HT-Demucs for drums/bass/other,
+  Resurrection BS-RoFormer models (default) or the community RoFormer ensembles, BS-RoFormer SW for drums/bass/other,
   RoFormer de-reverb for acapellas
 - **matching**: AutoMashUpper-style fit (tempo incl. half/double time, Camelot distance, chroma; key matters less
   for rap), set ordering by key, tempo and energy flow

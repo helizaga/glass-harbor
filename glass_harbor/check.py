@@ -139,9 +139,11 @@ def check_run(run_dir: Path) -> dict[str, Any]:
     for clip in report["clips"]:
         src = clip.get("source_grid_offset_ms")
         warp = clip.get("warp_offset_ms")
-        # Vocal syllables sit around the beat by design (laid-back or pushed delivery); only rhythm stems
-        # say anything about the grid itself.
-        if src is not None and abs(src) > SOURCE_GRID_TOLERANCE_MS and clip["stem"] != "vocals":
+        # Vocal syllables sit around the beat by design (laid-back or pushed delivery), and a clean bass stem is
+        # sustained notes, often off the beat (house): its only "onsets" near a beat are a decaying note at the edge
+        # of the search window (Blessings' BS-RoFormer SW bass read -62 ms with every peak on that edge). Drums and
+        # full mixes say something about the grid itself.
+        if src is not None and abs(src) > SOURCE_GRID_TOLERANCE_MS and clip["stem"] not in ("vocals", "bass"):
             flag("warning", clip["id"], f"source beat grid is {src:+.0f} ms off the audible beat for {clip['track']}"
                  " (re-analyze or adjust downbeat_shift)")
         if warp is not None and abs(warp) > WARP_TOLERANCE_MS:
