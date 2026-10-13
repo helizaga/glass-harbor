@@ -65,6 +65,7 @@ def test_render_transition_and_qa(workspace, synth_files, tmp_path):
     assert report["duration_s"] == pytest.approx(expected, abs=0.1)
     for clip in report["clips"]:
         assert clip["warp_offset_ms"] is not None and abs(clip["warp_offset_ms"]) < 12, clip
+        assert 0.0 <= clip["notes"]["warp_coverage"] <= 1.0, clip  # QA's sparse-vocal rule reads it from here
     assert len(list((out / "clips").glob("*.wav"))) == 2
     qa = check_run(out)
     assert qa["loudness_lufs"] == pytest.approx(-14, abs=1.0)

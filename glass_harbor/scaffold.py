@@ -753,6 +753,8 @@ def trim_run_up(plan: dict[str, Any], beat: dict[str, Any], *, keep_bars: int = 
     Starboy ran 28 seconds of Starboy before the first word (70 with the DJ intro)."""
     from glass_harbor.plan import AUTOMATABLE, FREQUENCY_PARAMS, automation_value, resolve
 
+    if keep_bars < 1:
+        raise ValueError("keep at least one bar of run-up (a cut at or past the vocal would shorten it)")
     res = resolve(plan)
     if not res.ok:
         raise ValueError("fix plan errors before trimming the run-up")
