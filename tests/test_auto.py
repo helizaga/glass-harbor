@@ -326,8 +326,8 @@ def test_hit_potential_scores_the_ingredients(monkeypatch, workspace):
         library.save_meta(track, {**library.load_meta(track), "artist": artist, "title": title})
     days = lambda n: (dt.date.today() - dt.timedelta(days=n)).isoformat()  # noqa: E731
     fake, calls = _deezer(
-        {"Don Toliver GLOCK": [{"id": 1, "title": "GLOCK", "rank": 450_000, "artist": {"name": "Don Toliver"}}],
-         "DABIN Stay With Me (feat. VELVETEARS)": [
+        {"don toliver GLOCK": [{"id": 1, "title": "GLOCK", "rank": 450_000, "artist": {"name": "Don Toliver"}}],
+         "dabin Stay With Me (feat. VELVETEARS)": [
              {"id": 9, "title": "Stay With Me", "rank": 990_000, "artist": {"name": "Calvin Harris"}},
              {"id": 2, "title": "Stay With Me", "rank": 700_000, "artist": {"name": "Dabin"}}]},
         {"track/1": days(900), "track/2": days(60)})
@@ -354,7 +354,8 @@ def test_popularity_reads_a_multi_artist_file_tag(monkeypatch, workspace):
     write_fake_track("b", bpm=130, key="Bm", bars=32)
     library.save_meta("b", {**library.load_meta("b"), "artist": "Calvin Harris; Clementine Douglas",
                             "title": "Blessings"})
-    fake, _ = _deezer({"Calvin Harris; Clementine Douglas Blessings": [
+    # Searched by the lead artist alone: Deezer finds nothing for a long credit ("1 Umbrella; Lil Bean; Lil Yee; ...").
+    fake, _ = _deezer({"calvin harris Blessings": [
         {"id": 1, "title": "Blessings", "rank": 875_690, "artist": {"name": "Calvin Harris"}}]},
         {"track/1": "2025-05-09"})
     monkeypatch.setattr(potential, "_get", fake)
@@ -397,6 +398,55 @@ def test_track_add_reads_artist_and_title_tags(workspace, tmp_path):
     subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-t", "1",
                     "-metadata", "artist=elden", "-metadata", "title=SWARM", str(source)], check=True)
     assert library.file_tags(source) == {"artist": "elden", "title": "SWARM"}
+
+
+def test_a_rapped_vocal_skips_the_bass_separation(workspace, monkeypatch):
+    from glass_harbor import analyze, auto, separate
+
+    asked = []
+    monkeypatch.setattr(separate, "separate_track", lambda track, stems, **k: asked.append(stems) or {})
+    monkeypatch.setattr(separate, "clean_stem", lambda *a, **k: None)
+    monkeypatch.setattr(analyze, "analyze_library_track", lambda *a, **k: None)
+    monkeypatch.setattr(auto, "_lyrics", lambda *a, **k: None)
+    write_fake_track("rap", bpm=95, key="Gm", bars=16)
+    auto.prepare_vocal("rap", lambda m: None, kind="rap")
+    auto.prepare_vocal("rap", lambda m: None, kind="sung")
+    assert asked == [["vocals"], ["vocals", "bass"]]  # bass only to follow sung chords
+
+
+def test_embedded_synced_lyrics_are_the_reference(workspace, tmp_path, monkeypatch):
+    import shutil
+    import subprocess
+
+    from glass_harbor import lyrics_ref
+
+    if not shutil.which("ffmpeg"):
+        pytest.skip("needs ffmpeg")
+    lrc = "[00:00.85] (Brutal Money)\n[00:03.10] \n[00:04.32] I am not your kinfolk\n[00:06.89] 1 Umbrella"
+    tagged, plain = tmp_path / "Umbrella.flac", tmp_path / "Plain.flac"
+    for path, extra in ((tagged, ["-metadata", f"LYRICS={lrc}"]), (plain, ["-metadata", "lyrics=just words"])):
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-t", "1",
+                        "-metadata", "artist=1 Umbrella; Lil Bean", "-metadata", "title=1 Umbrella", *extra,
+                        str(path)], check=True)
+    monkeypatch.setattr(lyrics_ref, "_get", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no LRCLIB")))
+
+    track, _ = library.add_track(tagged)
+    reference = lyrics_ref.fetch_reference(track, log=lambda m: None)
+    assert reference["source"] == "embedded" and lyrics_ref.load_reference(track) == reference
+    assert [(line["time"], line["text"]) for line in reference["lines"]] == [
+        (0.85, "(Brutal Money)"), (4.32, "I am not your kinfolk"), (6.89, "1 Umbrella")]  # blank lines dropped
+
+    library.embedded_lyrics_path(track).unlink()
+    assert library.add_track(tagged) == (track, False)  # added before lyrics were kept: a re-add picks them up
+    assert library.embedded_lyrics_path(track).exists()
+
+    other, _ = library.add_track(plain, track_id="plain")
+    assert lyrics_ref.embedded_reference(other) is None  # plain text, no timestamps: not a reference
+
+    both = tmp_path / "Both.flac"  # plain lyrics in the first tag, the synced ones after: the timed ones win
+    subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-t", "1",
+                    "-metadata", "UNSYNCEDLYRICS=just words", "-metadata", f"LYRICS={lrc}", str(both)], check=True)
+    assert library.file_tags(both)["lyrics"].startswith("[00:00.85]")
 
 
 def test_a_clip_counts_as_masked_only_when_it_reads_weak_twice_running():
@@ -452,6 +502,27 @@ def test_hearing_works_slice_by_slice_and_takes_each_overlap_word_once():
     times = [t for _, t in heard]
     assert times == sorted(times) and len(times) == len(set(times))  # nothing doubled where slices overlap
     assert times[0] == 9.0 and times[-1] == 50.0 and model == "m"
+
+
+def test_a_weak_clip_is_heard_again_on_its_own_window_before_it_counts():
+    from glass_harbor.listen import settle_weak
+
+    def clip(name, heard, start):
+        return {"clip": name, "expected": 100, "heard": heard, "recall": heard / 100, "start_s": start,
+                "end_s": start + 30}
+
+    judged = [clip("verse2", 80, 0), clip("verse4", 38, 30), clip("verse5", 30, 60), clip("verse6", 75, 90)]
+    windows = []
+    own = {30: 66, 60: 25}  # verse4 was lost to a slice cut; verse5 really is buried
+
+    def rehear(start, end):
+        windows.append((start, end))
+        return ["word"] * own[start]
+
+    weak = settle_weak(judged, {c["clip"]: len for c in judged}, rehear)
+    assert weak == ["verse5"] and windows == [(30, 60), (60, 90)]  # only the weak ones are heard again
+    assert judged[1]["recall"] == 0.66 and judged[1]["pass_recall"] == 0.38  # the better reading, both kept
+    assert judged[2]["recall"] == 0.3 and "pass_recall" not in judged[2]  # no better on its own
 
 
 def test_a_shifted_reading_moves_the_slice_boundaries():

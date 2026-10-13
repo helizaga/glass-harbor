@@ -34,9 +34,27 @@ def _get(path: str, params: dict[str, Any] | None = None) -> Any:
         return json.loads(response.read())
 
 
+def find(artist: str, title: str) -> dict[str, Any] | None:
+    """Deezer rank and release date for one song, or None when no hit is clearly that song. Network errors raise."""
+    from glass_harbor.lyrics_ref import _artists, _norm_name, lead_artist
+
+    want_title, lead = _norm_name(title), lead_artist(artist)
+    # Search by the lead artist only: a long credit ("1 Umbrella; Lil Bean; Lil Yee; ...") finds nothing.
+    hits = _get("search", {"q": f"{lead or ''} {title}".strip(), "limit": 10}).get("data", [])
+    same = [h for h in hits if _norm_name(h.get("title", "")) == want_title
+            and (lead is None or lead in _artists(h.get("artist", {}).get("name", "")))]
+    # Without an artist, a title several artists share is ambiguous: unknown beats wrong.
+    if not same or not (lead or len({h["artist"]["name"].lower() for h in same}) == 1):
+        return None
+    hit = same[0]
+    track = _get(f"track/{hit['id']}")
+    return {"title": hit["title"], "artist": hit["artist"]["name"], "rank": int(hit.get("rank") or 0),
+            "release_date": track.get("release_date")}
+
+
 def popularity(track_id: str) -> dict[str, Any] | None:
     """Deezer rank and release date for a library track (cached for a week). None when not found or offline."""
-    from glass_harbor.lyrics_ref import _artists, _norm_name, artist_and_title, lead_artist
+    from glass_harbor.lyrics_ref import artist_and_title
 
     cache = library.track_dir(track_id) / "popularity.json"
     try:
@@ -45,19 +63,8 @@ def popularity(track_id: str) -> dict[str, Any] | None:
             return data.get("result")
     except (OSError, ValueError, KeyError):
         pass  # missing or unreadable cache: look it up again
-    artist, title = artist_and_title(library.load_meta(track_id))
-    result = None
     try:
-        hits = _get("search", {"q": f"{artist} {title}".strip(), "limit": 10}).get("data", [])
-        want_title, lead = _norm_name(title), lead_artist(artist)
-        same = [h for h in hits if _norm_name(h.get("title", "")) == want_title
-                and (lead is None or lead in _artists(h.get("artist", {}).get("name", "")))]
-        # Without an artist, a title several artists share is ambiguous: unknown beats wrong.
-        if same and (lead or len({h["artist"]["name"].lower() for h in same}) == 1):
-            hit = same[0]
-            track = _get(f"track/{hit['id']}")
-            result = {"title": hit["title"], "artist": hit["artist"]["name"], "rank": int(hit.get("rank") or 0),
-                      "release_date": track.get("release_date")}
+        result = find(*artist_and_title(library.load_meta(track_id)))
     except Exception:  # noqa: BLE001 - offline or rate-limited: unknown, not zero
         return None
     # Write a temporary file and swap it in, so a parallel reader (another watcher) never sees half a cache.
@@ -74,6 +81,27 @@ def _months_old(release_date: str | None) -> float | None:
         return (dt.date.today() - dt.date.fromisoformat(release_date)).days / 30.4
     except ValueError:
         return None
+
+
+def tier(pop: dict[str, Any] | None) -> tuple[float, str]:
+    """How well known a song is: a 0-1 weight and a note for the reasons."""
+    if pop is None:
+        return 0.3, "unknown popularity"
+    rank = pop["rank"]
+    if rank >= HIT_RANK:
+        return 1.0, f"a hit (Deezer rank {rank:,})"
+    if rank >= POPULAR_RANK:
+        return 0.75, f"popular (Deezer rank {rank:,})"
+    if rank >= KNOWN_RANK:
+        return 0.45, f"known (Deezer rank {rank:,})"
+    return 0.2, f"niche (Deezer rank {rank:,})"
+
+
+def freshness(months: float | None) -> float:
+    """1 for a release in the last six months, less the older it is; unknown dates sit in between."""
+    if months is None:
+        return 0.4
+    return 1.0 if months <= 6 else 0.6 if months <= 18 else 0.25
 
 
 def hook(track_id: str) -> dict[str, Any] | None:
@@ -99,19 +127,6 @@ def assess(vocal: str, beat: str, *, crossover: bool | None = None) -> dict[str,
     vocal_pop, beat_pop = popularity(vocal), popularity(beat)
     hook_info = hook(vocal)
     score, reasons = 0.0, []
-
-    def tier(pop: dict[str, Any] | None) -> tuple[float, str]:
-        if pop is None:
-            return 0.3, "unknown popularity"
-        rank = pop["rank"]
-        if rank >= HIT_RANK:
-            return 1.0, f"a hit (Deezer rank {rank:,})"
-        if rank >= POPULAR_RANK:
-            return 0.75, f"popular (Deezer rank {rank:,})"
-        if rank >= KNOWN_RANK:
-            return 0.45, f"known (Deezer rank {rank:,})"
-        return 0.2, f"niche (Deezer rank {rank:,})"
-
     vocal_tier, vocal_note = tier(vocal_pop)
     beat_tier, beat_note = tier(beat_pop)
     score += 35 * max(vocal_tier, 0.6 * beat_tier) + 10 * beat_tier
@@ -119,9 +134,7 @@ def assess(vocal: str, beat: str, *, crossover: bool | None = None) -> dict[str,
 
     beat_age = _months_old((beat_pop or {}).get("release_date"))
     vocal_age = _months_old((vocal_pop or {}).get("release_date"))
-    fresh = lambda months: 1.0 if months is not None and months <= 6 else 0.6 if months is not None and months <= 18 \
-        else 0.25 if months is not None else 0.4  # noqa: E731
-    score += 15 * fresh(beat_age) + 5 * fresh(vocal_age)
+    score += 15 * freshness(beat_age) + 5 * freshness(vocal_age)
     if beat_age is not None:
         reasons.append(f"beat released {beat_age:.0f} months ago" + (" (fresh)" if beat_age <= 6 else ""))
 
