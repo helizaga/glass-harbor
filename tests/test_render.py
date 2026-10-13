@@ -207,7 +207,7 @@ def test_warp_warning_needs_enough_onsets_on_a_vocal(tmp_path):
     (tmp_path / "plan.json").write_text(json.dumps({"bpm": 93, "beats_per_bar": 4, "clips": []}))
     clips = [{"id": name, "track": "vox", "stem": stem, "start_s": 0.0, "length_s": 8.0, "stretch_pct": -2.1,
               "semitones": 2, "warp_offset_ms": 48.0, "notes": {"warp_coverage": coverage}}
-             for name, stem, coverage in (("sparse-verse", "vocals", 0.25), ("crisp-verse", "vocals", 0.5),
+             for name, stem, coverage in (("sparse-verse", "vocals", 0.346), ("crisp-verse", "vocals", 0.5),
                                           ("sparse-drums", "drums", 0.25))]
     (tmp_path / "render.json").write_text(json.dumps({"files": {"wav": "mix.wav"}, "clips": clips}))
     warned = [f["where"] for f in check_run(tmp_path)["flags"] if "off the output grid" in f["message"]]
