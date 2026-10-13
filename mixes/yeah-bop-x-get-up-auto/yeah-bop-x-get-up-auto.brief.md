@@ -10,6 +10,14 @@
 - `yeah-bop`: Lil Bean - yeah bop — 90.0 bpm (fixed grid), C major (8B, confidence 0.38), drops at [6, 14, 22, 34, 42]; stems: vocals, instrumental, bass
 - `get-up`: get-up-ijetfh — 175.0 bpm (fixed grid), A minor (8A, confidence 0.82), drops at [17, 113]; stems: vocals, instrumental, drums, bass, other
 
+## Fit check
+
+- verdict: good (rap vocal); vocal_room 0.0214 (good), harshness 0.0094 (good), out_of_key 0.345 (good)
+- hit potential: medium (56/100)
+  - vocal is niche (Deezer rank 61,929); beat is unknown popularity
+  - hook: 2-word line repeated 5x, first at 9s
+  - crossover: a hip-hop/R&B vocal on a club beat
+
 ## Decisions (the draft's rules; edit the plan to change them)
 
 - fit: relative major/minor, C major (8B) over A minor (8A), -2.8% stretch on vocals, score 0.946
@@ -25,12 +33,10 @@
 - fills: crash 17, crash 57, crash 83, crash 113, crash 148, crash 176, swell into 57
 - no extra DJ intro: the beat opens with 16 bars of its own
 - DJ edges: 0-bar beat intro, 16-bar beat outro (looped from bar 17 of get-up)
-- auto fix: vocal buried in the 1-4 kHz band: +2 dB on hook3, hook7; bed-other ducks 7 dB under the vocal
-- auto fix: vocal buried in the 1-4 kHz band: +2 dB on hook3, hook7; bed-other ducks 9 dB under the vocal
 
 ## Fix rounds
 
-- round 1: vocal buried in the 1-4 kHz band: +2 dB on hook3, hook7; bed-other ducks 7 dB under the vocal
+- round 1: vocal buried in the 1-4 kHz band: +2 dB on hook3, hook7; bed-other ducks 7 dB under the vocal (superseded by round 2's 9 dB)
 - round 2: vocal buried in the 1-4 kHz band: +2 dB on hook3, hook7; bed-other ducks 9 dB under the vocal
 
 ## QA after the last render
