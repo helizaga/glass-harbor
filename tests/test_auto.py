@@ -140,6 +140,33 @@ def test_fix_rounds_lift_buried_vocals_and_strip_before_flat_drops(workspace):
     assert not any("drop at bar 81" in c for c in apply_qa_fixes(plan, {"vocal_presence": []}, qa))  # done once
 
 
+def test_the_brief_lists_each_fix_round_once_and_marks_a_superseded_duck(workspace):
+    from glass_harbor.auto import apply_qa_fixes, write_brief
+
+    _chant_song(workspace)
+    plan = _plan_with_stems(workspace)
+    plan["title"] = "Vox x Bed"
+    plan["notes"] = ["fit: same key"]
+    plan["clips"][2]["duck"] = {"under": "vocals", "db": 5.0}
+    plan["clips"].append({"id": "verse1", "source": "vox", "stem": "vocals", "from_bar": 6, "bars": 12, "at_bar": 33})
+    report = {"vocal_presence": [{"bar": b, "db": -5.0} for b in (40, 41, 42)], "bass_clash": []}
+    rounds = [apply_qa_fixes(plan, report, {"flags": []}) for _ in range(2)] + [[]]
+    assert "bed-other ducks 7 dB under the vocal" in rounds[0] and "bed-other ducks 9 dB under the vocal" in rounds[1]
+    notes = list(plan["notes"])
+    assert sum(n.startswith("auto fix: ") for n in notes) == 2
+
+    text = write_brief("vox-x-bed", plan, "vox", "bed", None, rounds).read_text()
+    assert plan["notes"] == notes  # the plan keeps its fix notes
+    decisions = text.split("## Decisions")[1].split("## Fix rounds")[0]
+    fixes = text.split("## Fix rounds")[1].split("## Needs ears")[0]
+    assert "- fit: same key" in decisions and "auto fix" not in decisions and "ducks" not in decisions
+    assert "- round 1: vocal buried or hard to make out: +2 dB on verse1; bed-other ducks 7 dB under the vocal " \
+           "(superseded by round 2's 9 dB)\n" in fixes
+    assert "- round 2: vocal buried or hard to make out: +2 dB on verse1; bed-other ducks 9 dB under the vocal\n" \
+           in fixes
+    assert "- round 3: nothing left to fix" in fixes
+
+
 def test_match_words_counts_each_heard_word_once_near_its_spot():
     from glass_harbor.listen import match_words
 
