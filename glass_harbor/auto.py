@@ -118,7 +118,7 @@ def _bars(clip: Any, bpb: int) -> range:
 
 AUTO_FIX_NOTE = "auto fix: "  # prefix of the plan note each fix round leaves
 DUCK_CHANGE = "{clip} ducks {db:g} dB under the vocal"  # a setting, not a step: a later round's replaces it
-_DUCK_CHANGE_RE = re.compile(r"^(\S+) ducks (\S+) dB under the vocal$")
+_DUCK_CHANGE_RE = re.compile(r"^(.+) ducks (\S+) dB under the vocal$")  # plan clip ids may hold spaces
 
 
 def apply_qa_fixes(plan: dict[str, Any], report: dict[str, Any], qa: dict[str, Any],
