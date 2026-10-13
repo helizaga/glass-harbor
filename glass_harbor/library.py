@@ -111,20 +111,45 @@ def load_grid(track_id: str) -> Grid:
 FFPROBE_TIMEOUT_S = 15
 
 
+# Where files keep their lyrics: FLAC/Vorbis and M4A read as "lyrics", ID3 USLT as "lyrics-<language>".
+LYRICS_TAGS = ("lyrics", "syncedlyrics", "unsyncedlyrics")
+
+
 def file_tags(path: Path) -> dict[str, str]:
-    """Artist and title from the file's own tags (ffprobe), lowercase keys; empty when unavailable."""
+    """Artist, title, and embedded lyrics from the file's own tags (ffprobe), lowercase keys; empty when
+    unavailable."""
     import subprocess
 
     ffprobe = shutil.which("ffprobe")
     if not ffprobe:
         return {}
     try:
-        result = subprocess.run([ffprobe, "-v", "error", "-show_entries", "format_tags=artist,title", "-of", "json",
-                                 str(path)], capture_output=True, text=True, check=False, timeout=FFPROBE_TIMEOUT_S)
+        result = subprocess.run([ffprobe, "-v", "error", "-show_entries", "format_tags", "-of", "json", str(path)],
+                                capture_output=True, text=True, check=False, timeout=FFPROBE_TIMEOUT_S)
         tags = json.loads(result.stdout or "{}").get("format", {}).get("tags", {})
     except (subprocess.TimeoutExpired, ValueError):
         return {}
-    return {k.lower(): v.strip() for k, v in tags.items() if k.lower() in ("artist", "title") and v.strip()}
+    found = {}
+    for key, value in tags.items():
+        key, value = key.lower(), value.strip()
+        if not value:
+            continue
+        if key in ("artist", "title"):
+            found[key] = value
+        elif (key in LYRICS_TAGS or key.startswith("lyrics-")) and "lyrics" not in found:
+            found["lyrics"] = value
+    return found
+
+
+def embedded_lyrics_path(track_id: str) -> Path:
+    return track_dir(track_id) / "embedded_lyrics.lrc"
+
+
+def _keep_embedded_lyrics(track_id: str, tags: dict[str, str]) -> None:
+    """Store the file's own lyrics with the track (the decoded audio in the library loses its tags)."""
+    path = embedded_lyrics_path(track_id)
+    if tags.get("lyrics") and not path.exists():
+        path.write_text(tags["lyrics"] + "\n")
 
 
 def add_track(
@@ -142,6 +167,8 @@ def add_track(
     digest = sha256_file(source)
     existing = find_by_hash(digest)
     if existing and not stems:
+        if not embedded_lyrics_path(existing).exists():
+            _keep_embedded_lyrics(existing, file_tags(source))  # added before lyrics were kept: pick them up now
         return existing, False
 
     track_id = require_slug(track_id or existing or suggest_id(source), "track id")
@@ -167,6 +194,7 @@ def add_track(
             "added_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
             "stems": {},
         }
+        _keep_embedded_lyrics(track_id, tags)
     for name, path in (stems or {}).items():
         if name not in STEM_NAMES:
             raise ValueError(f"Unknown stem {name!r}; expected one of {', '.join(STEM_NAMES)}")

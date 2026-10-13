@@ -1,4 +1,5 @@
-"""Reference lyrics from LRCLIB (lrclib.net: free, no account), time-stamped by line.
+"""Reference lyrics, time-stamped by line: the synced lyrics embedded in the file's own tags when it has them (they
+belong to this exact recording), else LRCLIB (lrclib.net: free, no account).
 
 Whisper gives word timings but mishears sung and autotuned vocals (it made out about half of GLOCK in the finished
 mix). The published lyrics give the right words and show which lines really repeat, so choruses that come back only
@@ -111,9 +112,26 @@ def _get(path: str, params: dict[str, Any]) -> Any:
         return json.loads(response.read())
 
 
+def embedded_reference(track_id: str) -> dict[str, Any] | None:
+    """The synced lyrics that came embedded in the track's file, or None when it had none (or only plain text)."""
+    path = library.embedded_lyrics_path(track_id)
+    lines = parse_synced(path.read_text()) if path.exists() else []
+    if not lines:
+        return None
+    meta = library.load_meta(track_id)
+    artist, title = artist_and_title(meta)
+    return {"source": "embedded", "artist": artist, "title": title, "duration": meta.get("duration"), "lines": lines}
+
+
 def fetch_reference(track_id: str, *, log=print) -> dict[str, Any] | None:
-    """Look the track up on LRCLIB and store its synced lyrics. Returns None (and stores nothing) when there is no
-    match, no synced version, or no network."""
+    """Store the track's synced lyrics: the file's embedded ones first, else a LRCLIB match. Returns None (and
+    stores nothing) when there is neither: no embedded timestamps, no LRCLIB match or synced version, or no
+    network."""
+    embedded = embedded_reference(track_id)
+    if embedded:
+        reference_path(track_id).write_text(json.dumps(embedded, indent=1) + "\n")
+        log(f"reference lyrics: embedded in the file ({len(embedded['lines'])} lines)")
+        return embedded
     meta = library.load_meta(track_id)
     artist, title = artist_and_title(meta)
     duration = float(meta.get("duration") or 0)

@@ -400,6 +400,36 @@ def test_track_add_reads_artist_and_title_tags(workspace, tmp_path):
     assert library.file_tags(source) == {"artist": "elden", "title": "SWARM"}
 
 
+def test_embedded_synced_lyrics_are_the_reference(workspace, tmp_path, monkeypatch):
+    import shutil
+    import subprocess
+
+    from glass_harbor import lyrics_ref
+
+    if not shutil.which("ffmpeg"):
+        pytest.skip("needs ffmpeg")
+    lrc = "[00:00.85] (Brutal Money)\n[00:03.10] \n[00:04.32] I am not your kinfolk\n[00:06.89] 1 Umbrella"
+    tagged, plain = tmp_path / "Umbrella.flac", tmp_path / "Plain.flac"
+    for path, extra in ((tagged, ["-metadata", f"LYRICS={lrc}"]), (plain, ["-metadata", "lyrics=just words"])):
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-t", "1",
+                        "-metadata", "artist=1 Umbrella; Lil Bean", "-metadata", "title=1 Umbrella", *extra,
+                        str(path)], check=True)
+    monkeypatch.setattr(lyrics_ref, "_get", lambda *a, **k: (_ for _ in ()).throw(AssertionError("no LRCLIB")))
+
+    track, _ = library.add_track(tagged)
+    reference = lyrics_ref.fetch_reference(track, log=lambda m: None)
+    assert reference["source"] == "embedded" and lyrics_ref.load_reference(track) == reference
+    assert [(line["time"], line["text"]) for line in reference["lines"]] == [
+        (0.85, "(Brutal Money)"), (4.32, "I am not your kinfolk"), (6.89, "1 Umbrella")]  # blank lines dropped
+
+    library.embedded_lyrics_path(track).unlink()
+    assert library.add_track(tagged) == (track, False)  # added before lyrics were kept: a re-add picks them up
+    assert library.embedded_lyrics_path(track).exists()
+
+    other, _ = library.add_track(plain, track_id="plain")
+    assert lyrics_ref.embedded_reference(other) is None  # plain text, no timestamps: not a reference
+
+
 def test_a_clip_counts_as_masked_only_when_it_reads_weak_twice_running():
     from glass_harbor.auto import steady_weak
 
