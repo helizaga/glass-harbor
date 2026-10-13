@@ -738,6 +738,37 @@ def _quiet_tail_bars(analysis: dict[str, Any]) -> int:
     return bars
 
 
+LOOP_QUIET_DB = 6.0  # a bar this far under a stem's usual level is a fill or a break: not loop material
+DEAD_DB = 20.0  # this far under, there is no beat at all (the silence or pickup before a record's first downbeat)
+MAX_BRIDGE_BARS = 2
+
+
+def _stem_levels(analysis: dict[str, Any], stem: str) -> list[float]:
+    return ((analysis.get("stems") or {}).get(stem) or {}).get("bar_db") or analysis.get("bar_db") or []
+
+
+def _under(levels: list[float], bar: int, db: float) -> bool:
+    """True when 1-based ``bar`` sits ``db`` under the stem's median level (or past its end)."""
+    return bar - 1 >= len(levels) or levels[bar - 1] < float(np.median(levels)) - db
+
+
+def _loop_window(analysis: dict[str, Any], stems: list[str], groove: int, loop_len: int) -> tuple[int, int]:
+    """(start bar, length) for the DJ edges' loop: one in which every looped stem plays at its usual level, so the
+    beat's own fill or break never comes round in the intro and outro. The groove's ``loop_len`` bars first, then
+    its first 4, then the first clean window after it."""
+    levels = [_stem_levels(analysis, stem) for stem in stems]
+    if not levels or not all(levels):
+        return groove, loop_len
+    last = min(len(lv) for lv in levels)
+
+    def clean(start: int, length: int) -> bool:
+        return all(not _under(lv, bar, LOOP_QUIET_DB) for lv in levels for bar in range(start, start + length))
+
+    lengths = list(dict.fromkeys((loop_len, 4)))
+    candidates = [(groove, n) for n in lengths] + [(s, n) for n in lengths for s in range(groove + 1, last - n + 2)]
+    return next(((s, n) for s, n in candidates if clean(s, n)), (groove, loop_len))
+
+
 def add_dj_edges(plan: dict[str, Any], *, intro_bars: int = 16, outro_bars: int = 16) -> dict[str, Any]:
     """DJ-friendly edit: a beat-only intro (drums, then bass halfway) and outro (bass out halfway) so a DJ can
     mix the edit in and out. Everything else moves later by ``intro_bars``; end-of-bed fades are replaced by the
@@ -757,6 +788,16 @@ def add_dj_edges(plan: dict[str, Any], *, intro_bars: int = 16, outro_bars: int 
     stems = library.available_stems(bed.track)
     parts = [("drums", 0.0), ("bass", 0.5)] if {"drums", "bass"} <= set(stems) else [(bed.stem, 0.0)]
     loop_len = 8 if intro_bars % 8 == 0 and outro_bars % 8 == 0 else 4
+    groove, loop_len = _loop_window(analysis, [stem for stem, _ in parts], int(groove), loop_len)
+    # The record's own dead air before its first downbeat would open a hole right after the DJ intro: the intro's
+    # groove runs on through it (only true silence, never a quiet intro that builds into the drop).
+    levels = [_stem_levels(analysis, stem) for stem, _ in parts]
+    bed_spec = plan["clips"][bed.index]
+    bridge = 0
+    if intro_bars and bed_spec["at_bar"] == 1 and all(levels):
+        while bridge < MAX_BRIDGE_BARS and all(_under(lv, int(bed_spec.get("from_bar", 1)) + bridge, DEAD_DB)
+                                               for lv in levels):
+            bridge += 1
 
     # A bed that fades out on its own would leave near-silence before the looped outro: end it before the fade.
     tail = _quiet_tail_bars(analysis)
@@ -793,13 +834,29 @@ def add_dj_edges(plan: dict[str, Any], *, intro_bars: int = 16, outro_bars: int 
             edges.append({"id": f"outro-{stem}", "source": source, "stem": stem, "from_bar": groove,
                           "bars": loop_len, "loop": max(1, length // loop_len),
                           "at_bar": round(last_bar + intro_bars, 4)})
-    plan["clips"] = edges[: len(parts)] + plan["clips"] + edges[len(parts):] if intro_bars else plan["clips"] + edges
+    bridges = [{"id": f"intro-{stem}-bridge", "source": source, "stem": stem, "from_bar": groove, "bars": bridge,
+                "at_bar": 1 + intro_bars} for stem, _ in parts] if bridge else []
+    if bridge:
+        from glass_harbor.plan import BASS_STEMS
+
+        # The bridge's bass takes over: the record's own (silent) low end steps aside for those bars, so the plan
+        # never has two basslines at once. Its pickup above the bass still plays.
+        for spec in plan["clips"]:
+            if spec.get("source") == source and spec.get("stem") in BASS_STEMS and spec["at_bar"] == 1 + intro_bars:
+                lanes = spec.setdefault("automation", {})
+                lanes["eq_low_db"] = _merge_points(lanes.get("eq_low_db"), 0, bridge, [
+                    [0, -24.0], [round(bridge - 0.002, 4), -24.0], [bridge, 0.0]])
+    intro = [e for e in edges if e["id"].startswith("intro-")] + bridges
+    outro = [e for e in edges if e["id"].startswith("outro-")]
+    plan["clips"] = intro + plan["clips"] + outro
     notes = plan.setdefault("notes", [])
     if intro_bars and notes:
         notes.append(f"bar numbers in the notes above (and in fill ids like riser-92) are from before the DJ intro: "
                      f"add {intro_bars} to find them in this plan")
     notes.append(f"DJ edges: {intro_bars}-bar beat intro, {outro_bars}-bar beat outro "
-                 f"(looped from bar {groove} of {bed.track})")
+                 f"({loop_len}-bar loop from bar {groove} of {bed.track})")
+    if bridge:
+        notes.append(f"the intro's groove runs on through the beat's {bridge} silent opening bar(s)")
     return plan
 
 
