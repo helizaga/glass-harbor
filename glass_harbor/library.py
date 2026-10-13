@@ -113,6 +113,7 @@ FFPROBE_TIMEOUT_S = 15
 
 # Where files keep their lyrics: FLAC/Vorbis and M4A read as "lyrics", ID3 USLT as "lyrics-<language>".
 LYRICS_TAGS = ("lyrics", "syncedlyrics", "unsyncedlyrics")
+SYNCED_LINE = re.compile(r"^\s*\[\d+:\d+(?:\.\d+)?\]", re.M)  # an LRC line, "[01:23.45] words"
 
 
 def file_tags(path: Path) -> dict[str, str]:
@@ -129,15 +130,19 @@ def file_tags(path: Path) -> dict[str, str]:
         tags = json.loads(result.stdout or "{}").get("format", {}).get("tags", {})
     except (subprocess.TimeoutExpired, ValueError):
         return {}
-    found = {}
+    found, lyrics = {}, []
     for key, value in tags.items():
         key, value = key.lower(), value.strip()
         if not value:
             continue
         if key in ("artist", "title"):
             found[key] = value
-        elif (key in LYRICS_TAGS or key.startswith("lyrics-")) and "lyrics" not in found:
-            found["lyrics"] = value
+        elif key in LYRICS_TAGS or key.startswith("lyrics-"):
+            lyrics.append(value)
+    # A file can carry plain and synced lyrics side by side, in any tag and any order: the timed ones win.
+    timed = [text for text in lyrics if SYNCED_LINE.search(text)]
+    if timed or lyrics:
+        found["lyrics"] = (timed or lyrics)[0]
     return found
 
 

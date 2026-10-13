@@ -443,6 +443,11 @@ def test_embedded_synced_lyrics_are_the_reference(workspace, tmp_path, monkeypat
     other, _ = library.add_track(plain, track_id="plain")
     assert lyrics_ref.embedded_reference(other) is None  # plain text, no timestamps: not a reference
 
+    both = tmp_path / "Both.flac"  # plain lyrics in the first tag, the synced ones after: the timed ones win
+    subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo", "-t", "1",
+                    "-metadata", "UNSYNCEDLYRICS=just words", "-metadata", f"LYRICS={lrc}", str(both)], check=True)
+    assert library.file_tags(both)["lyrics"].startswith("[00:00.85]")
+
 
 def test_a_clip_counts_as_masked_only_when_it_reads_weak_twice_running():
     from glass_harbor.auto import steady_weak
