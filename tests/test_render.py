@@ -201,6 +201,19 @@ def test_grid_warning_trusts_drums_not_sustained_bass(tmp_path):
     assert grid == ["loop-drums"]  # an off-beat bassline's decaying notes say nothing about the grid
 
 
+def test_warp_warning_needs_enough_onsets_on_a_vocal(tmp_path):
+    rng = np.random.default_rng(6)
+    A.save(tmp_path / "mix.wav", (0.1 * rng.standard_normal((8 * A.SR, 2))).astype(np.float32))
+    (tmp_path / "plan.json").write_text(json.dumps({"bpm": 93, "beats_per_bar": 4, "clips": []}))
+    clips = [{"id": name, "track": "vox", "stem": stem, "start_s": 0.0, "length_s": 8.0, "stretch_pct": -2.1,
+              "semitones": 2, "warp_offset_ms": 48.0, "notes": {"warp_coverage": coverage}}
+             for name, stem, coverage in (("sparse-verse", "vocals", 0.25), ("crisp-verse", "vocals", 0.5),
+                                          ("sparse-drums", "drums", 0.25))]
+    (tmp_path / "render.json").write_text(json.dumps({"files": {"wav": "mix.wav"}, "clips": clips}))
+    warned = [f["where"] for f in check_run(tmp_path)["flags"] if "off the output grid" in f["message"]]
+    assert warned == ["crisp-verse", "sparse-drums"]  # a few soft syllables say little about the warp
+
+
 def test_vocal_balance_reads_loudness_only_where_the_vocal_sounds(workspace):
     from glass_harbor.render import _balance_lu, record_balance
     from conftest import write_fake_track

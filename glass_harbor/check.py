@@ -12,6 +12,11 @@ from glass_harbor import audio as A
 
 SOURCE_GRID_TOLERANCE_MS = 35.0
 WARP_TOLERANCE_MS = 15.0
+# A vocal with a clear onset on fewer of its beats is too sparse to judge its warp. Time-stretching smears a soft
+# attack by about one analysis window, so 1 Umbrella's closing verse (hums and held words, onsets on 7 of 28 beats)
+# read 45 ms late at a 2% stretch and 0 ms with the pitch shift alone, although it sits where it should; its crisp
+# rapped verses (43-52% of beats) read within 9 ms.
+WARP_MIN_VOCAL_COVERAGE = 0.35
 BASS_CLASH_PCT = 10.0  # the vocal over its own bass measures 0-4%
 # A vocal this much louder over the beat than on its own record buries the beat. Listeners like the lead a little
 # above the released mix (Knoll & Siedenburg, Music & Science 2022), not 10 LU above it: Thankful x Blessings read
@@ -146,7 +151,9 @@ def check_run(run_dir: Path) -> dict[str, Any]:
         if src is not None and abs(src) > SOURCE_GRID_TOLERANCE_MS and clip["stem"] not in ("vocals", "bass"):
             flag("warning", clip["id"], f"source beat grid is {src:+.0f} ms off the audible beat for {clip['track']}"
                  " (re-analyze or adjust downbeat_shift)")
-        if warp is not None and abs(warp) > WARP_TOLERANCE_MS:
+        coverage = (clip.get("notes") or {}).get("warp_coverage")
+        sparse = clip["stem"] == "vocals" and coverage is not None and coverage < WARP_MIN_VOCAL_COVERAGE
+        if warp is not None and abs(warp) > WARP_TOLERANCE_MS and not sparse:
             flag("warning", clip["id"], f"warped clip lands {warp:+.0f} ms off the output grid")
         if abs(clip.get("stretch_pct", 0)) > 8:
             flag("info", clip["id"], f"{clip['stretch_pct']:+.1f}% stretch; listen for artifacts")
