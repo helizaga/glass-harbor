@@ -188,3 +188,51 @@ def test_short_edit_never_cuts_the_last_copy_of_a_hook(workspace):
 
     assert edit["cuts"] and not (cut(33) and cut(49))  # one copy of the hook stays
     assert not cut(65)  # "longer" carries material "shorter" does not
+
+
+def test_vocal_balance_reads_loudness_only_where_the_vocal_sounds(workspace):
+    from glass_harbor.render import _balance_lu, record_balance
+    from conftest import write_fake_track
+
+    rng = np.random.default_rng(1)
+    rest = (0.05 * rng.standard_normal((12 * A.SR, 2))).astype(np.float32)
+    vocal = np.zeros_like(rest)
+    vocal[: 6 * A.SR] = 0.1 * rng.standard_normal((6 * A.SR, 2))  # sounds for half the time, 6 dB over the rest
+    lu, seconds = _balance_lu(vocal, rest)
+    assert lu == pytest.approx(6.0, abs=0.3) and seconds == pytest.approx(6.0, abs=0.2)  # the gaps do not count
+    assert _balance_lu(vocal[: 2 * A.SR], rest) is None  # too little vocal to judge
+    write_fake_track("song", bpm=120, key="Am", bars=8, stems=("vocals", "instrumental"))
+    A.save(library.stem_path("song", "vocals"), vocal)
+    A.save(library.stem_path("song", "instrumental"), rest)
+    assert record_balance("song") == pytest.approx(6.0, abs=0.3)
+
+
+def test_range_renders_measure_vocal_balance_only_inside_the_range():
+    from types import SimpleNamespace
+
+    from glass_harbor.render import vocal_balance
+
+    rng = np.random.default_rng(4)
+    beat = (0.05 * rng.standard_normal((20 * A.SR, 2))).astype(np.float32)
+    rap = np.zeros_like(beat)
+    rap[: 8 * A.SR] = 0.1 * rng.standard_normal((8 * A.SR, 2))  # the vocal only sounds in the first 8 s
+
+    def clip(cid, stem, audio):
+        return SimpleNamespace(clip=SimpleNamespace(id=cid, stem=stem, chop=None, track=cid), start_sample=0,
+                               audio=audio)
+
+    rendered = [clip("bed", "instrumental", beat), clip("rap", "vocals", rap)]
+    assert [b["track"] for b in vocal_balance(rendered, beat.shape[0])] == ["rap"]
+    assert vocal_balance(rendered, beat.shape[0], keep=(10 * A.SR, 20 * A.SR)) == []  # not in the preview
+
+
+def test_qa_flags_a_vocal_far_louder_than_on_its_own_record(tmp_path):
+    rng = np.random.default_rng(2)
+    A.save(tmp_path / "mix.wav", (0.1 * rng.standard_normal((8 * A.SR, 2))).astype(np.float32))
+    (tmp_path / "plan.json").write_text(json.dumps({"bpm": 120, "beats_per_bar": 4, "clips": []}))
+    balance = [{"track": "rap", "clips": ["verse"], "mix_lu": 6.2, "record_lu": -3.9, "active_s": 90.0},
+               {"track": "singer", "clips": ["hook"], "mix_lu": -2.8, "record_lu": -4.6, "active_s": 40.0}]
+    (tmp_path / "render.json").write_text(json.dumps({"files": {"wav": "mix.wav"}, "clips": [],
+                                                      "vocal_balance": balance}))
+    flags = [f for f in check_run(tmp_path)["flags"] if "own record" in f["message"]]
+    assert [f["where"] for f in flags] == ["rap"]  # 10.1 LU over its record; the singer's 1.8 LU is fine

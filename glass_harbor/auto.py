@@ -107,6 +107,7 @@ def apply_qa_fixes(plan: dict[str, Any], report: dict[str, Any], qa: dict[str, A
                    heard: dict[str, Any] | None = None) -> list[str]:
     """The fixes QA findings map to safely. Changes ``plan`` in place; returns what was done (empty when there is
     nothing left that a rule can fix)."""
+    from glass_harbor.check import VOCAL_OVER_RECORD_LU
     from glass_harbor.plan import resolve
     from glass_harbor.scaffold import _lane_override, follow_vocal_roots
 
@@ -114,8 +115,12 @@ def apply_qa_fixes(plan: dict[str, Any], report: dict[str, Any], qa: dict[str, A
     bpb = res.beats_per_bar
     auto = plan.setdefault("auto", {"gain_db": {}, "duck_db": {}})
     changes: list[str] = []
+    # dB a vocal track can still rise before it sits louder over the beat than its own record allows (QA's limit).
+    headroom = {item["track"]: item["record_lu"] + VOCAL_OVER_RECORD_LU - item["mix_lu"]
+                for item in report.get("vocal_balance", []) if item.get("record_lu") is not None}
 
-    # 1. Buried vocal: lift the clips that carry two or more buried bars, and duck the melodic layer harder.
+    # 1. Buried vocal: lift the clips that carry two or more buried bars, and duck the melodic layer harder. Never
+    # past the balance limit: a lift that buries the beat trades one problem for another.
     buried = {p["bar"] for p in report.get("vocal_presence", []) if p["db"] < -3.0}
     masked = set((heard or {}).get("weak", []))  # Whisper could not make out the words in the finished mix
     lifted = []
@@ -123,7 +128,7 @@ def apply_qa_fixes(plan: dict[str, Any], report: dict[str, Any], qa: dict[str, A
         if clip.stem != "vocals" or clip.chop is not None or clip.source == "bed":
             continue
         weak = len(buried & set(_bars(clip, bpb))) >= 2 or clip.id in masked
-        if weak and auto["gain_db"].get(clip.id, 0.0) < MAX_AUTO_GAIN_DB:
+        if weak and auto["gain_db"].get(clip.id, 0.0) < MAX_AUTO_GAIN_DB and headroom.get(clip.track, 2.0) >= 2.0:
             spec = plan["clips"][clip.index]
             spec["gain_db"] = round(float(spec.get("gain_db", 0.0)) + 2.0, 2)
             auto["gain_db"][clip.id] = auto["gain_db"].get(clip.id, 0.0) + 2.0
@@ -138,7 +143,23 @@ def apply_qa_fixes(plan: dict[str, Any], report: dict[str, Any], qa: dict[str, A
                 auto["duck_db"][clip.id] = auto["duck_db"].get(clip.id, 0.0) + 2.0
                 changes.append(f"{clip.id} ducks {spec['duck']['db']:g} dB under the vocal")
 
-    # 2. A drop without contrast: take the bass and melody out of the bar before it.
+    # 2. Vocal louder over the beat than its own record allows: bring its clips back down to the limit.
+    for track, room in sorted(headroom.items()):
+        if room >= 0:  # QA warns on any excess over the limit
+            continue
+        step = math.floor(round(room, 6) * 10) / 10  # rounded down to 0.1 dB, so the vocal lands at or under the limit
+        lowered = []
+        for clip in res.clips:  # the beat's own vocal too: QA measures it like any other
+            if clip.track != track or clip.stem != "vocals" or clip.chop is not None:
+                continue
+            spec = plan["clips"][clip.index]
+            spec["gain_db"] = round(float(spec.get("gain_db", 0.0)) + step, 1)
+            auto["gain_db"][clip.id] = round(auto["gain_db"].get(clip.id, 0.0) + step, 1)
+            lowered.append(clip.id)
+        if lowered:
+            changes.append(f"vocal louder over the beat than on its own record: {step:.1f} dB on {', '.join(lowered)}")
+
+    # 3. A drop without contrast: take the bass and melody out of the bar before it.
     for flag in qa.get("flags", []):
         if "of contrast with the 8 bars before it" not in flag["message"]:
             continue
@@ -160,7 +181,7 @@ def apply_qa_fixes(plan: dict[str, Any], report: dict[str, Any], qa: dict[str, A
         if stripped:
             changes.append(f"drop at bar {bar}: {', '.join(stripped)} out for bar {bar - 1}")
 
-    # 3. Sung notes off the bass: make the bass follow the vocal's chords under those clips.
+    # 4. Sung notes off the bass: make the bass follow the vocal's chords under those clips.
     clashing = [c["clip"] for c in report.get("bass_clash", []) if c["pct"] >= BASS_CLASH_PCT and c["sung_frames"] >= 40]
     if clashing:
         already = {i for c in plan["clips"] for i in (c.get("follow_roots") or []) if isinstance(i, str)}
