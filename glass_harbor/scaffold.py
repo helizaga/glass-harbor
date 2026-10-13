@@ -771,18 +771,20 @@ def trim_run_up(plan: dict[str, Any], beat: dict[str, Any], *, keep_bars: int = 
     starts = [bed["at_bar"] + (c - bed["from_bar"]) * ratio for c in corners] if bed else []
     start = max((s for s in starts if 1 < s <= latest and float(s).is_integer()), default=latest)
     cut = int(start) - 1
-    kept = []
-    for clip in plan["clips"]:
+    bpb = res.beats_per_bar
+    ends = {c.index: 1 + c.out_end_beat / bpb for c in res.clips}
+    kept, lost = [], []
+    for index, clip in enumerate(plan["clips"]):
         if clip["at_bar"] >= start:
             clip["at_bar"] = round(clip["at_bar"] - cut, 4)
             kept.append(clip)
             continue
-        scale = float((plan["sources"].get(clip.get("source")) or {}).get("tempo_ratio", 1.0))
-        if "from_bar" not in clip or clip.get("loop", 1) != 1 or clip["at_bar"] + clip["bars"] * scale <= start:
+        if ends.get(index, clip["at_bar"]) <= start:
             continue  # it only played in the run-up
         into = start - clip["at_bar"]  # output bars of this clip that fall in the run-up
-        clip["from_bar"] = round(clip["from_bar"] + into / scale, 4)
-        clip["bars"] = round(clip["bars"] - into / scale, 4)
+        if clip.get("loop", 1) != 1 or not _cut_front(clip, into, plan, bpb):
+            lost.append(clip["id"])
+            continue
         clip["at_bar"] = 1
         for lane, points in (clip.get("automation") or {}).items():
             if not points:
@@ -791,13 +793,41 @@ def trim_run_up(plan: dict[str, Any], beat: dict[str, Any], *, keep_bars: int = 
             clip["automation"][lane] = [[0, value]] + [[round(p[0] - into, 4), p[1]] for p in points if p[0] > into]
         kept.append(clip)
     plan["clips"] = kept
-    for point in (plan.get("tempo") or [])[1:]:
-        point["bar"] = max(1, point["bar"] - cut)
+    if plan.get("tempo"):
+        # The trimmed map opens on the tempo in force at the cut (part way up a ramp, if one is under way).
+        later = [{**p, "bar": round(p["bar"] - cut, 4)} for p in plan["tempo"][1:] if p["bar"] > start]
+        plan["tempo"] = [{"bar": 1, "bpm": round(res.tempo.bpm_at((start - 1) * bpb), 3)}] + later
     plan["edits"] = [{**e, "at_bar": e["at_bar"] - cut} for e in plan.get("edits", []) if e["at_bar"] - cut >= 1]
     notes = plan.setdefault("notes", [])
     notes.append(f"run-up trimmed: the edit starts on bar {start:g} of the draft, {first - start:g} bars before the "
                  f"first vocal (taste run_up_bars={keep_bars}); subtract {cut} from bar numbers in the notes above")
+    if lost:
+        notes.append(f"dropped with the run-up (they could not be cut at bar {start:g}): {', '.join(lost)}")
     return plan
+
+
+def _cut_front(clip: dict[str, Any], into: float, plan: dict[str, Any], bpb: int) -> bool:
+    """Start ``clip`` ``into`` output bars later, as if the edit began there. False when it cannot be cut there."""
+    from glass_harbor.plan import CHOP_HOLD, CHOP_REST, _chop_steps
+
+    if "chop" in clip:
+        steps = _chop_steps(clip["chop"].get("pattern"))
+        skip = into * bpb / float(clip["chop"].get("step", 0.25))
+        if not steps or not float(skip).is_integer():
+            return False
+        # The pattern repeats to fill the clip: what plays on is the same cycle, picked up at the cut.
+        steps = [steps[(int(skip) + k) % len(steps)] for k in range(len(steps))]
+        if steps[0] == CHOP_HOLD:
+            steps[0] = CHOP_REST  # the slice it would hold started in the cut run-up
+        clip["chop"]["pattern"] = "".join(steps)
+    elif "from_bar" in clip:
+        scale = float((plan["sources"].get(clip.get("source")) or {}).get("tempo_ratio", 1.0))
+        clip["from_bar"] = round(clip["from_bar"] + into / scale, 4)
+        clip["bars"] = round(clip["bars"] - into / scale, 4)
+        return True
+    if "bars" in clip:
+        clip["bars"] = round(clip["bars"] - into, 4)  # a generated riser, roll, or swell just gets shorter
+    return True
 
 
 LOOP_QUIET_DB = 6.0  # a bar this far under a stem's usual level is a fill or a break: not loop material
