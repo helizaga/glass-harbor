@@ -853,7 +853,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--style", choices=("edm", "hiphop"), help="default: by the plan's tempo")
     p.add_argument("--build-bars", type=float, help="default: 8 (edm) or 2 (hip-hop)")
     p.add_argument("--clips", help="comma list of bed clip ids (default: every non-vocal clip in the build)")
-    p.add_argument("--silence-beats", type=float, help="default: 1 (edm) or 4 (hip-hop)")
+    p.add_argument("--silence-beats", type=float, help="default: 1 (edm) or one bar (hip-hop)")
     p.add_argument("--no-riser", action="store_true")
     p.add_argument("--riser", help="noise, none, or vocal:<word> (a riser made from a lyric word); default: noise "
                                    "for edm, none for hip-hop")

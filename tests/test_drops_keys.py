@@ -61,6 +61,10 @@ def test_drops_on_slow_beats_filter_down_and_cut_instead_of_rising(workspace):
     assert "impact-25" in ids and not any(i.startswith(("riser", "roll")) for i in ids)
     assert "2-bar hip-hop build (filter down)" in plan["notes"][-1]
 
+    waltz = {**plan, "beats_per_bar": 3, "clips": [{**plan["clips"][0], "automation": {}}]}
+    add_drop(waltz, 25)  # in 3/4 the cut is one bar of three beats, not 1 1/3 bars
+    assert waltz["clips"][0]["automation"]["gain_db"][1] == [23, -60] and "3 beat(s) of silence" in waltz["notes"][-1]
+
     add_drop(plan, 41, style="edm")  # asked for: the EDM build on a slow beat
     assert "riser-41" in {c["id"] for c in plan["clips"]} and auto["highpass_hz"][0] == [32, 20]
     with pytest.raises(ValueError):

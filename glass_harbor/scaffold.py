@@ -453,7 +453,8 @@ def _merge_points(existing: list[list[float]] | None, start: float, end: float,
 # check the dip that a low-pass sweep alone would not (the bass, which carries the level, stays in).
 BUILDS = {
     "edm": {"build_bars": 8.0, "silence_beats": 1.0, "riser": True, "filter": ("highpass_hz", 20.0, 700.0)},
-    "hiphop": {"build_bars": 2.0, "silence_beats": 4.0, "riser": False, "filter": ("lowpass_hz", 20000.0, 300.0)},
+    # silence None: one bar in the plan's own meter (three beats in 3/4)
+    "hiphop": {"build_bars": 2.0, "silence_beats": None, "riser": False, "filter": ("lowpass_hz", 20000.0, 300.0)},
 }
 
 
@@ -474,12 +475,13 @@ def add_drop(plan: dict[str, Any], at_bar: float, *, build_bars: float | None = 
         raise ValueError(f"build style must be one of {', '.join(BUILDS)}")
     defaults = BUILDS[style]
     build_bars = defaults["build_bars"] if build_bars is None else build_bars
-    silence_beats = defaults["silence_beats"] if silence_beats is None else silence_beats
     riser = defaults["riser"] if riser is None else riser
     res = resolve(plan)
     if not res.ok:
         raise ValueError("fix plan errors before adding a drop")
     bpb = res.beats_per_bar
+    if silence_beats is None:
+        silence_beats = defaults["silence_beats"] if defaults["silence_beats"] is not None else float(bpb)
     start_bar = at_bar - build_bars
     if start_bar < 1:
         raise ValueError("the build would start before bar 1")
