@@ -3,13 +3,15 @@
 Whisper transcribes the finished mix, and each vocal clip's own lyrics are checked against what it hears at that
 moment. It hears the vocal sections in slices shorter than its 30-second window: decoding a whole busy mix in one
 pass dropped entire stretches (the first 42 seconds of GLOCK over Stay With Me read as nothing, yet the same audio
-sliced read almost word for word). A clip whose words Whisper cannot make out over the beat is masked for a listener too. ``vocal_presence``
+sliced read almost word for word). A clip that reads weak is heard once more on a window of its own before it
+counts, since a cut in the middle of a verse loses words too. A clip whose words Whisper cannot make out over the beat is masked for a listener too. ``vocal_presence``
 measures level in the 1-4 kHz band; this measures whether the words actually survive the beat, the reverb, and the
 master. Results go to ``listen.json`` in the run folder; QA flags weak clips and ``glass-harbor auto`` lifts them.
 """
 
 from __future__ import annotations
 
+import functools
 import json
 from pathlib import Path
 from typing import Any
@@ -134,6 +136,34 @@ def _expected_reference(res: Any, clip: Any, reference: dict[str, Any], offset_s
     return [(w, to_out(a), to_out(b)) for w, a, b in expected_words(reference, src[0], src[-1])]
 
 
+def _weak(judged: list[dict[str, Any]]) -> list[str]:
+    """Weak = below the floor and clearly below this track's own average (sung, autotuned vocals read lower across
+    the board; a clip is masked when it reads worse than the rest of the same song)."""
+    total = sum(c["expected"] for c in judged)
+    average = sum(c["heard"] for c in judged) / total if total else 0.0
+    return [c["clip"] for c in judged if c["recall"] < WEAK_RECALL and (not total or c["recall"] < average - RELATIVE_DROP)]
+
+
+def settle_weak(judged: list[dict[str, Any]], scorers: dict[str, Any], rehear) -> list[str]:
+    """The weak clips once each has also been heard on a window of its own, keeping the better reading.
+
+    A low score can come from the slicing, not the mix: the vocal sections are cut every SLICE_S seconds wherever
+    that falls, and Whisper drops words around a cut in the middle of a verse. Over Starboy, two of 1 Umbrella's
+    verses read 38% and 36% in the pass and 66% and 72% heard on their own, the same as the other verses; the
+    auto fixes then pushed one verse 4 dB above the rest. ``rehear(start_s, end_s)`` hears one clip's window (its
+    slices start at the clip's first word) and ``scorers[clip]`` scores what it heard."""
+    reheard: set[str] = set()
+    while True:
+        todo = [c for c in judged if c["clip"] in _weak(judged) and c["clip"] not in reheard]
+        if not todo:
+            return _weak(judged)
+        for item in todo:
+            reheard.add(item["clip"])
+            found = scorers[item["clip"]](rehear(item["start_s"], item["end_s"]))
+            if found > item["heard"]:
+                item.update(pass_recall=item["recall"], heard=found, recall=round(found / item["expected"], 2))
+
+
 def listen_run(run_dir: Path, *, log=print, shift_s: float = 0.0) -> dict[str, Any]:
     """Transcribe ``run_dir``'s mix and score every vocal clip. Writes and returns listen.json. ``shift_s`` moves
     where the slices start, for an independent second reading of the same render."""
@@ -147,8 +177,10 @@ def listen_run(run_dir: Path, *, log=print, shift_s: float = 0.0) -> dict[str, A
     res = resolve(plan)
     log(f"listening to {run_dir.name} (Whisper on the finished mix)")
     offset = float(report.get("timeline_offset_s", 0.0))
-    heard, model, backend = hear(A.load(run_dir / report["files"]["wav"]), vocal_spans(res, offset), shift_s=shift_s)
+    audio = A.load(run_dir / report["files"]["wav"])
+    heard, model, backend = hear(audio, vocal_spans(res, offset), shift_s=shift_s)
     clips = []
+    scorers: dict[str, Any] = {}
     lyrics_cache: dict[str, Any] = {}
     for clip in res.clips:
         if clip.stem != "vocals" or clip.chop is not None or clip.loop != 1:
@@ -164,23 +196,24 @@ def listen_run(run_dir: Path, *, log=print, shift_s: float = 0.0) -> dict[str, A
             spans = _expected_reference(res, clip, reference, offset)
             if not spans:
                 continue
-            found, count, start, stop = match_spans(spans, heard), len(spans), spans[0][1], spans[-1][2]
+            score = functools.partial(match_spans, spans)
+            count, start, stop = len(spans), spans[0][1], spans[-1][2]
         else:
             expected = _expected(res, clip, lyrics_cache[clip.track], offset)
             if not expected:
                 continue
-            found, count, start, stop = match_words(expected, heard), len(expected), expected[0][1], expected[-1][1]
+            score = functools.partial(match_words, expected)
+            count, start, stop = len(expected), expected[0][1], expected[-1][1]
+        found = score(heard)
+        scorers[clip.id] = score
         clips.append({"clip": clip.id, "source": clip.source, "expected": count, "heard": found,
                       "recall": round(found / count, 2), "words": "reference" if reference else "whisper",
                       "start_s": round(start, 2), "end_s": round(stop, 2)})
     # The beat's own vocal (call and response) is effects and shouts, not lyrics to follow: not judged.
     judged = [c for c in clips if c["expected"] >= MIN_WORDS and c["source"] != "bed"]
+    weak = settle_weak(judged, scorers, lambda start, stop: hear(audio, [(start, stop)])[0])
     total = sum(c["expected"] for c in judged)
     result = {"model": model, "backend": backend, "clips": clips,
-              "overall_recall": round(sum(c["heard"] for c in judged) / total, 2) if total else None,
-              # Weak = below the floor and clearly below this track's own average (sung, autotuned vocals read lower
-              # across the board; a clip is masked when it reads worse than the rest of the same song).
-              "weak": [c["clip"] for c in judged if c["recall"] < WEAK_RECALL
-                       and (not total or c["recall"] < sum(c["heard"] for c in judged) / total - RELATIVE_DROP)]}
+              "overall_recall": round(sum(c["heard"] for c in judged) / total, 2) if total else None, "weak": weak}
     (run_dir / "listen.json").write_text(json.dumps(result, indent=2) + "\n")
     return result

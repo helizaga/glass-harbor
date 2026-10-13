@@ -499,6 +499,27 @@ def test_hearing_works_slice_by_slice_and_takes_each_overlap_word_once():
     assert times[0] == 9.0 and times[-1] == 50.0 and model == "m"
 
 
+def test_a_weak_clip_is_heard_again_on_its_own_window_before_it_counts():
+    from glass_harbor.listen import settle_weak
+
+    def clip(name, heard, start):
+        return {"clip": name, "expected": 100, "heard": heard, "recall": heard / 100, "start_s": start,
+                "end_s": start + 30}
+
+    judged = [clip("verse2", 80, 0), clip("verse4", 38, 30), clip("verse5", 30, 60), clip("verse6", 75, 90)]
+    windows = []
+    own = {30: 66, 60: 25}  # verse4 was lost to a slice cut; verse5 really is buried
+
+    def rehear(start, end):
+        windows.append((start, end))
+        return ["word"] * own[start]
+
+    weak = settle_weak(judged, {c["clip"]: len for c in judged}, rehear)
+    assert weak == ["verse5"] and windows == [(30, 60), (60, 90)]  # only the weak ones are heard again
+    assert judged[1]["recall"] == 0.66 and judged[1]["pass_recall"] == 0.38  # the better reading, both kept
+    assert judged[2]["recall"] == 0.3 and "pass_recall" not in judged[2]  # no better on its own
+
+
 def test_a_shifted_reading_moves_the_slice_boundaries():
     import numpy as np
 
