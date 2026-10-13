@@ -400,6 +400,20 @@ def test_track_add_reads_artist_and_title_tags(workspace, tmp_path):
     assert library.file_tags(source) == {"artist": "elden", "title": "SWARM"}
 
 
+def test_a_rapped_vocal_skips_the_bass_separation(workspace, monkeypatch):
+    from glass_harbor import analyze, auto, separate
+
+    asked = []
+    monkeypatch.setattr(separate, "separate_track", lambda track, stems, **k: asked.append(stems) or {})
+    monkeypatch.setattr(separate, "clean_stem", lambda *a, **k: None)
+    monkeypatch.setattr(analyze, "analyze_library_track", lambda *a, **k: None)
+    monkeypatch.setattr(auto, "_lyrics", lambda *a, **k: None)
+    write_fake_track("rap", bpm=95, key="Gm", bars=16)
+    auto.prepare_vocal("rap", lambda m: None, kind="rap")
+    auto.prepare_vocal("rap", lambda m: None, kind="sung")
+    assert asked == [["vocals"], ["vocals", "bass"]]  # bass only to follow sung chords
+
+
 def test_embedded_synced_lyrics_are_the_reference(workspace, tmp_path, monkeypatch):
     import shutil
     import subprocess
