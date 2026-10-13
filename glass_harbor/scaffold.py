@@ -812,13 +812,17 @@ def _cut_front(clip: dict[str, Any], into: float, plan: dict[str, Any], bpb: int
 
     if "chop" in clip:
         steps = _chop_steps(clip["chop"].get("pattern"))
-        skip = into * bpb / float(clip["chop"].get("step", 0.25))
+        step = float(clip["chop"].get("step", 0.25))
+        skip = into * bpb / step
         if not steps or not float(skip).is_integer():
             return False
-        # The pattern repeats to fill the clip: what plays on is the same cycle, picked up at the cut.
-        steps = [steps[(int(skip) + k) % len(steps)] for k in range(len(steps))]
+        # The pattern repeats to fill the clip. Written out for the whole remaining clip, it plays on exactly as
+        # before from the cut, and only the first step loses a hold (its slice started in the cut run-up); the
+        # holds in every later cycle stay.
+        left = (clip["bars"] - into) * bpb / step if "bars" in clip else len(steps) - skip
+        steps = [steps[(int(skip) + k) % len(steps)] for k in range(max(1, int(round(left))))]
         if steps[0] == CHOP_HOLD:
-            steps[0] = CHOP_REST  # the slice it would hold started in the cut run-up
+            steps[0] = CHOP_REST
         clip["chop"]["pattern"] = "".join(steps)
     elif "from_bar" in clip:
         scale = float((plan["sources"].get(clip.get("source")) or {}).get("tempo_ratio", 1.0))

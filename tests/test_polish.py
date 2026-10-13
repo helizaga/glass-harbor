@@ -203,12 +203,17 @@ def test_trim_run_up_starts_on_a_section_of_the_beat_and_keeps_the_vocal_on_its_
         {"id": "riser", "generate": "riser", "at_bar": 3, "bars": 8},  # runs on past the cut at bar 7
         {"id": "beat-chop", "source": "bed", "stem": "instrumental", "at_bar": 5, "bars": 4,
          "chop": {"slices": {"a": {"bar": 1, "beat": 1, "beats": 1}},
-                  "pattern": ["a---............", ".a--............", "..a-............", "...a............"]}}]
+                  "pattern": ["a---............", ".a--............", "..a-............", "...a............"]}},
+        {"id": "held-chop", "source": "bed", "stem": "instrumental", "at_bar": 5, "bars": 4,
+         "chop": {"slices": {"a": {"bar": 1, "beat": 1, "beats": 1}}, "pattern": "a--"}}]
     trim_run_up(plan, beat, keep_bars=4)
     assert resolve(plan).ok, [i.to_dict() for i in resolve(plan).issues]
     ids = {c["id"]: c for c in plan["clips"]}
     assert (ids["riser"]["at_bar"], ids["riser"]["bars"]) == (1, 4)  # shorter, not gone
     assert ids["beat-chop"]["bars"] == 2 and ids["beat-chop"]["chop"]["pattern"].startswith("..a-")  # picked up at the cut
+    # a three-step cycle cut on a hold: only the first step turns into a rest, every later cycle keeps its holds
+    held = ids["held-chop"]["chop"]["pattern"]
+    assert held.startswith(".a--a--a--") and len(held) == 32 and held.count(".") == 1
     # the map opens on the tempo at the cut, half way up the 120 -> 128 ramp, and keeps what follows
     assert plan["tempo"] == [{"bar": 1, "bpm": 124.0}, {"bar": 3, "bpm": 128, "ramp": True}, {"bar": 19, "bpm": 126}]
 
