@@ -57,13 +57,13 @@ residue between words (-3.1 dB vs -2.1 to -2.7), so it is the active stem.
 - Kodak -7 dB, Clementine +3 dB; melodic layer back under the verses (-6 dB, -3 dB in the breakdowns, full on the
   drops); spectral duck 4 dB on the melodic layer and 3 dB on the drums, under Kodak only
 
-## QA after the last render (`runs/thankful-x-blessings/20261012-221901`)
+## QA after the last render (`runs/thankful-x-blessings/20261013-144833`, on main b1c19b6)
 
 - verdict: review, -7.8 LUFS, -1.0 dBTP, 4:18
+- rendered on main with everything merged: Kodak's lyrics force-aligned to his acapella (all 37 published lines, none skipped; Whisper's timings kept in `lyrics_whisper.json`), and the vocal balance check passes: Kodak -3.8 LU over the beat (his record -3.3), Clementine -5.5 LU (her record -4.6)
 - Blessings' drums/bass/other re-split with BS-RoFormer SW (PR #10); the HT-Demucs stems are backed up outside the repo. Same QA flags and Whisper reading as the HT-Demucs render (20261012-021358)
 - Kodak vs beat: -2.8 LU where he raps (v3 before this pass: +6.2 LU)
-- Whisper on the finished mix: Kodak verse 1 68%, verse 2 67% with the hook (v6: 68% / 67%) after the softer tone (v4/v5: 70% / 70%; v2:
-  64% / 61%; auto draft: about 45%), against a 74% ceiling on the isolated acapella
+- Whisper on the finished mix, two readings: Kodak verse 1 69% / 67%, verse 2 61% / 66% (with Whisper's own timings 68% / 64% and 67% / 63%: the same within Whisper's run-to-run swing), against a 74% ceiling on the isolated acapella
 - hook presence over the beat on the phrase bars: +5.4 to +6.9 dB
 - vocal presence (1-4 kHz, target about +7 dB): 4.7-7.3 dB in the verses, 17 dB in the second breakdown; QA no
   longer flags any Kodak bar as buried
