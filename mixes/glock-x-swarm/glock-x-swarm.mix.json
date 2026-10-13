@@ -1,0 +1,878 @@
+{
+  "version": 1,
+  "title": "GLOCK x SWARM",
+  "kind": "mashup",
+  "bpm": 149.99,
+  "beats_per_bar": 4,
+  "sources": {
+    "vox": {
+      "track": "01-don-toliver-glock",
+      "semitones": 0,
+      "tempo_ratio": 2.0
+    },
+    "bed": {
+      "track": "swarm"
+    }
+  },
+  "clips": [
+    {
+      "id": "intro-drums",
+      "source": "bed",
+      "stem": "drums",
+      "from_bar": 17,
+      "bars": 8,
+      "loop": 2,
+      "at_bar": 1
+    },
+    {
+      "id": "outro-drums",
+      "source": "bed",
+      "stem": "drums",
+      "from_bar": 17,
+      "bars": 8,
+      "loop": 2,
+      "at_bar": 105.0
+    },
+    {
+      "id": "bed-drums",
+      "source": "bed",
+      "stem": "drums",
+      "from_bar": 1,
+      "bars": 88,
+      "at_bar": 17,
+      "automation": {
+        "gain_db": [
+          [
+            15.747,
+            0
+          ],
+          [
+            15.75,
+            -60
+          ],
+          [
+            15.998,
+            -60
+          ],
+          [
+            16,
+            0
+          ],
+          [
+            51.747,
+            0
+          ],
+          [
+            51.75,
+            -60
+          ],
+          [
+            51.998,
+            -60
+          ],
+          [
+            52,
+            0
+          ],
+          [
+            75.747,
+            0
+          ],
+          [
+            75.75,
+            -60
+          ],
+          [
+            75.998,
+            -60
+          ],
+          [
+            76,
+            0
+          ],
+          [
+            80,
+            0
+          ]
+        ],
+        "highpass_hz": [
+          [
+            8,
+            20
+          ],
+          [
+            15.75,
+            700
+          ],
+          [
+            15.998,
+            700
+          ],
+          [
+            16,
+            20
+          ],
+          [
+            44,
+            20
+          ],
+          [
+            51.75,
+            700
+          ],
+          [
+            51.998,
+            700
+          ],
+          [
+            52,
+            20
+          ],
+          [
+            68,
+            20
+          ],
+          [
+            75.75,
+            700
+          ],
+          [
+            75.998,
+            700
+          ],
+          [
+            76,
+            20
+          ]
+        ]
+      },
+      "punch": {
+        "attack_db": 3.0,
+        "parallel": 0.2
+      },
+      "clip_db": 3.0,
+      "duck": {
+        "under": "vocals",
+        "db": 4.0
+      }
+    },
+    {
+      "id": "bed-bass",
+      "source": "bed",
+      "stem": "bass",
+      "from_bar": 1,
+      "bars": 88,
+      "at_bar": 17,
+      "automation": {
+        "gain_db": [
+          [
+            15.747,
+            0
+          ],
+          [
+            15.75,
+            -60
+          ],
+          [
+            15.998,
+            -60
+          ],
+          [
+            16,
+            0
+          ],
+          [
+            51.747,
+            0
+          ],
+          [
+            51.75,
+            -60
+          ],
+          [
+            51.998,
+            -60
+          ],
+          [
+            52,
+            0
+          ],
+          [
+            75.747,
+            0
+          ],
+          [
+            75.75,
+            -60
+          ],
+          [
+            75.998,
+            -60
+          ],
+          [
+            76,
+            0
+          ],
+          [
+            80,
+            0
+          ]
+        ],
+        "highpass_hz": [
+          [
+            8,
+            20
+          ],
+          [
+            15.75,
+            700
+          ],
+          [
+            15.998,
+            700
+          ],
+          [
+            16,
+            20
+          ],
+          [
+            44,
+            20
+          ],
+          [
+            51.75,
+            700
+          ],
+          [
+            51.998,
+            700
+          ],
+          [
+            52,
+            20
+          ],
+          [
+            68,
+            20
+          ],
+          [
+            75.75,
+            700
+          ],
+          [
+            75.998,
+            700
+          ],
+          [
+            76,
+            20
+          ]
+        ],
+        "arrange_db": [
+          [
+            74.996,
+            0.0
+          ],
+          [
+            75.0,
+            -60.0
+          ],
+          [
+            75.996,
+            -60.0
+          ],
+          [
+            76.0,
+            0.0
+          ]
+        ]
+      },
+      "follow_roots": [
+        "verse2"
+      ]
+    },
+    {
+      "id": "bed-other",
+      "source": "bed",
+      "stem": "other",
+      "from_bar": 1,
+      "bars": 88,
+      "at_bar": 17,
+      "automation": {
+        "gain_db": [
+          [
+            15.747,
+            0
+          ],
+          [
+            15.75,
+            -60
+          ],
+          [
+            15.998,
+            -60
+          ],
+          [
+            16,
+            0
+          ],
+          [
+            51.747,
+            0
+          ],
+          [
+            51.75,
+            -60
+          ],
+          [
+            51.998,
+            -60
+          ],
+          [
+            52,
+            0
+          ],
+          [
+            75.747,
+            0
+          ],
+          [
+            75.75,
+            -60
+          ],
+          [
+            75.998,
+            -60
+          ],
+          [
+            76,
+            0
+          ],
+          [
+            80,
+            0
+          ]
+        ],
+        "width": [
+          [
+            0.0,
+            1.25
+          ],
+          [
+            13.9688,
+            1.25
+          ],
+          [
+            14.0,
+            0.7
+          ],
+          [
+            51.9688,
+            0.7
+          ],
+          [
+            52.0,
+            1.25
+          ],
+          [
+            53.9688,
+            1.25
+          ],
+          [
+            54.0,
+            0.7
+          ],
+          [
+            59.9688,
+            0.7
+          ],
+          [
+            60.0,
+            1.25
+          ],
+          [
+            61.9688,
+            1.25
+          ],
+          [
+            62.0,
+            0.7
+          ],
+          [
+            85.9688,
+            0.7
+          ],
+          [
+            86.0,
+            1.25
+          ]
+        ],
+        "arrange_db": [
+          [
+            0.0,
+            0.0
+          ],
+          [
+            13.9688,
+            0.0
+          ],
+          [
+            14.0,
+            -60.0
+          ],
+          [
+            51.9688,
+            -60.0
+          ],
+          [
+            52.0,
+            0.0
+          ],
+          [
+            53.9688,
+            0.0
+          ],
+          [
+            54.0,
+            -60.0
+          ],
+          [
+            59.9688,
+            -60.0
+          ],
+          [
+            60.0,
+            0.0
+          ],
+          [
+            61.9688,
+            0.0
+          ],
+          [
+            62.0,
+            -60.0
+          ],
+          [
+            85.9688,
+            -60.0
+          ],
+          [
+            86.0,
+            0.0
+          ]
+        ],
+        "highpass_hz": [
+          [
+            8,
+            20
+          ],
+          [
+            15.75,
+            700
+          ],
+          [
+            15.998,
+            700
+          ],
+          [
+            16,
+            20
+          ],
+          [
+            44,
+            20
+          ],
+          [
+            51.75,
+            700
+          ],
+          [
+            51.998,
+            700
+          ],
+          [
+            52,
+            20
+          ],
+          [
+            68,
+            20
+          ],
+          [
+            75.75,
+            700
+          ],
+          [
+            75.998,
+            700
+          ],
+          [
+            76,
+            20
+          ]
+        ]
+      },
+      "duck": {
+        "under": "vocals",
+        "db": 9.0
+      },
+      "pump": {
+        "db": 3.0,
+        "release": 0.5
+      }
+    },
+    {
+      "id": "verse1",
+      "source": "vox",
+      "stem": "vocals",
+      "from_bar": 1,
+      "bars": 14,
+      "at_bar": 31.0,
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            100.0
+          ]
+        ]
+      },
+      "gain_db": 4.0
+    },
+    {
+      "id": "verse2",
+      "source": "vox",
+      "stem": "vocals",
+      "from_bar": 15,
+      "bars": 5,
+      "at_bar": 59.0,
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            100.0
+          ]
+        ]
+      },
+      "gain_db": 4.0
+    },
+    {
+      "id": "hook3",
+      "source": "vox",
+      "stem": "vocals",
+      "from_bar": 20,
+      "bars": 1,
+      "at_bar": 69.0,
+      "chain": "hook",
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            100.0
+          ]
+        ]
+      }
+    },
+    {
+      "id": "verse4",
+      "source": "vox",
+      "stem": "vocals",
+      "from_bar": 21,
+      "bars": 3,
+      "at_bar": 71.0,
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            100.0
+          ]
+        ]
+      },
+      "gain_db": 4.0
+    },
+    {
+      "id": "hook5",
+      "source": "vox",
+      "stem": "vocals",
+      "from_bar": 24,
+      "bars": 1,
+      "at_bar": 77.0,
+      "chain": "hook",
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            100.0
+          ]
+        ]
+      }
+    },
+    {
+      "id": "verse6",
+      "source": "vox",
+      "stem": "vocals",
+      "from_bar": 25,
+      "bars": 12,
+      "at_bar": 79.0,
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            100.0
+          ]
+        ]
+      },
+      "gain_db": 4.0
+    },
+    {
+      "id": "riser-17",
+      "generate": "riser",
+      "at_bar": 25,
+      "bars": 7.75,
+      "gain_db": -9,
+      "duck": {
+        "under": "vocals",
+        "db": 8.0
+      }
+    },
+    {
+      "id": "roll-17",
+      "generate": "snare_roll",
+      "source": "bed",
+      "at_bar": 31.0,
+      "bars": 1.75,
+      "gain_db": -4,
+      "duck": {
+        "under": "vocals",
+        "db": 8.0
+      }
+    },
+    {
+      "id": "impact-17",
+      "generate": "impact",
+      "at_bar": 33,
+      "bars": 2,
+      "gain_db": -5
+    },
+    {
+      "id": "riser-53",
+      "generate": "riser",
+      "at_bar": 61,
+      "bars": 7.75,
+      "gain_db": -9,
+      "duck": {
+        "under": "vocals",
+        "db": 8.0
+      }
+    },
+    {
+      "id": "roll-53",
+      "generate": "snare_roll",
+      "source": "bed",
+      "at_bar": 67.0,
+      "bars": 1.75,
+      "gain_db": -4,
+      "duck": {
+        "under": "vocals",
+        "db": 8.0
+      }
+    },
+    {
+      "id": "impact-53",
+      "generate": "impact",
+      "at_bar": 69,
+      "bars": 2,
+      "gain_db": -5
+    },
+    {
+      "id": "riser-77",
+      "generate": "riser",
+      "at_bar": 85,
+      "bars": 7.75,
+      "gain_db": -9,
+      "duck": {
+        "under": "vocals",
+        "db": 8.0
+      }
+    },
+    {
+      "id": "roll-77",
+      "generate": "snare_roll",
+      "source": "bed",
+      "at_bar": 91.0,
+      "bars": 1.75,
+      "gain_db": -4,
+      "duck": {
+        "under": "vocals",
+        "db": 8.0
+      }
+    },
+    {
+      "id": "impact-77",
+      "generate": "impact",
+      "at_bar": 93,
+      "bars": 2,
+      "gain_db": -5
+    },
+    {
+      "id": "bed-shout-1",
+      "source": "bed",
+      "stem": "vocals",
+      "from_bar": 1,
+      "bars": 1,
+      "at_bar": 17.0,
+      "chain": "hook"
+    },
+    {
+      "id": "bed-shout-4",
+      "source": "bed",
+      "stem": "vocals",
+      "from_bar": 4,
+      "bars": 2,
+      "at_bar": 20.0,
+      "chain": "hook"
+    },
+    {
+      "id": "bed-shout-9",
+      "source": "bed",
+      "stem": "vocals",
+      "from_bar": 9,
+      "bars": 1,
+      "at_bar": 25.0,
+      "chain": "hook"
+    },
+    {
+      "id": "bed-shout-11",
+      "source": "bed",
+      "stem": "vocals",
+      "from_bar": 11,
+      "bars": 1,
+      "at_bar": 27.0,
+      "chain": "hook"
+    },
+    {
+      "id": "crash-1",
+      "generate": "crash",
+      "source": "bed",
+      "at_bar": 17.0,
+      "bars": 2,
+      "gain_db": -8,
+      "duck": {
+        "under": "vocals",
+        "db": 8.0
+      }
+    },
+    {
+      "id": "crash-17",
+      "generate": "crash",
+      "source": "bed",
+      "at_bar": 33,
+      "bars": 2,
+      "gain_db": -8,
+      "duck": {
+        "under": "vocals",
+        "db": 8.0
+      }
+    },
+    {
+      "id": "crash-53",
+      "generate": "crash",
+      "source": "bed",
+      "at_bar": 69,
+      "bars": 2,
+      "gain_db": -8,
+      "duck": {
+        "under": "vocals",
+        "db": 8.0
+      }
+    },
+    {
+      "id": "crash-77",
+      "generate": "crash",
+      "source": "bed",
+      "at_bar": 93,
+      "bars": 2,
+      "gain_db": -8,
+      "duck": {
+        "under": "vocals",
+        "db": 8.0
+      }
+    },
+    {
+      "id": "swell-53",
+      "generate": "reverse_swell",
+      "source": "vox",
+      "word": "right",
+      "occurrence": 2,
+      "at_bar": 68.0,
+      "bars": 1,
+      "gain_db": -8,
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            250
+          ]
+        ]
+      },
+      "duck": {
+        "under": "vocals",
+        "db": 8.0
+      }
+    },
+    {
+      "id": "intro-bass",
+      "source": "bed",
+      "stem": "bass",
+      "from_bar": 17,
+      "bars": 8,
+      "loop": 1,
+      "at_bar": 9
+    },
+    {
+      "id": "outro-bass",
+      "source": "bed",
+      "stem": "bass",
+      "from_bar": 17,
+      "bars": 8,
+      "loop": 1,
+      "at_bar": 105.0
+    }
+  ],
+  "master": {
+    "reference": "swarm",
+    "ceiling_db": -1.0
+  },
+  "notes": [
+    "fit: parallel major/minor (same home note), E major (12B) over E minor (9A), -1.3% stretch on vocals, score 0.911",
+    "song order: verse 1 (vocal bar 2) lands on the beat's first full section (bar 17)",
+    "the beat ends before the song: the draft keeps 6 of 12 vocal pieces (extend the beat or pick a longer one to use the rest)",
+    "stem arrangement on bed: verses over drums + bass (melodic layer -60 dB), full beat under hooks, 0 drums-only bar before each hook, melodic layer pumps on the beat",
+    "drop at bar 17: 8-bar build on bed-drums, bed-bass, bed-other, riser, snare roll, impact, 1 beat(s) of silence",
+    "drop at bar 53: 8-bar build on bed-drums, bed-bass, bed-other, riser, snare roll, impact, 1 beat(s) of silence",
+    "drop at bar 77: 8-bar build on bed-drums, bed-bass, bed-other, riser, snare roll, impact, 1 beat(s) of silence",
+    "the beat's own vocal answers the acapella at bar(s) 1, 4, 9, 11 (call and response)",
+    "fills: crash 1, crash 17, crash 53, crash 77, swell into 53",
+    "bar numbers in the notes above (and in fill ids like riser-92) are from before the DJ intro: add 16 to find them in this plan",
+    "DJ edges: 16-bar beat intro, 16-bar beat outro (looped from bar 17 of swarm)",
+    "bass follows the vocal's original chords under verse2 (their sung notes sat a half-step off the beat's bassline)",
+    "auto fix: vocal buried or hard to make out: +2 dB on verse1, verse2, verse4, verse6; bed-other ducks 7 dB under the vocal; drop at bar 93: bed-bass out for bar 92",
+    "auto fix: vocal buried or hard to make out: +2 dB on verse1, verse2, verse4, verse6; bed-other ducks 9 dB under the vocal"
+  ],
+  "groove": {
+    "pump_fx": {
+      "db": 5.0,
+      "release": 0.6
+    }
+  },
+  "auto": {
+    "gain_db": {
+      "verse1": 4.0,
+      "verse2": 4.0,
+      "verse4": 4.0,
+      "verse6": 4.0
+    },
+    "duck_db": {
+      "bed-other": 4.0
+    }
+  }
+}

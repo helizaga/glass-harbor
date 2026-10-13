@@ -1,0 +1,564 @@
+{
+  "version": 1,
+  "title": "1 Umbrella x Starboy",
+  "kind": "mashup",
+  "bpm": 93.0,
+  "beats_per_bar": 4,
+  "sources": {
+    "vox": {
+      "track": "1-umbrella",
+      "semitones": 2
+    },
+    "bed": {
+      "track": "01-the-weeknd-starboy"
+    }
+  },
+  "clips": [
+    {
+      "id": "bed-drums",
+      "source": "bed",
+      "stem": "drums",
+      "from_bar": 17.0,
+      "bars": 71.0,
+      "at_bar": 1,
+      "automation": {
+        "gain_db": [
+          [
+            0,
+            0.0
+          ],
+          [
+            38.997,
+            0
+          ],
+          [
+            39.0,
+            -60
+          ],
+          [
+            39.998,
+            -60
+          ],
+          [
+            40.0,
+            0
+          ],
+          [
+            52.997,
+            0
+          ],
+          [
+            53.0,
+            -60
+          ],
+          [
+            53.998,
+            -60
+          ],
+          [
+            54.0,
+            0
+          ],
+          [
+            65.0,
+            0
+          ]
+        ],
+        "lowpass_hz": [
+          [
+            0,
+            20000.0
+          ],
+          [
+            38.0,
+            20000.0
+          ],
+          [
+            39.0,
+            300.0
+          ],
+          [
+            39.998,
+            300.0
+          ],
+          [
+            40.0,
+            20000.0
+          ],
+          [
+            52.0,
+            20000.0
+          ],
+          [
+            53.0,
+            300.0
+          ],
+          [
+            53.998,
+            300.0
+          ],
+          [
+            54.0,
+            20000.0
+          ]
+        ]
+      },
+      "punch": {
+        "attack_db": 3.0,
+        "parallel": 0.2
+      },
+      "duck": {
+        "under": "vocals",
+        "db": 4.0
+      }
+    },
+    {
+      "id": "bed-bass",
+      "source": "bed",
+      "stem": "bass",
+      "from_bar": 17.0,
+      "bars": 71.0,
+      "at_bar": 1,
+      "automation": {
+        "gain_db": [
+          [
+            0,
+            0.0
+          ],
+          [
+            38.997,
+            0
+          ],
+          [
+            39.0,
+            -60
+          ],
+          [
+            39.998,
+            -60
+          ],
+          [
+            40.0,
+            0
+          ],
+          [
+            52.997,
+            0
+          ],
+          [
+            53.0,
+            -60
+          ],
+          [
+            53.998,
+            -60
+          ],
+          [
+            54.0,
+            0
+          ],
+          [
+            65.0,
+            0
+          ]
+        ],
+        "lowpass_hz": [
+          [
+            0,
+            20000.0
+          ],
+          [
+            38.0,
+            20000.0
+          ],
+          [
+            39.0,
+            300.0
+          ],
+          [
+            39.998,
+            300.0
+          ],
+          [
+            40.0,
+            20000.0
+          ],
+          [
+            52.0,
+            20000.0
+          ],
+          [
+            53.0,
+            300.0
+          ],
+          [
+            53.998,
+            300.0
+          ],
+          [
+            54.0,
+            20000.0
+          ]
+        ]
+      }
+    },
+    {
+      "id": "bed-other",
+      "source": "bed",
+      "stem": "other",
+      "from_bar": 17.0,
+      "bars": 71.0,
+      "at_bar": 1,
+      "automation": {
+        "gain_db": [
+          [
+            0,
+            0.0
+          ],
+          [
+            38.997,
+            0
+          ],
+          [
+            39.0,
+            -60
+          ],
+          [
+            39.998,
+            -60
+          ],
+          [
+            40.0,
+            0
+          ],
+          [
+            52.997,
+            0
+          ],
+          [
+            53.0,
+            -60
+          ],
+          [
+            53.998,
+            -60
+          ],
+          [
+            54.0,
+            0
+          ],
+          [
+            65.0,
+            0
+          ]
+        ],
+        "width": [
+          [
+            0,
+            1.25
+          ],
+          [
+            5.9688,
+            1.25
+          ],
+          [
+            6.0,
+            0.7
+          ],
+          [
+            71.9688,
+            0.7
+          ],
+          [
+            72.0,
+            1.25
+          ]
+        ],
+        "arrange_db": [
+          [
+            0,
+            0.0
+          ],
+          [
+            5.9688,
+            0.0
+          ],
+          [
+            6.0,
+            -60.0
+          ],
+          [
+            71.9688,
+            -60.0
+          ],
+          [
+            72.0,
+            0.0
+          ]
+        ],
+        "lowpass_hz": [
+          [
+            0,
+            20000.0
+          ],
+          [
+            38.0,
+            20000.0
+          ],
+          [
+            39.0,
+            300.0
+          ],
+          [
+            39.998,
+            300.0
+          ],
+          [
+            40.0,
+            20000.0
+          ],
+          [
+            52.0,
+            20000.0
+          ],
+          [
+            53.0,
+            300.0
+          ],
+          [
+            53.998,
+            300.0
+          ],
+          [
+            54.0,
+            20000.0
+          ]
+        ]
+      },
+      "duck": {
+        "under": "vocals",
+        "db": 5.0
+      }
+    },
+    {
+      "id": "hook1",
+      "source": "vox",
+      "stem": "vocals",
+      "from_bar": 1,
+      "bars": 1,
+      "at_bar": 6.0,
+      "chain": "hook",
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            100.0
+          ]
+        ]
+      }
+    },
+    {
+      "id": "verse2",
+      "source": "vox",
+      "stem": "vocals",
+      "from_bar": 2,
+      "bars": 12,
+      "at_bar": 7.0,
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            100.0
+          ]
+        ]
+      }
+    },
+    {
+      "id": "verse3",
+      "source": "vox",
+      "stem": "vocals",
+      "from_bar": 14,
+      "bars": 12,
+      "at_bar": 19.0,
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            100.0
+          ]
+        ]
+      }
+    },
+    {
+      "id": "verse4",
+      "source": "vox",
+      "stem": "vocals",
+      "from_bar": 26,
+      "bars": 12,
+      "at_bar": 31.0,
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            100.0
+          ]
+        ]
+      }
+    },
+    {
+      "id": "verse5",
+      "source": "vox",
+      "stem": "vocals",
+      "from_bar": 38,
+      "bars": 12,
+      "at_bar": 43.0,
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            100.0
+          ]
+        ]
+      }
+    },
+    {
+      "id": "verse6",
+      "source": "vox",
+      "stem": "vocals",
+      "from_bar": 50,
+      "bars": 11,
+      "at_bar": 55.0,
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            100.0
+          ]
+        ]
+      }
+    },
+    {
+      "id": "verse7",
+      "source": "vox",
+      "stem": "vocals",
+      "from_bar": 61,
+      "bars": 7,
+      "at_bar": 66.0,
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            100.0
+          ]
+        ]
+      }
+    },
+    {
+      "id": "impact-57",
+      "generate": "impact",
+      "at_bar": 41,
+      "bars": 2,
+      "gain_db": -5
+    },
+    {
+      "id": "impact-71",
+      "generate": "impact",
+      "at_bar": 55,
+      "bars": 2,
+      "gain_db": -5
+    },
+    {
+      "id": "crash-22",
+      "generate": "crash",
+      "source": "bed",
+      "at_bar": 6.0,
+      "bars": 2,
+      "gain_db": -8,
+      "duck": {
+        "under": "vocals",
+        "db": 8.0
+      }
+    },
+    {
+      "id": "crash-57",
+      "generate": "crash",
+      "source": "bed",
+      "at_bar": 41,
+      "bars": 2,
+      "gain_db": -8,
+      "duck": {
+        "under": "vocals",
+        "db": 8.0
+      }
+    },
+    {
+      "id": "crash-71",
+      "generate": "crash",
+      "source": "bed",
+      "at_bar": 55,
+      "bars": 2,
+      "gain_db": -8,
+      "duck": {
+        "under": "vocals",
+        "db": 8.0
+      }
+    },
+    {
+      "id": "swell-22",
+      "generate": "reverse_swell",
+      "source": "vox",
+      "word": "brutal",
+      "occurrence": 1,
+      "at_bar": 5.0,
+      "bars": 1,
+      "gain_db": -8,
+      "automation": {
+        "highpass_hz": [
+          [
+            0,
+            250
+          ]
+        ]
+      },
+      "duck": {
+        "under": "vocals",
+        "db": 8.0
+      }
+    },
+    {
+      "id": "outro-drums",
+      "source": "bed",
+      "stem": "drums",
+      "from_bar": 57,
+      "bars": 4,
+      "loop": 4,
+      "at_bar": 72.0
+    },
+    {
+      "id": "outro-bass",
+      "source": "bed",
+      "stem": "bass",
+      "from_bar": 57,
+      "bars": 4,
+      "loop": 2,
+      "at_bar": 72.0
+    }
+  ],
+  "master": {
+    "reference": "01-the-weeknd-starboy",
+    "ceiling_db": -1.0
+  },
+  "notes": [
+    "fit: same key, A minor (8A) over A minor (8A), -2.1% stretch on vocals, score 0.945",
+    "song order: verse 1 (vocal bar 2) lands on the beat's first full section (bar 23)",
+    "stem arrangement on bed: verses over drums + bass (melodic layer -60 dB), full beat under hooks, 0 drums-only bar before each hook",
+    "drop at bar 57: 2-bar hip-hop build (filter down) on bed-drums, bed-bass, bed-other, impact, 4 beat(s) of silence",
+    "drop at bar 71: 2-bar hip-hop build (filter down) on bed-drums, bed-bass, bed-other, impact, 4 beat(s) of silence",
+    "fills: crash 22, crash 57, crash 71, swell into 22",
+    "run-up trimmed: the edit starts on bar 17 of the draft, 5 bars before the first vocal (taste run_up_bars=4); subtract 16 from bar numbers in the notes above",
+    "no extra DJ intro: the vocal comes in within 4 bars (taste run_up_bars)",
+    "the beat's own 2-bar fade-out is cut; the DJ outro follows on",
+    "DJ edges: 0-bar beat intro, 16-bar beat outro (4-bar loop from bar 57 of 01-the-weeknd-starboy)"
+  ],
+  "edits": []
+}
