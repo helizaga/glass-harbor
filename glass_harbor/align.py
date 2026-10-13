@@ -111,10 +111,18 @@ def align_lines(vocal: np.ndarray, lines: list[dict[str, Any]], windows: list[tu
     out = []
     for line, (a, b) in zip(lines, windows):
         raws = [raw for raw in line["text"].split() if _token(raw)]
-        lo, hi = int(a / frame_s), min(emission.shape[0], int(b / frame_s) + 1)
-        if not raws or hi - lo < 2 * len(raws):
+        if not raws:
             continue
-        spans = aligner(emission[lo:hi], tokenizer(["*"] + [_token(raw) for raw in raws] + ["*"]))[1:-1]
+        targets = tokenizer(["*"] + [_token(raw) for raw in raws] + ["*"])
+        lo, hi = int(a / frame_s), min(emission.shape[0], int(b / frame_s) + 1)
+        # CTC needs a frame per letter, plus a blank between repeated letters.
+        needed = sum(len(word) + sum(x == y for x, y in zip(word, word[1:])) for word in targets)
+        if hi - lo < needed:
+            continue  # the window cannot hold the line: Whisper's timings stay for it
+        try:
+            spans = aligner(emission[lo:hi], targets)[1:-1]
+        except RuntimeError:
+            continue
         out.append({"text": line["text"], "words": [
             {"word": raw.strip(",.!?;:\"()"), "start": round((lo + span[0].start) * frame_s, 3),
              "end": round((lo + span[-1].end) * frame_s, 3), "prob": round(float(np.mean([t.score for t in span])), 3)}
@@ -129,7 +137,7 @@ def timing_offset(aligned: list[dict[str, Any]], segments: list[dict[str, Any]])
     matcher = difflib.SequenceMatcher(None, [m[0] for m in mine], [h[0] for h in heard], autojunk=False)
     gaps = [abs(mine[block.a + k][1] - heard[block.b + k][1])
             for block in matcher.get_matching_blocks() for k in range(block.size)]
-    return float(np.median(gaps)) if gaps else 0.0
+    return float(np.median(gaps)) if gaps else float("inf")  # nothing to check against: not trusted
 
 
 def merge(whisper: dict[str, Any], aligned: list[dict[str, Any]]) -> dict[str, Any]:

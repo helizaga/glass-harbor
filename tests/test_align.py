@@ -72,3 +72,40 @@ def test_auto_retimes_lyrics_that_are_not_aligned_yet(workspace, monkeypatch):
     monkeypatch.setattr(align, "align_lines", _fake_align)
     auto._lyrics("rap", log=lambda m: None)
     assert load_lyrics("rap")["timing"] == "aligned"
+
+
+def test_timing_offset_does_not_trust_an_alignment_it_cannot_check():
+    aligned = [{"text": "x", "words": _words("no looking back", 3.0)}]
+    assert align.timing_offset(aligned, _whisper()["segments"]) == float("inf")
+
+
+def test_align_lines_skips_lines_the_window_or_aligner_cannot_fit(monkeypatch):
+    import sys
+    import types
+
+    import numpy as np
+    import torch
+
+    class Span:
+        def __init__(self, frame):
+            self.start, self.end, self.score = frame, frame + 1, 0.5
+
+    def aligner(emission, targets):
+        if len(targets) > 4:  # stands in for torchaudio's "targets length is too long for CTC"
+            raise RuntimeError("targets length is too long for CTC")
+        return [[Span(i)] for i in range(len(targets))]
+
+    bundle = types.SimpleNamespace(
+        sample_rate=16000,
+        get_model=lambda with_star: types.SimpleNamespace(
+            eval=lambda: lambda wave: (torch.zeros(1, wave.shape[1] // 320, 29), None)),
+        get_tokenizer=lambda: lambda words: [list(range(1, len(w) + 1)) for w in words],
+        get_aligner=lambda: aligner)
+    fake = types.ModuleType("torchaudio")
+    fake.pipelines = types.SimpleNamespace(MMS_FA=bundle)
+    monkeypatch.setitem(sys.modules, "torchaudio", fake)
+
+    lines = [{"text": "hey you"}, {"text": "a line far too long for this aligner"}, {"text": "squeezed in"}]
+    windows = [(0.0, 2.0), (2.0, 6.0), (6.0, 6.1)]  # the last window holds 5 frames for 11 letters
+    out = align.align_lines(np.zeros((8 * 44100, 2), np.float32), lines, windows)
+    assert [line["text"] for line in out] == ["hey you"]
