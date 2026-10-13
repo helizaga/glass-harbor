@@ -81,7 +81,9 @@ Use a Python build with SSL (Homebrew); the pyenv 3.11.3 build on this machine l
 - `glass-harbor match <id> [--role vocals|bed|next] [--against ids...]`
 - `glass-harbor set order <ids...> [--start <id>]`
 - `glass-harbor mix new <slug> --kind mashup|transition|set ...`
-- `glass-harbor mix drop <slug> --at-bar N [--build-bars 8] [--silence-beats 1] [--clips ids]`
+- `glass-harbor mix drop <slug> --at-bar N [--style edm|hiphop] [--build-bars N] [--silence-beats N] [--clips ids]`
+  (styled by tempo: 115+ bpm gets the 8-bar EDM build with a riser, slower beats a bar of filter-down and a bar
+  of beat cut)
 - `glass-harbor mix follow <slug> [--clips ids]` (bass follows the chords each sung vocal was written over)
 - `glass-harbor mix validate <slug>`
 - `glass-harbor mix render <slug> [--start-bar N --end-bar M] [--clips] [--no-mp3]`

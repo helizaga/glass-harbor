@@ -415,7 +415,7 @@ def build_mashup(vocals: str, bed: str, *, semitones: int | None = None, intro_b
     for bar, spotlight in drop_builds:
         try:
             # A title-line spotlight owns the break: no snare roll under it, and the riser ends where it starts.
-            plan = add_drop(plan, bar, build_bars=8, roll=has_drums and not spotlight)
+            plan = add_drop(plan, bar, roll=edm and has_drums and not spotlight)
         except ValueError:
             continue  # no room for a build here (too close to the start)
         if spotlight:
@@ -446,13 +446,36 @@ def _merge_points(existing: list[list[float]] | None, start: float, end: float,
     return sorted(kept + new, key=lambda p: p[0])
 
 
-def add_drop(plan: dict[str, Any], at_bar: float, *, build_bars: float = 8, clip_ids: list[str] | None = None,
-             riser: bool | str = True, impact: bool = True, silence_beats: float = 1.0,
-             roll: bool = False) -> dict[str, Any]:
-    """Build -> silence -> drop at ``at_bar``: high-pass sweep on the beds, a beat of silence, a generated riser
-    that ends on the downbeat, and an impact on the one."""
+# How a beat builds into a drop depends on its tempo. Club beats (EDM_MIN_BPM and up) rise for 8 bars under a
+# high-pass sweep and a noise riser, with one beat of silence before the one. Slower beats (hip-hop, R&B, dancehall,
+# reggaeton) filter down for a bar, drop out for a bar while the vocal carries on alone, and slam back on the one:
+# a riser or snare roll over a 90 bpm beat sounds like an EDM edit. The bar of silence also gives QA's drop-contrast
+# check the dip that a low-pass sweep alone would not (the bass, which carries the level, stays in).
+BUILDS = {
+    "edm": {"build_bars": 8.0, "silence_beats": 1.0, "riser": True, "filter": ("highpass_hz", 20.0, 700.0)},
+    "hiphop": {"build_bars": 2.0, "silence_beats": 4.0, "riser": False, "filter": ("lowpass_hz", 20000.0, 300.0)},
+}
+
+
+def build_style(bpm: float) -> str:
+    return "edm" if _is_edm(bpm) else "hiphop"
+
+
+def add_drop(plan: dict[str, Any], at_bar: float, *, build_bars: float | None = None,
+             clip_ids: list[str] | None = None, riser: bool | str | None = None, impact: bool = True,
+             silence_beats: float | None = None, roll: bool = False, style: str | None = None) -> dict[str, Any]:
+    """Build -> silence -> drop at ``at_bar``: a filter sweep on the beds, silence before the one, an optional
+    generated riser that ends on the downbeat, and an impact on the one. The build follows the plan's tempo
+    (``BUILDS``) unless ``style`` names one; arguments left as None take that style's values."""
     from glass_harbor.plan import resolve
 
+    style = style or (build_style(float(plan["bpm"])) if plan.get("bpm") else "edm")
+    if style not in BUILDS:
+        raise ValueError(f"build style must be one of {', '.join(BUILDS)}")
+    defaults = BUILDS[style]
+    build_bars = defaults["build_bars"] if build_bars is None else build_bars
+    silence_beats = defaults["silence_beats"] if silence_beats is None else silence_beats
+    riser = defaults["riser"] if riser is None else riser
     res = resolve(plan)
     if not res.ok:
         raise ValueError("fix plan errors before adding a drop")
@@ -466,13 +489,17 @@ def add_drop(plan: dict[str, Any], at_bar: float, *, build_bars: float = 8, clip
     if not targets:
         raise ValueError("no bed clip plays during the build; pass --clips")
     gap = silence_beats / bpb
+    if gap >= build_bars:
+        raise ValueError("the silence must be shorter than the build")
+    lane, open_hz, closed_hz = defaults["filter"]
     for target in targets:
         spec = plan["clips"][target.index]
         anchor_bar = spec["at_bar"]
         s0, e0 = start_bar - anchor_bar, at_bar - anchor_bar
         automation = spec.setdefault("automation", {})
-        automation["highpass_hz"] = _merge_points(automation.get("highpass_hz"), s0, e0, [
-            [round(s0, 4), 20], [round(e0 - gap, 4), 700], [round(e0 - 0.002, 4), 700], [round(e0, 4), 20]])
+        automation[lane] = _merge_points(automation.get(lane), s0, e0, [
+            [round(s0, 4), open_hz], [round(e0 - gap, 4), closed_hz], [round(e0 - 0.002, 4), closed_hz],
+            [round(e0, 4), open_hz]])
         if silence_beats:
             automation["gain_db"] = _merge_points(automation.get("gain_db"), e0 - gap - 0.01, e0, [
                 [round(e0 - gap - 0.003, 4), 0], [round(e0 - gap, 4), -60], [round(e0 - 0.002, 4), -60],
@@ -498,7 +525,8 @@ def add_drop(plan: dict[str, Any], at_bar: float, *, build_bars: float = 8, clip
         plan["clips"].append({"id": f"impact-{at_bar:g}", "generate": "impact", "at_bar": at_bar, "bars": 2,
                               "gain_db": -5})
     plan.setdefault("notes", []).append(
-        f"drop at bar {at_bar:g}: {build_bars:g}-bar build on {', '.join(t.id for t in targets)}"
+        f"drop at bar {at_bar:g}: {build_bars:g}-bar {'hip-hop' if style == 'hiphop' else 'EDM'} build "
+        f"({'filter down' if lane == 'lowpass_hz' else 'high-pass sweep'}) on {', '.join(t.id for t in targets)}"
         f"{(', vocal riser' if isinstance(riser, str) else ', riser') if riser else ''}{', snare roll' if roll else ''}"
         f"{', impact' if impact else ''}, "
         f"{silence_beats:g} beat(s) of silence")

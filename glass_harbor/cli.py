@@ -467,10 +467,11 @@ def cmd_mix_drop(args: argparse.Namespace) -> int:
 
     slug = require_slug(args.slug)
     path = plan_path(slug)
-    riser: bool | str = False if args.no_riser or args.riser == "none" else (args.riser if args.riser.startswith("vocal:") else True)
+    riser: bool | str | None = (False if args.no_riser or args.riser == "none" else None if args.riser is None
+                                else args.riser if args.riser.startswith("vocal:") else True)
     plan = add_drop(load_plan(path), args.at_bar, build_bars=args.build_bars,
                     clip_ids=args.clips.split(",") if args.clips else None, riser=riser,
-                    impact=not args.no_impact, silence_beats=args.silence_beats, roll=args.roll)
+                    impact=not args.no_impact, silence_beats=args.silence_beats, roll=args.roll, style=args.style)
     save_plan(path, plan)
     return _validate_and_report(args, slug, prefix=f"added a drop at bar {args.at_bar:g}\n")
 
@@ -845,14 +846,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     common(mix.add_parser("list", help="list mix plans")).set_defaults(func=cmd_mix_list)
 
-    p = common(mix.add_parser("drop", help="add build -> silence -> drop (riser, high-pass sweep, impact) at a bar"))
+    p = common(mix.add_parser("drop", help="add build -> silence -> drop at a bar, styled by tempo: EDM (115+ bpm: "
+                                           "8-bar high-pass sweep, riser) or hip-hop (filter down, a bar of beat cut)"))
     p.add_argument("slug")
     p.add_argument("--at-bar", type=float, required=True)
-    p.add_argument("--build-bars", type=float, default=8)
+    p.add_argument("--style", choices=("edm", "hiphop"), help="default: by the plan's tempo")
+    p.add_argument("--build-bars", type=float, help="default: 8 (edm) or 2 (hip-hop)")
     p.add_argument("--clips", help="comma list of bed clip ids (default: every non-vocal clip in the build)")
-    p.add_argument("--silence-beats", type=float, default=1.0)
+    p.add_argument("--silence-beats", type=float, help="default: 1 (edm) or 4 (hip-hop)")
     p.add_argument("--no-riser", action="store_true")
-    p.add_argument("--riser", default="noise", help="noise (default), none, or vocal:<word> (a riser made from a lyric word)")
+    p.add_argument("--riser", help="noise, none, or vocal:<word> (a riser made from a lyric word); default: noise "
+                                   "for edm, none for hip-hop")
     p.add_argument("--roll", action="store_true", help="snare roll cut from the beat's drum stem in the last 2 bars")
     p.add_argument("--no-impact", action="store_true")
     p.add_argument("--verbose", action="store_true")
