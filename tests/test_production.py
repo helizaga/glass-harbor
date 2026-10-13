@@ -132,6 +132,10 @@ def test_render_writes_a_phone_version(workspace, synth_files, tmp_path):
                            capture_output=True, text=True, check=True).stdout
     assert "codec_name=aac" in probe and "Phone Test" in probe
     assert not (tmp_path / "run" / "mix-phone.wav").exists()
+    phone = A.load(tmp_path / "run" / "mix-phone.m4a")  # the decoded AAC, overshoot and all, stays under -1 dBTP
+    assert A.true_peak_db(phone) <= -1.0
+    assert report["encodes"]["mix-phone.m4a"]["true_peak_db"] == pytest.approx(A.true_peak_db(phone), abs=0.05)
+    assert A.true_peak_db(A.load(tmp_path / "run" / "mix.mp3")) <= -1.0
 
 
 def test_phone_version_without_mp3_and_no_stale_report(workspace, synth_files, tmp_path):
