@@ -358,7 +358,7 @@ def test_hit_potential_scores_the_ingredients(monkeypatch, workspace):
          "dabin Stay With Me (feat. VELVETEARS)": [
              {"id": 9, "title": "Stay With Me", "rank": 990_000, "artist": {"name": "Calvin Harris"}},
              {"id": 2, "title": "Stay With Me", "rank": 700_000, "artist": {"name": "Dabin"}}]},
-        {"track/1": days(900), "track/2": days(60)})
+        {"track/1": days(900), "track/2": days(30)})
     monkeypatch.setattr(potential, "_get", fake)
     reference_path("v").write_text(json.dumps({"lines": parse_synced(
         "[00:20.00] Glock in my hand\n[00:30.00] a long verse line that is not the hook at all\n"
@@ -370,6 +370,8 @@ def test_hit_potential_scores_the_ingredients(monkeypatch, workspace):
     assert result["beat"]["artist"] == "Dabin"  # the same title by another artist is not this song
     assert result["hook"] == {"repeats": 3, "words": 4, "first_s": 20.0}
     assert any("crossover" in r for r in result["reasons"])
+    assert "beat released 1 month ago (fresh)" in result["reasons"]
+    assert "hook: 4-word line repeated 3x, first at 20s" in result["reasons"]
     potential.assess("v", "b")
     assert calls.count("search") == 2  # cached for a week
     (library.track_dir("b") / "popularity.json").write_text('{"checked": "20')  # a half-written cache

@@ -18,8 +18,8 @@
 - a lot of the beat's harmony sits outside the vocal's key (dark/chromatic)
 - hit potential: high (72/100)
   - vocal is popular (Deezer rank 436,000); beat is niche (Deezer rank 71,023)
-  - beat released 1 months ago (fresh)
-  - hook: a 8-word line repeated 7x, first at 28s
+  - beat released 1 month ago (fresh)
+  - hook: 8-word line repeated 7x, first at 28s
   - crossover: a hip-hop/R&B vocal on a club beat
 
 ## Decisions (the draft's rules; edit the plan to change them)

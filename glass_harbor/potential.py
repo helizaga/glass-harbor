@@ -136,13 +136,15 @@ def assess(vocal: str, beat: str, *, crossover: bool | None = None) -> dict[str,
     vocal_age = _months_old((vocal_pop or {}).get("release_date"))
     score += 15 * freshness(beat_age) + 5 * freshness(vocal_age)
     if beat_age is not None:
-        reasons.append(f"beat released {beat_age:.0f} months ago" + (" (fresh)" if beat_age <= 6 else ""))
+        months = f"{beat_age:.0f}"
+        reasons.append(f"beat released {months} month{'' if months == '1' else 's'} ago"
+                       + (" (fresh)" if beat_age <= 6 else ""))
 
     if hook_info:
         catchy = min(1.0, hook_info["repeats"] / 4) * (1.0 if hook_info["words"] <= 6 else 0.7)
         early = 1.0 if hook_info["first_s"] <= 45 else 0.6 if hook_info["first_s"] <= 75 else 0.3
         score += 25 * catchy * early
-        reasons.append(f"hook: a {hook_info['words']}-word line repeated {hook_info['repeats']}x, first at "
+        reasons.append(f"hook: {hook_info['words']}-word line repeated {hook_info['repeats']}x, first at "
                        f"{hook_info['first_s']:.0f}s")
     else:
         score += 8

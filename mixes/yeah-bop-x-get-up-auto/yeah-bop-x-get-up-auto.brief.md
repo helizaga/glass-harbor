@@ -15,7 +15,7 @@
 - verdict: good (rap vocal); vocal_room 0.0214 (good), harshness 0.0094 (good), out_of_key 0.345 (good)
 - hit potential: medium (56/100)
   - vocal is niche (Deezer rank 61,929); beat is unknown popularity
-  - hook: a 2-word line repeated 5x, first at 9s
+  - hook: 2-word line repeated 5x, first at 9s
   - crossover: a hip-hop/R&B vocal on a club beat
 
 ## Decisions (the draft's rules; edit the plan to change them)
