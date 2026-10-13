@@ -162,11 +162,80 @@ def test_dj_edges_loop_skips_the_beats_break_and_bridge_its_dead_air(workspace):
     assert not any("two basslines" in i.message for i in resolve(plan).issues)
 
 
+def test_dj_outro_starts_where_the_beat_ends_under_a_vocal_that_runs_on(workspace):
+    plan = _mashup()
+    plan["clips"][2]["at_bar"] = 29  # the hook runs to bar 37, four bars past the beat's end at 33
+    plan = add_dj_edges(plan, intro_bars=0, outro_bars=16)
+    assert resolve(plan).ok
+    ids = {c["id"]: c for c in plan["clips"]}
+    assert ids["outro-drums"]["at_bar"] == 33 and ids["outro-bass"]["at_bar"] == 33  # no bars of vocal on silence
+
+
 def test_dj_edges_loop_moves_past_a_break_inside_the_drop(workspace):
     plan = add_dj_edges(_with_levels(silent_bars=[], breaks=[11]), intro_bars=16, outro_bars=16)
     ids = {c["id"]: c for c in plan["clips"]}
     assert (ids["intro-drums"]["from_bar"], ids["intro-drums"]["bars"]) == (12, 8)  # first clean 8 bars after it
     assert not any(i.endswith("-bridge") for i in ids)
+
+
+def test_trim_run_up_starts_on_a_section_of_the_beat_and_keeps_the_vocal_on_its_bar(workspace):
+    from glass_harbor.scaffold import trim_run_up
+
+    plan = _mashup()
+    plan["clips"][1]["at_bar"], plan["clips"][2]["at_bar"] = 13, 21  # 12 bars of beat before the verse
+    plan["clips"].append({"id": "early-fx", "generate": "riser", "at_bar": 3, "bars": 2})
+    beat = {"sections": [{"start_bar": 1}, {"start_bar": 7}, {"start_bar": 17}], "drops": []}
+    trim_run_up(plan, beat, keep_bars=4)
+    assert resolve(plan).ok
+    ids = {c["id"]: c for c in plan["clips"]}
+    # bar 7 is the latest section start at least 4 bars before the verse: the edit starts there
+    assert (ids["verse"]["at_bar"], ids["hook"]["at_bar"]) == (7, 15)
+    assert (ids["bed"]["at_bar"], ids["bed"]["from_bar"], ids["bed"]["bars"]) == (1, 7, 26)  # same beat bar under it
+    assert ids["bed"]["automation"]["gain_db"] == [[0, 0.0], [18, 0], [26, -40]]  # the fade moves with it
+    assert "early-fx" not in ids  # it only played in the cut run-up
+
+    plan = _mashup()
+    plan["clips"][1]["at_bar"], plan["clips"][2]["at_bar"] = 13, 21
+    del plan["bpm"]
+    plan["tempo"] = [{"bar": 1, "bpm": 124}, {"bar": 5, "bpm": 120}, {"bar": 9, "bpm": 128, "ramp": True},
+                     {"bar": 25, "bpm": 126}]
+    plan["clips"] += [
+        {"id": "riser", "generate": "riser", "at_bar": 3, "bars": 8},  # runs on past the cut at bar 7
+        {"id": "beat-chop", "source": "bed", "stem": "instrumental", "at_bar": 5, "bars": 4,
+         "chop": {"slices": {"a": {"bar": 1, "beat": 1, "beats": 1}},
+                  "pattern": ["a---............", ".a--............", "..a-............", "...a............"]}},
+        {"id": "held-chop", "source": "bed", "stem": "instrumental", "at_bar": 5, "bars": 4,
+         "chop": {"slices": {"a": {"bar": 1, "beat": 1, "beats": 1}}, "pattern": "a--"}}]
+    trim_run_up(plan, beat, keep_bars=4)
+    assert resolve(plan).ok, [i.to_dict() for i in resolve(plan).issues]
+    ids = {c["id"]: c for c in plan["clips"]}
+    assert (ids["riser"]["at_bar"], ids["riser"]["bars"]) == (1, 4)  # shorter, not gone
+    assert ids["beat-chop"]["bars"] == 2 and ids["beat-chop"]["chop"]["pattern"].startswith("..a-")  # picked up at the cut
+    # a three-step cycle cut on a hold: only the first step turns into a rest, every later cycle keeps its holds
+    held = ids["held-chop"]["chop"]["pattern"]
+    assert held.startswith(".a--a--a--") and len(held) == 32 and held.count(".") == 1
+    # the map opens on the tempo at the cut, half way up the 120 -> 128 ramp, and keeps what follows
+    assert plan["tempo"] == [{"bar": 1, "bpm": 124.0}, {"bar": 3, "bpm": 128, "ramp": True}, {"bar": 19, "bpm": 126}]
+
+    plan = _mashup()  # without a section start in reach, exactly keep_bars before the vocal
+    trim_run_up(plan, {"sections": [{"start_bar": 1}]}, keep_bars=4)
+    assert {c["id"]: c["at_bar"] for c in plan["clips"]}["verse"] == 5
+
+
+def test_a_vocal_first_taste_skips_the_dj_intro(workspace):
+    from glass_harbor.feedback import load_taste, save_taste
+    from glass_harbor.scaffold import build_mashup
+
+    _mashup()  # the tracks
+    plan_default = build_mashup("vox", "bed")
+    taste = load_taste()
+    taste["defaults"]["run_up_bars"] = 4
+    save_taste(taste)
+    plan = build_mashup("vox", "bed")
+    first = lambda p: min(c["at_bar"] for c in p["clips"] if c.get("stem") == "vocals")  # noqa: E731
+    assert not any(c["id"].startswith("intro-") for c in plan["clips"])  # no DJ intro
+    assert any(c["id"].startswith("outro-") for c in plan["clips"])  # the outro stays
+    assert first(plan) <= 5 < first(plan_default)
 
 
 def test_fills_and_edits(workspace):

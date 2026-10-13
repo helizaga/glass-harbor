@@ -500,7 +500,8 @@ def render_clip(res: Resolution, clip: ResolvedClip, source_audio: np.ndarray, l
     audio = _apply_mixer(res, clip, audio, start_time)
 
     source_dev, _, _ = grid_deviation_ms(segment, list(beat_src[:src_beats] - beat_src[0]))
-    warp_dev, jitter, _ = grid_deviation_ms(dry, target_beats)
+    warp_dev, jitter, warp_coverage = grid_deviation_ms(dry, target_beats)
+    notes["warp_coverage"] = warp_coverage  # share of beats with a clear onset (unrounded: QA compares it)
     warp_offset = None if warp_dev is None or source_dev is None else warp_dev - source_dev
     nudge = float(spec.get("nudge_ms", 0.0)) / 1000.0
     if nudge:

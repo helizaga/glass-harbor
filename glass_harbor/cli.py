@@ -455,7 +455,10 @@ def cmd_taste(args: argparse.Namespace) -> int:
         name, _, value = args.value.partition("=")
         if name not in feedback.TASTE_DEFAULTS:
             raise ValueError(f"unknown default {name!r}; known: {', '.join(feedback.TASTE_DEFAULTS)}")
-        taste["defaults"][name] = type(feedback.TASTE_DEFAULTS[name])(value)
+        converted = type(feedback.TASTE_DEFAULTS[name])(value)
+        if name == "run_up_bars" and converted < 0:
+            raise ValueError("run_up_bars must be 0 (keep the beat's run-up) or a number of bars")
+        taste["defaults"][name] = converted
         feedback.save_taste(taste)
     elif args.action == "add":
         taste["preferences"].append(args.value)

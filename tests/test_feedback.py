@@ -111,3 +111,5 @@ def test_taste_set_and_add_need_values(workspace, capsys):
     assert main(["taste", "set", "hiphop_blend_bars"]) == 2
     assert main(["taste", "add"]) == 2
     assert feedback.load_taste()["preferences"] == []
+    assert main(["taste", "set", "run_up_bars=-1"]) == 2  # a cut past the first vocal would shorten it
+    assert main(["taste", "set", "run_up_bars=4"]) == 0 and feedback.taste_default("run_up_bars") == 4

@@ -65,6 +65,7 @@ def test_render_transition_and_qa(workspace, synth_files, tmp_path):
     assert report["duration_s"] == pytest.approx(expected, abs=0.1)
     for clip in report["clips"]:
         assert clip["warp_offset_ms"] is not None and abs(clip["warp_offset_ms"]) < 12, clip
+        assert 0.0 <= clip["notes"]["warp_coverage"] <= 1.0, clip  # QA's sparse-vocal rule reads it from here
     assert len(list((out / "clips").glob("*.wav"))) == 2
     qa = check_run(out)
     assert qa["loudness_lufs"] == pytest.approx(-14, abs=1.0)
@@ -199,6 +200,19 @@ def test_grid_warning_trusts_drums_not_sustained_bass(tmp_path):
     (tmp_path / "render.json").write_text(json.dumps({"files": {"wav": "mix.wav"}, "clips": clips}))
     grid = [f["where"] for f in check_run(tmp_path)["flags"] if "source beat grid" in f["message"]]
     assert grid == ["loop-drums"]  # an off-beat bassline's decaying notes say nothing about the grid
+
+
+def test_warp_warning_needs_enough_onsets_on_a_vocal(tmp_path):
+    rng = np.random.default_rng(6)
+    A.save(tmp_path / "mix.wav", (0.1 * rng.standard_normal((8 * A.SR, 2))).astype(np.float32))
+    (tmp_path / "plan.json").write_text(json.dumps({"bpm": 93, "beats_per_bar": 4, "clips": []}))
+    clips = [{"id": name, "track": "vox", "stem": stem, "start_s": 0.0, "length_s": 8.0, "stretch_pct": -2.1,
+              "semitones": 2, "warp_offset_ms": 48.0, "notes": {"warp_coverage": coverage}}
+             for name, stem, coverage in (("sparse-verse", "vocals", 0.346), ("crisp-verse", "vocals", 0.5),
+                                          ("sparse-drums", "drums", 0.25))]
+    (tmp_path / "render.json").write_text(json.dumps({"files": {"wav": "mix.wav"}, "clips": clips}))
+    warned = [f["where"] for f in check_run(tmp_path)["flags"] if "off the output grid" in f["message"]]
+    assert warned == ["crisp-verse", "sparse-drums"]  # a few soft syllables say little about the warp
 
 
 def test_vocal_balance_reads_loudness_only_where_the_vocal_sounds(workspace):
