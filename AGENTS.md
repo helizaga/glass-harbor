@@ -76,7 +76,7 @@ Use a Python build with SSL (Homebrew); the pyenv 3.11.3 build on this machine l
 - `glass-harbor track analyze <ids...>|--all [--force] [--beats auto|beat_this|librosa] [--sections novelty|allin1]`
 - `glass-harbor track separate <id> [--stems vocals,instrumental,drums,bass,other] [--quality ...]`
 - `glass-harbor track clean <id> [--stem vocals] [--mode dereverb|dereverb-gentle|deecho|denoise|lead] [--restart] [--force]` (steps stack; `lead` drops backing vocals and keeps them in `stems/raw/<stem>-backing.flac`, and refuses a split whose lead loses more than 6 dB in over 25% of the half-second windows where the vocal sounds, as on a double-tracked rap verse, unless `--force`)
-- `glass-harbor track lyrics <id> [--force]`
+- `glass-harbor track lyrics <id> [--force]` (Whisper, then the published synced lyrics, the file's own or LRCLIB's, force-aligned to the acapella for word timings when Whisper heard at least half of it; Whisper's own output stays in `lyrics_whisper.json`)
 - `glass-harbor track list` / `glass-harbor track show <id>`
 - `glass-harbor match <id> [--role vocals|bed|next] [--against ids...]`
 - `glass-harbor set order <ids...> [--start <id>]`

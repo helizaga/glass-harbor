@@ -42,8 +42,9 @@ Lookup cannot hear the beat: once the user has the files, `glass-harbor fit <voc
 (1-4 kHz crowding), harshness, and out-of-key harmony in a minute, plus an advisory hit-potential score (a known
 song on either side, a beat from the last six months, a short hook that repeats early, a rap/R&B vocal on a club
 beat). Treat a low score as a reason to look for a fresher or better-known beat, not as a verdict. Lyrics come
-from Whisper for timing and from the file's own embedded synced lyrics, else LRCLIB (free, synced lines), for the
-right words and which lines really repeat; both stay in the gitignored library.
+from the file's own embedded synced lyrics, else LRCLIB (free, synced lines), for the right words and which lines
+really repeat, force-aligned to the acapella for word timings; Whisper times whatever the published text leaves
+out (spoken intros, ad-libs). All of it stays in the gitignored library.
 
 **Measure before you rank.** Chart and streaming-derived keys are hints and can be wrong: Spotify's data lists
 Kodak Black's "Thankful" in C major, while the file measures B minor (S-KEY 0.71 on the instrumental stem, the 808
