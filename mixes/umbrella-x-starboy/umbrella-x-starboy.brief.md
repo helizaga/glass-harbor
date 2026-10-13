@@ -17,7 +17,7 @@
 - hit potential: low (40/100)
   - vocal is niche (Deezer rank 31,773); beat is a hit (Deezer rank 975,897)
   - beat released 119 months ago
-  - hook: a 1-word line repeated 1x, first at 170s
+  - hook: 1-word line repeated 1x, first at 170s
 
 ## Decisions (the draft's rules; edit the plan to change them)
 

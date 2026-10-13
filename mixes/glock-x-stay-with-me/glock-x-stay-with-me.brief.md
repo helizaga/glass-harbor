@@ -17,7 +17,7 @@
 - hit potential: medium (68/100)
   - vocal is popular (Deezer rank 436,000); beat is known (Deezer rank 114,549)
   - beat released 18 months ago
-  - hook: a 8-word line repeated 7x, first at 28s
+  - hook: 8-word line repeated 7x, first at 28s
   - crossover: a hip-hop/R&B vocal on a club beat
 
 ## Decisions (the draft's rules; edit the plan to change them)
@@ -33,12 +33,10 @@
 - no extra DJ intro: the beat opens with 16 bars of its own
 - the beat's own 2-bar fade-out is cut; the DJ outro follows on
 - DJ edges: 0-bar beat intro, 16-bar beat outro (looped from bar 17 of dabin-stay-with-me-feat-velvetears)
-- auto fix: vocal buried or hard to make out: +2 dB on hook2; bed-other ducks 7 dB under the vocal
-- auto fix: vocal buried or hard to make out: +2 dB on verse1, hook2; bed-other ducks 9 dB under the vocal
 
 ## Fix rounds
 
-- round 1: vocal buried or hard to make out: +2 dB on hook2; bed-other ducks 7 dB under the vocal
+- round 1: vocal buried or hard to make out: +2 dB on hook2; bed-other ducks 7 dB under the vocal (superseded by round 2's 9 dB)
 - round 2: vocal buried or hard to make out: +2 dB on verse1, hook2; bed-other ducks 9 dB under the vocal
 
 ## QA after the last render
