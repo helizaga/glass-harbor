@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import datetime as dt
 import math
+import re
 from pathlib import Path
 from typing import Any, Callable
 
@@ -115,6 +116,11 @@ def _bars(clip: Any, bpb: int) -> range:
     return range(int(math.floor(1 + clip.out_start_beat / bpb)), int(math.ceil(1 + clip.out_end_beat / bpb)))
 
 
+AUTO_FIX_NOTE = "auto fix: "  # prefix of the plan note each fix round leaves
+DUCK_CHANGE = "{clip} ducks {db:g} dB under the vocal"  # a setting, not a step: a later round's replaces it
+_DUCK_CHANGE_RE = re.compile(r"^(.+) ducks (\S+) dB under the vocal$")  # plan clip ids may hold spaces
+
+
 def apply_qa_fixes(plan: dict[str, Any], report: dict[str, Any], qa: dict[str, Any],
                    heard: dict[str, Any] | None = None) -> list[str]:
     """The fixes QA findings map to safely. Changes ``plan`` in place; returns what was done (empty when there is
@@ -153,7 +159,7 @@ def apply_qa_fixes(plan: dict[str, Any], report: dict[str, Any], qa: dict[str, A
                     and float(spec["duck"].get("db", 0)) + 2.0 <= MAX_AUTO_DUCK_DB:
                 spec["duck"]["db"] = float(spec["duck"]["db"]) + 2.0
                 auto["duck_db"][clip.id] = auto["duck_db"].get(clip.id, 0.0) + 2.0
-                changes.append(f"{clip.id} ducks {spec['duck']['db']:g} dB under the vocal")
+                changes.append(DUCK_CHANGE.format(clip=clip.id, db=spec["duck"]["db"]))
 
     # 2. Vocal louder over the beat than its own record allows: bring its clips back down to the limit.
     for track, room in sorted(headroom.items()):
@@ -202,7 +208,7 @@ def apply_qa_fixes(plan: dict[str, Any], report: dict[str, Any], qa: dict[str, A
             follow_vocal_roots(plan, clip_ids=sorted(already | set(wanted)))
             changes.append(f"bass follows the vocal's chords under {', '.join(wanted)}")
     if changes:
-        plan.setdefault("notes", []).append("auto fix: " + "; ".join(changes))
+        plan.setdefault("notes", []).append(AUTO_FIX_NOTE + "; ".join(changes))
     return changes
 
 
@@ -245,6 +251,25 @@ def _listen(run_dir: Path, log: Log, *, shift_s: float = 0.0) -> dict[str, Any] 
 # ---------------------------------------------------------------- brief
 
 
+def _round_lines(rounds: list[list[str]]) -> list[str]:
+    """One line per fix round. Gain lifts are steps and add up; a duck depth is a setting, so where a later round
+    sets the same clip's duck again, the earlier value is marked as superseded."""
+    ducks: dict[str, list[tuple[int, str]]] = {}  # clip id -> (round, dB) for each round that set its duck
+    for i, changes in enumerate(rounds):
+        for change in changes:
+            if m := _DUCK_CHANGE_RE.match(change):
+                ducks.setdefault(m[1], []).append((i, m[2]))
+    lines = []
+    for i, changes in enumerate(rounds):
+        shown = []
+        for change in changes:
+            m = _DUCK_CHANGE_RE.match(change)
+            later = [(j, db) for j, db in ducks.get(m[1], []) if j > i] if m else []
+            shown.append(f"{change} (superseded by round {later[0][0] + 1}'s {later[0][1]} dB)" if later else change)
+        lines.append(f"- round {i + 1}: {'; '.join(shown) if shown else 'nothing left to fix'}")
+    return lines or ["- none"]
+
+
 def write_brief(slug: str, plan: dict[str, Any], vocal: str, bed: str, qa: dict[str, Any] | None,
                 rounds: list[list[str]], check: dict[str, Any] | None = None) -> Path:
     from glass_harbor.paths import mix_dir
@@ -270,9 +295,9 @@ def write_brief(slug: str, plan: dict[str, Any], vocal: str, bed: str, qa: dict[
                + [f"- hit potential: {check['potential']['level']} ({check['potential']['score']}/100)"]
                + [f"  - {r}" for r in check["potential"]["reasons"]] if check else ["- not run"]), "",
              "## Decisions (the draft's rules; edit the plan to change them)", ""]
-    lines += [f"- {note}" for note in plan.get("notes", [])]
-    lines += ["", "## Fix rounds", ""]
-    lines += [f"- round {i + 1}: {'; '.join(r) if r else 'nothing left to fix'}" for i, r in enumerate(rounds)] or ["- none"]
+    # The fix rounds' notes stay in the plan, but the brief records each round once, under "Fix rounds".
+    lines += [f"- {note}" for note in plan.get("notes", []) if not note.startswith(AUTO_FIX_NOTE)]
+    lines += ["", "## Fix rounds", "", *_round_lines(rounds)]
     if qa is not None:
         lines += ["", "## QA after the last render", "", f"- verdict: {qa['verdict']}, "
                   f"{qa['loudness_lufs']:.1f} LUFS, {qa['true_peak_db']:.1f} dBTP"]
