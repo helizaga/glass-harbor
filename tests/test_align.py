@@ -24,7 +24,8 @@ def _reference():
 
 
 def _fake_align(vocal, lines, windows=None):
-    return [{"text": line["text"], "words": _words(line["text"], 5.12, step=0.3)} for line in lines]
+    return [{"index": i, "text": line["text"], "words": _words(line["text"], 5.12, step=0.3)}
+            for i, line in enumerate(lines)]
 
 
 def test_agreement_counts_the_published_words_whisper_heard_in_order():
@@ -109,3 +110,25 @@ def test_align_lines_skips_lines_the_window_or_aligner_cannot_fit(monkeypatch):
     windows = [(0.0, 2.0), (2.0, 6.0), (6.0, 6.1)]  # the last window holds 5 frames for 11 letters
     out = align.align_lines(np.zeros((8 * 44100, 2), np.float32), lines, windows)
     assert [line["text"] for line in out] == ["hey you"]
+
+
+def test_align_track_rejects_mostly_skipped_lines_and_records_the_rest(workspace, monkeypatch):
+    write_fake_track("rap", bpm=90, key="Am", bars=8)
+    whisper = _whisper()
+    lyrics_path("rap").write_text(json.dumps(whisper))
+    lines = _reference()["lines"] + [{"time": 9.0 + i, "text": f"spare line {i}"} for i in range(4)]
+    reference_path("rap").write_text(json.dumps({"lines": lines}))
+
+    def keep(indexes):
+        return lambda vocal, lines, windows: [line for line in _fake_align(vocal, lines) if line["index"] in indexes]
+
+    # The first line carries enough of what Whisper heard to pass the text gate; only 2 of 5 lines aligning means
+    # the text and the recording disagree, so nothing is saved and auto can try again later.
+    monkeypatch.setattr(align, "text_agreement", lambda lines, segments: 0.9)
+    monkeypatch.setattr(align, "align_lines", keep({0, 1}))
+    assert align.align_track("rap", log=lambda m: None) is None
+    assert load_lyrics("rap") == whisper and not align.whisper_path("rap").exists()
+
+    monkeypatch.setattr(align, "align_lines", keep({0, 1, 2, 3}))  # 4 of 5: kept, the gap recorded
+    merged = align.align_track("rap", log=lambda m: None)
+    assert merged["skipped_lines"] == [4] and merged["aligned_lines"] == 4

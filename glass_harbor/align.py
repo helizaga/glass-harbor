@@ -28,6 +28,7 @@ MARGIN_S = 0.25  # Whisper words this close to an aligned line belong to it
 WINDOW_PAD_S = 1.0  # each line is searched for this far around where it was heard (or its LRCLIB timestamp)
 NEIGHBOUR_S = 0.15  # ...but no further than this into where Whisper heard the next or previous line
 MAX_OFFSET_S = 0.5  # aligned starts further than this from Whisper's (median) mean the alignment went wrong
+MIN_LINE_SHARE = 0.8  # fewer published lines than this aligned: the text and the recording disagree, keep Whisper
 
 
 def _token(word: str) -> str:
@@ -109,7 +110,7 @@ def align_lines(vocal: np.ndarray, lines: list[dict[str, Any]], windows: list[tu
     frame_s = wave.shape[1] / emission.shape[0] / bundle.sample_rate
 
     out = []
-    for line, (a, b) in zip(lines, windows):
+    for index, (line, (a, b)) in enumerate(zip(lines, windows)):
         raws = [raw for raw in line["text"].split() if _token(raw)]
         if not raws:
             continue
@@ -123,7 +124,7 @@ def align_lines(vocal: np.ndarray, lines: list[dict[str, Any]], windows: list[tu
             spans = aligner(emission[lo:hi], targets)[1:-1]
         except RuntimeError:
             continue
-        out.append({"text": line["text"], "words": [
+        out.append({"index": index, "text": line["text"], "words": [
             {"word": raw.strip(",.!?;:\"()"), "start": round((lo + span[0].start) * frame_s, 3),
              "end": round((lo + span[-1].end) * frame_s, 3), "prob": round(float(np.mean([t.score for t in span])), 3)}
             for raw, span in zip(raws, spans)]})
@@ -140,8 +141,9 @@ def timing_offset(aligned: list[dict[str, Any]], segments: list[dict[str, Any]])
     return float(np.median(gaps)) if gaps else float("inf")  # nothing to check against: not trusted
 
 
-def merge(whisper: dict[str, Any], aligned: list[dict[str, Any]]) -> dict[str, Any]:
-    """Aligned lines as segments, plus the Whisper words that fall outside every aligned line."""
+def merge(whisper: dict[str, Any], aligned: list[dict[str, Any]], skipped: list[int] | None = None) -> dict[str, Any]:
+    """Aligned lines as segments, plus the Whisper words that fall outside every aligned line (so a published line the
+    aligner skipped keeps whatever Whisper heard of it). ``skipped`` records those lines' indexes."""
     spans = [(line["words"][0]["start"] - MARGIN_S, line["words"][-1]["end"] + MARGIN_S) for line in aligned]
     segments = [{"start": line["words"][0]["start"], "end": line["words"][-1]["end"], "text": line["text"],
                  "words": line["words"]} for line in aligned]
@@ -151,7 +153,8 @@ def merge(whisper: dict[str, Any], aligned: list[dict[str, Any]]) -> dict[str, A
             segments.append({"start": kept[0]["start"], "end": kept[-1]["end"],
                              "text": " ".join(w["word"] for w in kept), "words": kept})
     segments.sort(key=lambda s: s["start"])
-    return {**whisper, "segments": segments, "timing": "aligned", "aligned_lines": len(aligned)}
+    return {**whisper, "segments": segments, "timing": "aligned", "aligned_lines": len(aligned),
+            "skipped_lines": skipped or []}
 
 
 def whisper_path(track_id: str):
@@ -184,15 +187,20 @@ def align_track(track_id: str, *, log: Log = print) -> dict[str, Any] | None:
     except ImportError:
         log("word alignment needs torch and torchaudio (pip install -e '.[ml]'); kept Whisper's timings")
         return None
-    if not aligned:
+    alignable = [i for i, line in enumerate(reference["lines"]) if any(_token(w) for w in line["text"].split())]
+    done = {line["index"] for line in aligned}
+    skipped = [i for i in alignable if i not in done]
+    if not aligned or len(done) < MIN_LINE_SHARE * len(alignable):
+        log(f"kept Whisper's timings for {track_id}: only {len(done)} of {len(alignable)} published lines aligned")
         return None
     offset = timing_offset(aligned, whisper["segments"])
     if offset > MAX_OFFSET_S:
         log(f"kept Whisper's timings for {track_id}: the aligned words land {offset:.2f} s from where Whisper heard them")
         return None
     saved.write_text(json.dumps(whisper, indent=1) + "\n")
-    merged = merge(whisper, aligned)
+    merged = merge(whisper, aligned, skipped)
     lyrics_path(track_id).write_text(json.dumps(merged, indent=1) + "\n")
     timed = sum(len(line["words"]) for line in aligned)
-    log(f"timed {timed} published words on {track_id}'s acapella (Whisper heard {agreement:.0%} of them)")
+    log(f"timed {timed} published words on {track_id}'s acapella (Whisper heard {agreement:.0%} of them)"
+        + (f"; {len(skipped)} line(s) keep Whisper's timing" if skipped else ""))
     return merged
