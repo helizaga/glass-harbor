@@ -36,7 +36,7 @@ overlaps, key clashes, audible stretch, silence).
 | `tempo` | tempo map: `[{"bar": 1, "bpm": 92}, {"bar": 33, "bpm": 128}, {"bar": 41, "bpm": 130, "ramp": true}]`. A point without `ramp` is a step change on that bar line (cuts, echo-outs); `ramp: true` ramps linearly from the previous point |
 | `beats_per_bar` | 4 (or 3) |
 | `master.lufs` | integrated loudness target (default -9); the limiter never applies more than 6 dB of gain reduction, QA flags a miss |
-| `master.ceiling_db` | true-peak ceiling (default -1) |
+| `master.ceiling_db` | true-peak ceiling (default -1); `mix.mp3` is held under it after decoding too (MP3 and AAC overshoot the master, so the lossy files are limited a little lower when they would go over) |
 | `master.match_loudness` | default `true`: every source is first matched to -14 LUFS so clip gains are relative |
 | `master.glue` | default `true`: gentle bus compression (about 1 dB) before the true-peak limiter |
 | `master.reference` | a library track id (or `{track, stem}`): Matchering matches tonal balance and width to that released master; without `lufs`, its loudness becomes the target (clamped to -14..-6; loud DnB/EDM beds reach -6 with drum clipping) |

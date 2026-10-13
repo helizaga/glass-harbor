@@ -7,7 +7,7 @@ from glass_harbor import audio as A
 from glass_harbor import library
 from glass_harbor.analyze import analyze_track
 from glass_harbor.check import check_run
-from glass_harbor.render import grid_deviation_ms, render_plan, warp
+from glass_harbor.render import encode_under_ceiling, grid_deviation_ms, master, render_plan, warp
 
 
 def _add(synth_files, name, bpm, key, **kwargs):
@@ -261,3 +261,44 @@ def test_qa_flags_a_vocal_far_louder_than_on_its_own_record(tmp_path):
                                                       "vocal_balance": balance}))
     flags = [f for f in check_run(tmp_path)["flags"] if "own record" in f["message"]]
     assert [f["where"] for f in flags] == ["rap"]  # 10.1 LU over its record; the singer's 1.8 LU is fine
+
+
+def test_lossy_encode_is_limited_until_the_decoded_file_is_under_the_ceiling(tmp_path):
+    rng = np.random.default_rng(7)
+    loud, _ = master((rng.standard_normal((A.SR * 4, 2)) * 0.1).astype(np.float32), lufs=-8.0, ceiling_db=-1.0)
+    wav = A.save(tmp_path / "mix.wav", loud, subtype="PCM_24")
+    calls = []
+
+    def overshooting(path):  # stands in for AAC: the decoded file peaks 2 dB over what went in
+        calls.append(path)
+        return A.save(tmp_path / "mix.out.wav", A.load(path) * A.db_to_gain(2.0), subtype="FLOAT")
+
+    staged, encoded, stats = encode_under_ceiling(loud, wav, overshooting, ceiling_db=-1.0, log=lambda m: None)
+    assert A.true_peak_db(A.load(encoded)) <= -1.0 and stats["true_peak_db"] <= -1.0
+    assert stats["relimited_db"] >= 2.0 and len(calls) >= 2
+    assert A.true_peak_db(staged) < A.true_peak_db(loud) - 1.5
+    assert np.allclose(A.load(wav), loud, atol=1e-4)  # the WAV master is left as it was
+    assert stats["lufs"] == pytest.approx(A.integrated_lufs(A.load(encoded)), abs=0.01)
+
+
+def test_lossy_encode_leaves_a_file_already_under_the_ceiling(tmp_path):
+    quiet = (np.random.default_rng(8).standard_normal((A.SR * 2, 2)) * 0.05).astype(np.float32)
+    wav = A.save(tmp_path / "mix.wav", quiet, subtype="PCM_24")
+    staged, encoded, stats = encode_under_ceiling(quiet, wav, lambda path: path, ceiling_db=-1.0, log=lambda m: None)
+    assert staged is quiet and encoded == wav and stats["relimited_db"] == 0.0
+    assert encode_under_ceiling(quiet, wav, lambda path: None, ceiling_db=-1.0) == (quiet, None, None)
+
+
+def test_lossy_encode_lands_just_under_the_ceiling_when_the_overshoot_shrinks(tmp_path):
+    rng = np.random.default_rng(9)
+    loud, _ = master((rng.standard_normal((A.SR * 4, 2)) * 0.1).astype(np.float32), lufs=-8.0, ceiling_db=-1.0)
+    wav = A.save(tmp_path / "mix.wav", loud, subtype="PCM_24")
+
+    def overshooting(path):  # like AAC on a limited master: 2 dB over at -1 dBTP in, less the deeper the limiting
+        audio = A.load(path)
+        over = max(0.3, 2.0 + 0.5 * (A.true_peak_db(audio) + 1.0))
+        return A.save(tmp_path / "mix.out.wav", audio * A.db_to_gain(over), subtype="FLOAT")
+
+    _, encoded, stats = encode_under_ceiling(loud, wav, overshooting, ceiling_db=-1.0, log=lambda m: None)
+    assert -1.4 <= A.true_peak_db(A.load(encoded)) <= -1.0  # under the ceiling without giving away loudness
+    assert stats["true_peak_db"] == pytest.approx(A.true_peak_db(A.load(encoded)), abs=0.01)

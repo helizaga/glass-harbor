@@ -28,6 +28,9 @@ GROOVE_LOCK = 0.4  # share of the way word onsets move onto the flow's 16th grid
 PHONE_LUFS = -8.0  # sent as a file, nothing normalizes it: loud like a release, a little less squashed than the club master
 LOUDEST_TARGET_LUFS = -6.0  # club masters for loud genres (DnB, EDM); reached with drum clipping + limiting
 MAX_LIMITING_DB = 6.0
+LOSSY_MARGIN_DB = 0.15  # a lossy file limited again aims this far under the ceiling
+LOSSY_WINDOW_DB = 0.4  # and is done once it decodes within this much under it
+LOSSY_RETRIES = 4
 
 Log = Callable[[str], None]
 
@@ -841,6 +844,48 @@ def limit(mix: np.ndarray, ceiling_db: float, *, release_ms: float = 80.0, looka
     return (mix * curve[:, None]).astype(np.float32)
 
 
+def encode_under_ceiling(audio: np.ndarray, wav_path: Path, encode: Callable[[Path], Path | None], *,
+                         ceiling_db: float, log: Log = print) -> tuple[np.ndarray, Path | None, dict[str, Any] | None]:
+    """Encode the master saved at ``wav_path`` and check the true peak of the decoded file. Lossy codecs overshoot the
+    master they encode (AAC by about 2 dB on a loud limited master, MP3 by under 1 dB), so a master limited to -1 dBTP
+    can decode above full scale and clip in the player. When it does, limit the master lower and encode again until the
+    decoded peak lands just under the ceiling. The overshoot shrinks as the limiting deepens, so each new limit comes
+    from the last two tries; stepping down by the first overshoot alone lands about 1 dB low and gives away loudness.
+    ``wav_path`` keeps the master as it was. Returns the audio that was encoded, the encoded file (None without
+    ffmpeg) and the decoded file's peak and loudness."""
+    encoded = encode(wav_path)
+    if encoded is None:
+        return audio, None, None
+    tries = [(ceiling_db, A.true_peak_db(A.load(encoded)))]  # (limiter ceiling, decoded peak); the master as it is
+    subtype = sf.info(str(wav_path)).subtype
+
+    def staged_at(target: float) -> np.ndarray:
+        return audio if target >= ceiling_db else limit(audio, target - 0.2)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        for _ in range(LOSSY_RETRIES):
+            target, peak = tries[-1]
+            if peak <= ceiling_db and (len(tries) == 1 or peak >= ceiling_db - LOSSY_WINDOW_DB):
+                break
+            slope = 1.0
+            if len(tries) > 1 and tries[-1][0] != tries[-2][0]:
+                slope = max(0.5, (peak - tries[-2][1]) / (target - tries[-2][0]))
+            target = min(ceiling_db - 0.1, target + (ceiling_db - LOSSY_MARGIN_DB - peak) / slope)
+            encode(A.save(Path(tmp) / wav_path.name, staged_at(target), subtype=subtype))
+            tries.append((target, A.true_peak_db(A.load(encoded))))
+        under = [t for t in tries if t[1] <= ceiling_db]
+        target, peak = max(under, key=lambda t: t[1]) if under else tries[-1]
+        if target != tries[-1][0]:  # an earlier try sat closer under the ceiling: encode it again
+            encode(A.save(Path(tmp) / wav_path.name, staged_at(target), subtype=subtype))
+    relimited = round(ceiling_db - target, 2)
+    if peak > ceiling_db:
+        log(f"{encoded.name} still decodes at {peak:.1f} dBTP, over the {ceiling_db:.1f} ceiling")
+    elif relimited:
+        log(f"{encoded.name}: limited {relimited:.1f} dB lower so it decodes under {ceiling_db:.1f} dBTP")
+    return staged_at(target), encoded, {"true_peak_db": round(peak, 2), "ceiling_db": round(ceiling_db, 2),
+                                        "relimited_db": relimited, "lufs": round(A.integrated_lufs(A.load(encoded)), 2)}
+
+
 def render_chop(res: Resolution, clip: ResolvedClip, source_audio: np.ndarray, loudness_offset_db: float,
                 timeline_offset: float) -> RenderedClip:
     """Vocal chops: trigger named slices on a step pattern; each hit is warped to tempo, pitched, optionally
@@ -1248,14 +1293,26 @@ def render_plan(plan: dict[str, Any], out_dir: Path, *, start_bar: float | None 
 
     out_dir.mkdir(parents=True, exist_ok=True)
     wav_path = A.save(out_dir / "mix.wav", mastered, subtype="PCM_24")
-    mp3_path = A.encode_mp3(wav_path, out_dir / "mix.mp3") if mp3 else None
+    encodes: dict[str, dict[str, Any]] = {}  # decoded peak of each lossy file (the codec overshoots the master)
+
+    def encode(audio: np.ndarray, wav: Path, encoder: Callable[[Path], Path | None],
+               ceiling_db: float = -1.0) -> tuple[np.ndarray, Path | None]:
+        staged, encoded, stats = encode_under_ceiling(audio, wav, encoder, ceiling_db=ceiling_db, log=log)
+        if encoded and stats:
+            encodes[encoded.name] = stats
+        return staged, encoded
+
+    mp3_path = None
+    if mp3:
+        _, mp3_path = encode(mastered, wav_path, lambda wav: A.encode_mp3(wav, out_dir / "mix.mp3"),
+                             float(master_spec.get("ceiling_db", -1.0)))
     stream_stats = None
     if master_spec.get("stream_version", True):
         # Streaming/phone master: -14 LUFS (what Spotify/YouTube normalize to), bass harmonics for small speakers.
         streamed, stream_stats = master(small_speaker_bass(premaster), lufs=-14.0, ceiling_db=-1.0, soft_clip=False)
         stream_wav = A.save(out_dir / "mix-stream.wav", streamed, subtype="PCM_24")
         if mp3:
-            A.encode_mp3(stream_wav, out_dir / "mix-stream.mp3")
+            encode(streamed, stream_wav, lambda wav: A.encode_mp3(wav, out_dir / "mix-stream.mp3"))
     phone_stats, phone_file = None, None
     stale = out_dir / "mix-phone.m4a"
     if stale.exists():
@@ -1266,7 +1323,8 @@ def render_plan(plan: dict[str, Any], out_dir: Path, *, start_bar: float | None 
         phone, phone_stats = master(small_speaker_bass(premaster), lufs=min(float(target_lufs), PHONE_LUFS),
                                     ceiling_db=-1.0, soft_clip=True)
         phone_wav = A.save(out_dir / "mix-phone.wav", phone, subtype="PCM_16")
-        encoded = A.encode_m4a(phone_wav, out_dir / "mix-phone.m4a", title=str(plan.get("title", "")))
+        phone, encoded = encode(phone, phone_wav, lambda wav: A.encode_m4a(wav, out_dir / "mix-phone.m4a",
+                                                                          title=str(plan.get("title", ""))))
         if encoded:
             phone_wav.unlink()
         phone_file = (encoded or phone_wav).name
@@ -1282,10 +1340,10 @@ def render_plan(plan: dict[str, Any], out_dir: Path, *, start_bar: float | None 
 
         short_edit = plan_short_edit(plan, res, target_s=float(seconds))
         if short_edit:
-            short_wav = A.save(out_dir / "mix-short.wav", splice(phone, short_edit, res, timeline_offset),
-                               subtype="PCM_16")
-            encoded = A.encode_m4a(short_wav, out_dir / "mix-short.m4a",
-                                   title=f"{plan.get('title', '')} (short edit)".strip())
+            short = splice(phone, short_edit, res, timeline_offset)
+            short_wav = A.save(out_dir / "mix-short.wav", short, subtype="PCM_16")
+            _, encoded = encode(short, short_wav, lambda wav: A.encode_m4a(
+                wav, out_dir / "mix-short.m4a", title=f"{plan.get('title', '')} (short edit)".strip()))
             if encoded:
                 short_wav.unlink()
             short_file = (encoded or short_wav).name
@@ -1310,6 +1368,7 @@ def render_plan(plan: dict[str, Any], out_dir: Path, *, start_bar: float | None 
         "master": master_stats,
         "stream_master": stream_stats,
         "phone_master": phone_stats,
+        "encodes": encodes,
         "issues": [i.to_dict() for i in res.issues],
         "vocal_presence": presence,
         "vocal_balance": balance,

@@ -108,6 +108,10 @@ def check_run(run_dir: Path) -> dict[str, Any]:
         flag("warning", "master", f"integrated loudness {lufs:.1f} LUFS misses the {target:.1f} target")
     if true_peak > float((plan.get("master") or {}).get("ceiling_db", -1.0)) + 0.5:
         flag("warning", "master", f"true peak {true_peak:.1f} dBTP is above the ceiling")
+    for name, encoded in (report.get("encodes") or {}).items():
+        if encoded["true_peak_db"] > encoded["ceiling_db"]:
+            flag("warning", "master", f"{name} decodes at {encoded['true_peak_db']:.1f} dBTP, over the "
+                                      f"{encoded['ceiling_db']:.1f} ceiling (clips in the player)")
     if clipped:
         flag("error", "master", f"{clipped} clipped samples")
 
