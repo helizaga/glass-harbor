@@ -578,7 +578,7 @@ def apply_ducking(rendered: list["RenderedClip"]) -> None:
 
 
 # A bar whose vocal sounds this far under the vocal's usual level is a fading tail, not a line. Rapped lines sat
-# within 3 dB of each other in 1 Umbrella over Starboy; the decay of its last "yeah" sat 17 dB under.
+# within 3 dB of each other in 1 Umbrella over Starboy; the decay of its last "yeah" sat 17 dB under the median.
 VOCAL_TAIL_DB = 12.0
 
 
@@ -586,7 +586,8 @@ def vocal_presence(rendered: list["RenderedClip"], total: int, bar_starts: list[
     """Per bar: vocal vs everything else in the 1-4 kHz band where intelligibility lives (dB). Bars where the vocal
     is only a tail (the reverb or breath after a song's last word, ``VOCAL_TAIL_DB`` under its usual level) are left
     out: the beat over a fading "yeah" is not burying a line (1 Umbrella's last bar read -3.8 dB that way). The usual
-    level is the median over the bars where the vocal sounds."""
+    level is the upper quartile over the bars where the vocal sounds, so a tail longer than the lines cannot lower
+    it."""
     vocal = np.zeros(total, dtype=np.float32)
     rest = np.zeros(total, dtype=np.float32)
     for r in rendered:
@@ -611,7 +612,7 @@ def vocal_presence(rendered: list["RenderedClip"], total: int, bar_starts: list[
         levels.append((bar, float(np.sqrt(np.mean(v_blocks[active] ** 2))), float(np.sqrt(np.mean(r_blocks[active] ** 2)))))
     if not levels:
         return []
-    usual = float(np.median([v for _, v, _ in levels]))
+    usual = float(np.percentile([v for _, v, _ in levels], 75))
     return [{"bar": bar, "db": round(20 * math.log10((v + 1e-9) / (b + 1e-9)), 1)}
             for bar, v, b in levels if v >= usual * 10 ** (-VOCAL_TAIL_DB / 20)]
 

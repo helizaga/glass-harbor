@@ -103,6 +103,12 @@ def test_vocal_presence_skips_a_fading_tail_but_not_a_quiet_line():
     assert sorted(result) == [1, 2, 3]  # the tail is not judged
     assert result[3] < result[1] - 6  # the quieter line still is
 
+    long_tail = np.concatenate([voice[: 2 * sr], 0.1 * voice[: 3 * sr]])  # two bars of lines, three bars of tail
+    beat5 = np.concatenate([beat, beat[: sr]])
+    bars5 = [(b + 1, (b * sr, (b + 1) * sr)) for b in range(5)]
+    result = vocal_presence([clip("vocals", long_tail), clip("instrumental", beat5)], 5 * sr, bars5)
+    assert sorted(p["bar"] for p in result) == [1, 2]  # a tail longer than the lines cannot lower the usual level
+
 
 def test_vocal_presence_ignores_gaps_between_shouts():
     from types import SimpleNamespace
