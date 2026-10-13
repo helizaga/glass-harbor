@@ -85,6 +85,25 @@ def test_duck_validation(workspace, synth_files):
     assert not resolve(plan).ok
 
 
+def test_vocal_presence_skips_a_fading_tail_but_not_a_quiet_line():
+    from types import SimpleNamespace
+
+    from glass_harbor.render import vocal_presence
+
+    sr = A.SR
+    t = np.arange(4 * sr) / sr
+    beat = (0.05 * np.sin(2 * np.pi * 2000 * t)).astype(np.float32)
+    voice = (0.3 * np.sin(2 * np.pi * 1500 * t)).astype(np.float32)
+    voice[2 * sr: 3 * sr] *= 0.4  # bar 3: a quieter line, 8 dB down
+    voice[3 * sr:] *= 0.1  # bar 4: the last word's tail, 20 dB down, under the beat
+    clip = lambda stem, audio: SimpleNamespace(clip=SimpleNamespace(stem=stem), start_sample=0,
+                                                audio=np.repeat(audio[:, None], 2, axis=1))
+    bars = [(b + 1, (b * sr, (b + 1) * sr)) for b in range(4)]
+    result = {p["bar"]: p["db"] for p in vocal_presence([clip("vocals", voice), clip("instrumental", beat)], 4 * sr, bars)}
+    assert sorted(result) == [1, 2, 3]  # the tail is not judged
+    assert result[3] < result[1] - 6  # the quieter line still is
+
+
 def test_vocal_presence_ignores_gaps_between_shouts():
     from types import SimpleNamespace
 
