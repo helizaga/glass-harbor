@@ -675,6 +675,51 @@ def cmd_fit(args: argparse.Namespace) -> int:
     return 0 if result["verdict"] != "poor" else 1
 
 
+def _lookup_lines(result: dict[str, Any]) -> list[str]:
+    name = f"{result['artist']} - {result['title']}" if result["title"] else result["query"]
+    if result["bpm"] is None and not result["keys"]:
+        head = f"{name}: tempo and key unknown (pass --bpm and --key to check a chart's numbers)"
+    else:
+        tempo = f"{result['bpm']:g} bpm" if result["bpm"] is not None else "tempo unknown"
+        head = f"{name}: {tempo}, {' or '.join(result['keys']) or 'key unknown'} ({result['source']})"
+    lines = [head, f"  {result['popularity_note']}" + (
+        f", released {result['popularity']['release_date']}" if (result["popularity"] or {}).get("release_date")
+        else "") + (f" ({result['months_old']:.0f} months ago{', fresh' if result['months_old'] <= 6 else ''})"
+                    if result["months_old"] is not None else "")]
+    lines += [f"  note: {note}" for note in result["notes"]]
+    check = result["fit"]
+    if check:
+        lines.append(f"  vocal {check['vocal']} ({check['vocal_bpm']:g} bpm, {check['vocal_key']}, "
+                     f"{check['vocal_type']}): {check['verdict'].upper()}")
+        lines += [f"    as {o['key']}: {o['relation']}, {o['semitones']:+d} st; tempo x{o['tempo_ratio']:g}, "
+                  f"{o['stretch_pct']:+.1f}% stretch ({o['verdict']})" for o in check["options"]]
+        lines += [f"    - {reason}" for reason in check["reasons"]]
+    elif result["verdict"] == "unknown":
+        lines.append("  vocal fit: UNKNOWN (no tempo or key to check)")
+    return lines
+
+
+def cmd_lookup(args: argparse.Namespace) -> int:
+    from glass_harbor.lookup import lookup_many, rank
+
+    if (args.bpm is not None or args.key) and len(args.songs) > 1:
+        raise ValueError("--bpm and --key describe one song; look songs up one at a time to use them")
+    vocal = None
+    if args.vocal:
+        from glass_harbor.auto import ingest
+
+        vocal = ingest(args.vocal, sections="novelty", log=_log(args))
+    results = lookup_many(args.songs, vocal=vocal, bpm=args.bpm, key=args.key)
+    if vocal:
+        results = rank(results)
+    lines = [line for result in results for line in _lookup_lines(result)]
+    if vocal:
+        lines.append("tempo and key only: once you have the file, `glass-harbor fit` measures vocal room and harshness")
+    _emit(args, results, "\n".join(lines))
+    usable = [r for r in results if (r["verdict"] in ("good", "risky") if vocal else r["bpm"] is not None)]
+    return 0 if usable else 1
+
+
 def cmd_auto(args: argparse.Namespace) -> int:
     from glass_harbor.auto import run_auto
 
@@ -945,6 +990,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("vocal")
     p.add_argument("bed")
     p.set_defaults(func=cmd_fit)
+
+    p = common(sub.add_parser("lookup", help="before you buy: a song's tempo, key, and popularity (songbpm, Deezer), "
+                                             "and with --vocal whether that vocal would fit it"))
+    p.add_argument("songs", nargs="+", help='"Artist - Title" (exact match) or free text (top hit)')
+    p.add_argument("--vocal", help="library track id or audio file whose vocal goes on top; ranks the songs")
+    p.add_argument("--bpm", type=float, help="use this tempo instead of songbpm's (e.g. a chart's tag)")
+    p.add_argument("--key", help="use this key instead of songbpm's, e.g. 'G minor' or 6A")
+    p.set_defaults(func=cmd_lookup)
 
     p = common(sub.add_parser("taste", help="your mixing defaults and preferences (read by scaffolds and agents)"))
     p.add_argument("action", nargs="?", choices=("show", "set", "add"), default="show")

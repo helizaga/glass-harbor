@@ -10,23 +10,40 @@ say what you could not verify, and treat the user's ears as the final judge.
 
 ## Choosing songs
 
-Pick from what is working right now, not from memory:
+Any two songs from any genres can pair; the vocal's tempo picks the beat, not the genre. Pick from what is
+working right now, not from memory.
 
-- **EDM side**: [Beatport](https://www.beatport.com/) Top 100 and genre charts (what DJs buy now; every track has
-  BPM and key). Start here.
-- **Hip-hop side**: [kworb.net](https://kworb.net/) daily Spotify and Apple charts (free, fast). Start here. Also
-  Billboard Hot Rap Songs (official weekly ranking) and Shazam charts (rising tracks, especially from clubs).
+**Start from the vocal's tempo window.** The engine lays the vocal on the beat at 1x, 2x, or 0.5x its tempo, and
+`fit` calls a vocal stretch over 3% risky and over 6% poor. Work the window out before searching: a 95 bpm rap
+vocal needs a beat near 90-100 bpm (or 180-200), so house (124-128), dubstep/trap (140-150), and DnB (174) all
+fail for it, while hip-hop, R&B, dancehall, afrobeats, and reggaeton beats live there. A vocal with no chorus
+(verses only) needs a beat whose own hook can carry the drop.
+
+Where to look:
+
+- **Hip-hop, R&B, pop, Latin, afro**: [kworb.net](https://kworb.net/) daily Spotify and Apple charts (free, fast).
+  Also Billboard Hot Rap Songs (official weekly ranking) and Shazam charts (rising tracks, especially from clubs).
+- **Club genres**: [Beatport](https://www.beatport.com/) Top 100 and genre charts (what DJs buy now). Its genre
+  labels are good. Its BPM tags hold only at the genre's usual tempo (DnB is listed at half time, 87 for 174);
+  off-tempo tags are often analyzer errors (Tape B & Zaytoven's "Signature Sound" is tagged 97 and plays at 140).
 - **Proof on the floor**: [1001Tracklists](https://www.1001tracklists.com/) shows what headline DJs actually play;
   its track pages list which tracks get played next to which.
 - **Mashup ideas**: Beatport's "DJ Edits" category shows which rap songs DJs already put over house, and at what BPM.
 
-Use 1001Tracklists to check whether a pairing is proven or already overdone before committing to it. For sung
-vocals, skip dark club-trap and riddim beds and look for melodic, key-matched beds (melodic bass, R&B); once the
-user has the files, `glass-harbor fit <vocal> <beat>` measures vocal room (1-4 kHz crowding), harshness, and
-out-of-key harmony in a minute, plus an advisory hit-potential score (a known song on either side, a beat from
-the last six months, a short hook that repeats early, a rap/R&B vocal on a club beat). Treat a low score as a
-reason to look for a fresher or better-known beat, not as a verdict. Lyrics come from Whisper for timing and from LRCLIB (free, synced lines) for
-the right words and which lines really repeat; both stay in the gitignored library.
+**Check before the user buys.** `glass-harbor lookup "Artist - Title" ... --vocal <id>` ranks candidates with
+tempo, key, and mode from songbpm (Spotify's analysis), popularity and release date from Deezer, and the fit
+check's own tempo and key gates. Its tempos matched the local analysis where checked; its keys are hints like any
+chart's (it listed Starboy in G, the file measures A minor, so the vocal needed a 2-semitone shift lookup did not
+predict). Never recommend a beat on a chart's BPM alone. Use 1001Tracklists to check whether a pairing is proven
+or already overdone before committing to it.
+
+For sung vocals, skip dark club-trap and riddim beds and look for melodic, key-matched beds (melodic bass, R&B).
+Lookup cannot hear the beat: once the user has the files, `glass-harbor fit <vocal> <beat>` measures vocal room
+(1-4 kHz crowding), harshness, and out-of-key harmony in a minute, plus an advisory hit-potential score (a known
+song on either side, a beat from the last six months, a short hook that repeats early, a rap/R&B vocal on a club
+beat). Treat a low score as a reason to look for a fresher or better-known beat, not as a verdict. Lyrics come
+from Whisper for timing and from the file's own embedded synced lyrics, else LRCLIB (free, synced lines), for the
+right words and which lines really repeat; both stay in the gitignored library.
 
 **Measure before you rank.** Chart and streaming-derived keys are hints and can be wrong: Spotify's data lists
 Kodak Black's "Thankful" in C major, while the file measures B minor (S-KEY 0.71 on the instrumental stem, the 808

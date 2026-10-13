@@ -326,8 +326,8 @@ def test_hit_potential_scores_the_ingredients(monkeypatch, workspace):
         library.save_meta(track, {**library.load_meta(track), "artist": artist, "title": title})
     days = lambda n: (dt.date.today() - dt.timedelta(days=n)).isoformat()  # noqa: E731
     fake, calls = _deezer(
-        {"Don Toliver GLOCK": [{"id": 1, "title": "GLOCK", "rank": 450_000, "artist": {"name": "Don Toliver"}}],
-         "DABIN Stay With Me (feat. VELVETEARS)": [
+        {"don toliver GLOCK": [{"id": 1, "title": "GLOCK", "rank": 450_000, "artist": {"name": "Don Toliver"}}],
+         "dabin Stay With Me (feat. VELVETEARS)": [
              {"id": 9, "title": "Stay With Me", "rank": 990_000, "artist": {"name": "Calvin Harris"}},
              {"id": 2, "title": "Stay With Me", "rank": 700_000, "artist": {"name": "Dabin"}}]},
         {"track/1": days(900), "track/2": days(60)})
@@ -354,7 +354,8 @@ def test_popularity_reads_a_multi_artist_file_tag(monkeypatch, workspace):
     write_fake_track("b", bpm=130, key="Bm", bars=32)
     library.save_meta("b", {**library.load_meta("b"), "artist": "Calvin Harris; Clementine Douglas",
                             "title": "Blessings"})
-    fake, _ = _deezer({"Calvin Harris; Clementine Douglas Blessings": [
+    # Searched by the lead artist alone: Deezer finds nothing for a long credit ("1 Umbrella; Lil Bean; Lil Yee; ...").
+    fake, _ = _deezer({"calvin harris Blessings": [
         {"id": 1, "title": "Blessings", "rank": 875_690, "artist": {"name": "Calvin Harris"}}]},
         {"track/1": "2025-05-09"})
     monkeypatch.setattr(potential, "_get", fake)
