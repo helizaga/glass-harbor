@@ -7,8 +7,20 @@
 
 ## Sources (from analysis)
 
-- `01-don-toliver-glock`: 01 - Don Toliver - GLOCK — 76.0 bpm (fixed grid), E major (12B, confidence 0.71), drops at [13, 21, 45]; stems: vocals, instrumental, bass
-- `swarm`: SWARM — 150.0 bpm (fixed grid), E minor (9A, confidence 0.69), drops at [17, 53, 77]; stems: vocals, instrumental, drums, bass, other
+- `01-don-toliver-glock`: Don Toliver - GLOCK — 76.0 bpm (fixed grid), E major (12B, confidence 0.71), drops at [13, 21, 45]; stems: vocals, instrumental, bass
+- `swarm`: elden - SWARM — 150.0 bpm (fixed grid), E minor (9A, confidence 0.69), drops at [17, 53, 77]; stems: vocals, instrumental, drums, bass, other
+
+## Fit check
+
+- verdict: poor (sung vocal); vocal_room 0.1345 (poor), harshness 0.0393 (risky), out_of_key 0.39 (risky)
+- the beat is crowded in the 1-4 kHz vocal range (busy synths/hats will mask the vocal)
+- the beat's vocal range is noisy or distorted (aggressive, gritty sound design)
+- a lot of the beat's harmony sits outside the vocal's key (dark/chromatic)
+- hit potential: high (72/100)
+  - vocal is popular (Deezer rank 436,000); beat is niche (Deezer rank 71,023)
+  - beat released 1 months ago (fresh)
+  - hook: a 8-word line repeated 7x, first at 28s
+  - crossover: a hip-hop/R&B vocal on a club beat
 
 ## Decisions (the draft's rules; edit the plan to change them)
 
@@ -24,12 +36,10 @@
 - bar numbers in the notes above (and in fill ids like riser-92) are from before the DJ intro: add 16 to find them in this plan
 - DJ edges: 16-bar beat intro, 16-bar beat outro (looped from bar 17 of swarm)
 - bass follows the vocal's original chords under verse2 (their sung notes sat a half-step off the beat's bassline)
-- auto fix: vocal buried or hard to make out: +2 dB on verse1, verse2, verse4, verse6; bed-other ducks 7 dB under the vocal; drop at bar 93: bed-bass out for bar 92
-- auto fix: vocal buried or hard to make out: +2 dB on verse1, verse2, verse4, verse6; bed-other ducks 9 dB under the vocal
 
 ## Fix rounds
 
-- round 1: vocal buried or hard to make out: +2 dB on verse1, verse2, verse4, verse6; bed-other ducks 7 dB under the vocal; drop at bar 93: bed-bass out for bar 92
+- round 1: vocal buried or hard to make out: +2 dB on verse1, verse2, verse4, verse6; bed-other ducks 7 dB under the vocal (superseded by round 2's 9 dB); drop at bar 93: bed-bass out for bar 92
 - round 2: vocal buried or hard to make out: +2 dB on verse1, verse2, verse4, verse6; bed-other ducks 9 dB under the vocal
 
 ## QA after the last render
