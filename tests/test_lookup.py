@@ -134,3 +134,15 @@ def test_cli_lookup_ranks_candidates_and_fails_when_none_fit(online, capsys):
     assert "POOR" in out and "-26.8% stretch" in out and "glass-harbor fit" in out
 
     assert main(["lookup", "a - b", "c - d", "--bpm", "96"]) == 2  # --bpm describes one song
+
+
+def test_release_age_agrees_with_its_number():
+    from glass_harbor.cli import _lookup_lines
+
+    assert [potential.months_ago(m) for m in (0.2, 1.0, 1.4, 1.6, 18.0)] == \
+        ["0 months ago", "1 month ago", "1 month ago", "2 months ago", "18 months ago"]
+    result = {"query": "elden - SWARM", "artist": "elden", "title": "SWARM", "bpm": 150.0, "keys": ["E minor"],
+              "source": "songbpm", "popularity": {"release_date": "2026-09-13"},
+              "popularity_note": "niche (Deezer rank 71,023)", "months_old": 1.0, "notes": [], "fit": None,
+              "verdict": None}
+    assert _lookup_lines(result)[1] == "  niche (Deezer rank 71,023), released 2026-09-13 (1 month ago, fresh)"

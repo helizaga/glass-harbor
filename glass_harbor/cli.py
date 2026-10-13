@@ -687,6 +687,8 @@ def cmd_fit(args: argparse.Namespace) -> int:
 
 
 def _lookup_lines(result: dict[str, Any]) -> list[str]:
+    from glass_harbor.potential import months_ago
+
     name = f"{result['artist']} - {result['title']}" if result["title"] else result["query"]
     if result["bpm"] is None and not result["keys"]:
         head = f"{name}: tempo and key unknown (pass --bpm and --key to check a chart's numbers)"
@@ -695,7 +697,7 @@ def _lookup_lines(result: dict[str, Any]) -> list[str]:
         head = f"{name}: {tempo}, {' or '.join(result['keys']) or 'key unknown'} ({result['source']})"
     lines = [head, f"  {result['popularity_note']}" + (
         f", released {result['popularity']['release_date']}" if (result["popularity"] or {}).get("release_date")
-        else "") + (f" ({result['months_old']:.0f} months ago{', fresh' if result['months_old'] <= 6 else ''})"
+        else "") + (f" ({months_ago(result['months_old'])}{', fresh' if result['months_old'] <= 6 else ''})"
                     if result["months_old"] is not None else "")]
     lines += [f"  note: {note}" for note in result["notes"]]
     check = result["fit"]

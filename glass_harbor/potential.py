@@ -83,6 +83,12 @@ def _months_old(release_date: str | None) -> float | None:
         return None
 
 
+def months_ago(months: float) -> str:
+    """'1 month ago', '18 months ago': the age as the reasons and the lookup print it."""
+    count = f"{months:.0f}"
+    return f"{count} month{'' if count == '1' else 's'} ago"
+
+
 def tier(pop: dict[str, Any] | None) -> tuple[float, str]:
     """How well known a song is: a 0-1 weight and a note for the reasons."""
     if pop is None:
@@ -136,9 +142,7 @@ def assess(vocal: str, beat: str, *, crossover: bool | None = None) -> dict[str,
     vocal_age = _months_old((vocal_pop or {}).get("release_date"))
     score += 15 * freshness(beat_age) + 5 * freshness(vocal_age)
     if beat_age is not None:
-        months = f"{beat_age:.0f}"
-        reasons.append(f"beat released {months} month{'' if months == '1' else 's'} ago"
-                       + (" (fresh)" if beat_age <= 6 else ""))
+        reasons.append(f"beat released {months_ago(beat_age)}" + (" (fresh)" if beat_age <= 6 else ""))
 
     if hook_info:
         catchy = min(1.0, hook_info["repeats"] / 4) * (1.0 if hook_info["words"] <= 6 else 0.7)
