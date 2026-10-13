@@ -1,0 +1,833 @@
+{
+ "version": 1,
+ "title": "Thankful x Blessings",
+ "kind": "mashup",
+ "bpm": 130.0,
+ "beats_per_bar": 4,
+ "sources": {
+  "vox": {
+   "track": "kodak-thankful",
+   "semitones": 0,
+   "tempo_ratio": 2.0
+  },
+  "bed": {
+   "track": "01-calvin-harris-blessings"
+  }
+ },
+ "clips": [
+  {
+   "id": "intro-drums",
+   "source": "bed",
+   "stem": "drums",
+   "from_bar": 17,
+   "bars": 8,
+   "loop": 2,
+   "at_bar": 1
+  },
+  {
+   "id": "outro-drums",
+   "source": "bed",
+   "stem": "drums",
+   "from_bar": 17,
+   "bars": 8,
+   "loop": 2,
+   "at_bar": 125.0
+  },
+  {
+   "id": "bed-drums",
+   "source": "bed",
+   "stem": "drums",
+   "from_bar": 9,
+   "bars": 108,
+   "at_bar": 17,
+   "punch": {
+    "attack_db": 3.0,
+    "parallel": 0.2
+   },
+   "duck": {
+    "under": [
+     "hook-peak",
+     "k-v1",
+     "k-v2"
+    ],
+    "db": 3.0
+   },
+   "automation": {
+    "highpass_hz": [
+     [
+      7.0,
+      20
+     ],
+     [
+      7.75,
+      700
+     ],
+     [
+      7.998,
+      700
+     ],
+     [
+      8.0,
+      20
+     ],
+     [
+      31.0,
+      20
+     ],
+     [
+      31.75,
+      700
+     ],
+     [
+      31.998,
+      700
+     ],
+     [
+      32.0,
+      20
+     ],
+     [
+      79.0,
+      20
+     ],
+     [
+      79.75,
+      700
+     ],
+     [
+      79.998,
+      700
+     ],
+     [
+      80.0,
+      20
+     ]
+    ],
+    "gain_db": [
+     [
+      7.747,
+      0
+     ],
+     [
+      7.75,
+      -60
+     ],
+     [
+      7.998,
+      -60
+     ],
+     [
+      8.0,
+      0
+     ],
+     [
+      31.747,
+      0
+     ],
+     [
+      31.75,
+      -60
+     ],
+     [
+      31.998,
+      -60
+     ],
+     [
+      32.0,
+      0
+     ],
+     [
+      79.747,
+      0
+     ],
+     [
+      79.75,
+      -60
+     ],
+     [
+      79.998,
+      -60
+     ],
+     [
+      80.0,
+      0
+     ]
+    ]
+   }
+  },
+  {
+   "id": "bed-bass",
+   "source": "bed",
+   "stem": "bass",
+   "from_bar": 9,
+   "bars": 108,
+   "at_bar": 17,
+   "automation": {
+    "highpass_hz": [
+     [
+      7.0,
+      20
+     ],
+     [
+      7.75,
+      700
+     ],
+     [
+      7.998,
+      700
+     ],
+     [
+      8.0,
+      20
+     ],
+     [
+      31.0,
+      20
+     ],
+     [
+      31.75,
+      700
+     ],
+     [
+      31.998,
+      700
+     ],
+     [
+      32.0,
+      20
+     ],
+     [
+      79.0,
+      20
+     ],
+     [
+      79.75,
+      700
+     ],
+     [
+      79.998,
+      700
+     ],
+     [
+      80.0,
+      20
+     ]
+    ],
+    "gain_db": [
+     [
+      7.747,
+      0
+     ],
+     [
+      7.75,
+      -60
+     ],
+     [
+      7.998,
+      -60
+     ],
+     [
+      8.0,
+      0
+     ],
+     [
+      31.747,
+      0
+     ],
+     [
+      31.75,
+      -60
+     ],
+     [
+      31.998,
+      -60
+     ],
+     [
+      32.0,
+      0
+     ],
+     [
+      79.747,
+      0
+     ],
+     [
+      79.75,
+      -60
+     ],
+     [
+      79.998,
+      -60
+     ],
+     [
+      80.0,
+      0
+     ]
+    ]
+   }
+  },
+  {
+   "id": "bed-other",
+   "source": "bed",
+   "stem": "other",
+   "from_bar": 9,
+   "bars": 108,
+   "at_bar": 17,
+   "automation": {
+    "width": [
+     [
+      0,
+      1.25
+     ],
+     [
+      7.96875,
+      1.25
+     ],
+     [
+      8,
+      1.25
+     ],
+     [
+      23.96875,
+      1.25
+     ],
+     [
+      24,
+      1.0
+     ],
+     [
+      31.96875,
+      1.0
+     ],
+     [
+      32,
+      1.25
+     ],
+     [
+      47.46875,
+      1.25
+     ],
+     [
+      47.5,
+      1.0
+     ],
+     [
+      61.96875,
+      1.0
+     ],
+     [
+      62,
+      1.0
+     ],
+     [
+      71.96875,
+      1.0
+     ],
+     [
+      72,
+      1.0
+     ],
+     [
+      78.96875,
+      1.0
+     ],
+     [
+      79,
+      1.25
+     ]
+    ],
+    "arrange_db": [
+     [
+      0,
+      0.0
+     ],
+     [
+      7.96875,
+      0.0
+     ],
+     [
+      8,
+      0.0
+     ],
+     [
+      23.96875,
+      0.0
+     ],
+     [
+      24,
+      -3.0
+     ],
+     [
+      31.96875,
+      -3.0
+     ],
+     [
+      32,
+      0.0
+     ],
+     [
+      47.46875,
+      0.0
+     ],
+     [
+      47.5,
+      -6.0
+     ],
+     [
+      61.96875,
+      -6.0
+     ],
+     [
+      62,
+      -3.0
+     ],
+     [
+      71.96875,
+      -3.0
+     ],
+     [
+      72,
+      -6.0
+     ],
+     [
+      78.96875,
+      -6.0
+     ],
+     [
+      79,
+      0.0
+     ]
+    ],
+    "highpass_hz": [
+     [
+      7.0,
+      20
+     ],
+     [
+      7.75,
+      700
+     ],
+     [
+      7.998,
+      700
+     ],
+     [
+      8.0,
+      20
+     ],
+     [
+      31.0,
+      20
+     ],
+     [
+      31.75,
+      700
+     ],
+     [
+      31.998,
+      700
+     ],
+     [
+      32.0,
+      20
+     ],
+     [
+      79.0,
+      20
+     ],
+     [
+      79.75,
+      700
+     ],
+     [
+      79.998,
+      700
+     ],
+     [
+      80.0,
+      20
+     ]
+    ],
+    "gain_db": [
+     [
+      7.747,
+      0
+     ],
+     [
+      7.75,
+      -60
+     ],
+     [
+      7.998,
+      -60
+     ],
+     [
+      8.0,
+      0
+     ],
+     [
+      31.747,
+      0
+     ],
+     [
+      31.75,
+      -60
+     ],
+     [
+      31.998,
+      -60
+     ],
+     [
+      32.0,
+      0
+     ],
+     [
+      79.747,
+      0
+     ],
+     [
+      79.75,
+      -60
+     ],
+     [
+      79.998,
+      -60
+     ],
+     [
+      80.0,
+      0
+     ]
+    ]
+   },
+   "duck": {
+    "under": [
+     "hook-intro",
+     "hook-outro",
+     "hook-peak",
+     "k-v1",
+     "k-v2"
+    ],
+    "db": 4.0
+   },
+   "pump": {
+    "db": 3.0,
+    "release": 0.5
+   }
+  },
+  {
+   "id": "k-v1",
+   "source": "vox",
+   "stem": "vocals",
+   "from_bar": 4.75,
+   "bars": 14.25,
+   "at_bar": 20.5,
+   "automation": {
+    "highpass_hz": [
+     [
+      0,
+      110.0
+     ]
+    ],
+    "eq_high_db": [
+     [
+      0,
+      -4.0
+     ]
+    ],
+    "lowpass_hz": [
+     [
+      0,
+      12000.0
+     ]
+    ]
+   },
+   "gain_db": -7.0,
+   "density": 0.25,
+   "gate": 20,
+   "chain": "dry",
+   "fx": {
+    "reverb": {
+     "mix": 0.15
+    }
+   }
+  },
+  {
+   "id": "clem-drop2",
+   "from_bar": 41,
+   "bars": 15.5,
+   "at_bar": 49,
+   "source": "bed",
+   "stem": "vocals",
+   "chain": "none",
+   "gate": false,
+   "ride": false,
+   "groove_lock": 0,
+   "automation": {},
+   "gain_db": 3.0
+  },
+  {
+   "id": "k-v2",
+   "source": "vox",
+   "stem": "vocals",
+   "from_bar": 19,
+   "bars": 15.5,
+   "at_bar": 65,
+   "automation": {
+    "highpass_hz": [
+     [
+      0,
+      110.0
+     ]
+    ],
+    "eq_high_db": [
+     [
+      0,
+      -4.0
+     ]
+    ],
+    "lowpass_hz": [
+     [
+      0,
+      12000.0
+     ]
+    ]
+   },
+   "gain_db": -7.0,
+   "density": 0.25,
+   "gate": 20,
+   "chain": "dry",
+   "fx": {
+    "reverb": {
+     "mix": 0.15
+    }
+   }
+  },
+  {
+   "id": "clem-end",
+   "from_bar": 94.75,
+   "bars": 17.75,
+   "at_bar": 102.75,
+   "source": "bed",
+   "stem": "vocals",
+   "chain": "none",
+   "gate": false,
+   "ride": false,
+   "groove_lock": 0,
+   "automation": {},
+   "gain_db": 3.0
+  },
+  {
+   "id": "impact-17",
+   "generate": "impact",
+   "at_bar": 25.0,
+   "bars": 2,
+   "gain_db": -5
+  },
+  {
+   "id": "impact-41",
+   "generate": "impact",
+   "at_bar": 49.0,
+   "bars": 2,
+   "gain_db": -5
+  },
+  {
+   "id": "impact-89",
+   "generate": "impact",
+   "at_bar": 97.0,
+   "bars": 2,
+   "gain_db": -5
+  },
+  {
+   "id": "crash-17",
+   "generate": "crash",
+   "source": "bed",
+   "at_bar": 25.0,
+   "bars": 2,
+   "gain_db": -8,
+   "duck": {
+    "under": "vocals",
+    "db": 8.0
+   }
+  },
+  {
+   "id": "crash-41",
+   "generate": "crash",
+   "source": "bed",
+   "at_bar": 49.0,
+   "bars": 2,
+   "gain_db": -8,
+   "duck": {
+    "under": "vocals",
+    "db": 8.0
+   }
+  },
+  {
+   "id": "crash-89",
+   "generate": "crash",
+   "source": "bed",
+   "at_bar": 97.0,
+   "bars": 2,
+   "gain_db": -8,
+   "duck": {
+    "under": "vocals",
+    "db": 8.0
+   }
+  },
+  {
+   "id": "intro-bass",
+   "source": "bed",
+   "stem": "bass",
+   "from_bar": 17,
+   "bars": 8,
+   "loop": 1,
+   "at_bar": 9
+  },
+  {
+   "id": "outro-bass",
+   "source": "bed",
+   "stem": "bass",
+   "from_bar": 17,
+   "bars": 8,
+   "loop": 1,
+   "at_bar": 125.0
+  },
+  {
+   "id": "hook-intro",
+   "at_bar": 17,
+   "bars": 3.5,
+   "source": "vox",
+   "stem": "vocals",
+   "chop": {
+    "slices": {
+     "a": {
+      "bar": 28,
+      "beat": 2.01,
+      "beats": 0.97
+     }
+    },
+    "pattern": [
+     "a-------........",
+     "................",
+     "a-------........",
+     "........"
+    ],
+    "step": 0.25
+   },
+   "automation": {
+    "highpass_hz": [
+     [
+      0,
+      120.0
+     ]
+    ]
+   },
+   "gain_db": -2.0,
+   "chain": "none"
+  },
+  {
+   "id": "hook-peak",
+   "at_bar": 97,
+   "bars": 6,
+   "source": "vox",
+   "stem": "vocals",
+   "chop": {
+    "slices": {
+     "a": {
+      "bar": 28,
+      "beat": 2.01,
+      "beats": 0.97
+     }
+    },
+    "pattern": [
+     "a-------........",
+     "................",
+     "a-------........",
+     "................",
+     "a-------........",
+     "................"
+    ],
+    "step": 0.25
+   },
+   "automation": {
+    "highpass_hz": [
+     [
+      0,
+      120.0
+     ]
+    ]
+   },
+   "gain_db": 5.0,
+   "chain": "none"
+  },
+  {
+   "id": "hook-outro",
+   "at_bar": 121,
+   "bars": 4,
+   "source": "vox",
+   "stem": "vocals",
+   "chop": {
+    "slices": {
+     "a": {
+      "bar": 28,
+      "beat": 2.01,
+      "beats": 0.97
+     }
+    },
+    "pattern": [
+     "a-------........",
+     "................",
+     "a-------........",
+     "................"
+    ],
+    "step": 0.25
+   },
+   "automation": {
+    "highpass_hz": [
+     [
+      0,
+      120.0
+     ]
+    ]
+   },
+   "gain_db": 4.0,
+   "chain": "none"
+  }
+ ],
+ "master": {
+  "reference": "01-calvin-harris-blessings",
+  "ceiling_db": -1.0
+ },
+ "groove": {
+  "pump_fx": {
+   "db": 5.0,
+   "release": 0.6
+  }
+ },
+ "notes": [
+  "hand arrangement (replaces the auto draft): Kodak's opening couplet (vox 4.75-6.8) over the beat's soft intro as the build into drop 1; verse 1 rides drop 1 and the first breakdown; drop 2 is Clementine's own hook; verse 2 runs over the beat's verse and second breakdown (vox bars 27.7-30.6 land in the breakdown); the instrumental peak at bar 89 stays instrumental; Clementine carries the last choruses; Kodak's spoken tag (vox 3-4.25) closes the outro",
+  "every Kodak clip edge sits in a measured gap between words (Whisper word timings)",
+  "bar numbers in these notes are Blessings' own bars, before the 16-bar DJ intro",
+  "stem arrangement on bed: verses over drums + bass (melodic layer -60 dB), full beat under hooks, 1 drums-only bar before each hook, melodic layer pumps on the beat",
+  "melodic layer by section: full in the intro, drops, and peak; -6 dB in both breakdowns under the rap; off under verse 2 and the bars after the second breakdown (drums + bass)",
+  "drop at bar 17: 1-bar build on bed-drums, bed-bass, bed-other, impact, 1 beat(s) of silence",
+  "drop at bar 41: 1-bar build on bed-drums, bed-bass, bed-other, impact, 1 beat(s) of silence",
+  "drop at bar 89: 1-bar build on bed-drums, bed-bass, bed-other, impact, 1 beat(s) of silence",
+  "fills: crash 17, crash 41, crash 89, crash 112.5",
+  "the beat's own 2-bar fade-out is cut; the DJ outro follows on",
+  "bar numbers in the notes above (and in fill ids like riser-92) are from before the DJ intro: add 16 to find them in this plan",
+  "DJ edges: 16-bar beat intro, 16-bar beat outro (looped from bar 17 of 01-calvin-harris-blessings)",
+  "QA round 1 (vocal presence below +7 dB): Kodak +3 dB (tag +5 dB), Clementine +3 dB, drums duck 6 dB under both vocals, outro drums -4 dB under the closing tag",
+  "QA round 2: closing tag +7 dB with the outro drums -8 dB and bass -4 dB under it; Clementine's flagged drop bars are her faint background chops (-26 to -41 dB in the stem), kept at the record's balance",
+  "QA round 3: spoken intro +7 dB (Whisper made out 9% of it; the source speaks it ~5 dB under the verse); Clementine reads 0% to Whisper here and on Calvin Harris's own master, so that is not a mix problem",
+  "clarity pass: Kodak's acapella re-separated at best quality and de-reverbed; density 0.75 and a 20 dB gate on his clips; drums duck 9 dB under Kodak (they are the beat's loudest 1-4 kHz part under the rap); melodic layer -6 dB under verse 1 on drop 1",
+  "v3: spoken intro removed (user); Blessings' intro trimmed by its first 8 bars, so plan bars from 25 on are 8 earlier than in the notes above (Blessings bar = plan bar - 8); verses use the dry chain with a light room instead of echo throws; no doubles on the closing tag",
+  "v3: closing tag removed too (user); the vocals end on Clementine, then the beat-only outro",
+  "v3 balance: Kodak +1.5 dB and drums duck 7 dB (the cleaner acapella reached about +20 dB presence, far past the +7 target, so level went back to the beat)",
+  "beat level pass: the cleaner acapella left Kodak at +6.2 LU over the beat where he raps, against -3.9 LU on his own record and -4.6 LU on Blessings; melodic layer back under the verses (-6 dB, -3 dB in the breakdowns, full on drop 1), drums duck 3 dB and melodic duck 4 dB",
+  "v6 tone: the chain had tripled Kodak's 2-5 kHz share (5.3% on his record, 14.3% in the mix) and sibilance (1.5% to 4.5%); density 0.25, a -4 dB shelf above 4.5 kHz, a 12 kHz low-pass, and room reverb 0.15 bring them to 10.4% and 1.8% for 2-3 points of Whisper clarity. Pitch correction can't make the verse more melodic: 0.2% of his rapped frames are steady sung notes",
+  "v7 hook: Thankful has no repeated line, so a pitched 'thankful' chop (B minor pentatonic, 3-3-2 rhythm, call and answer over 4 bars) gives the mix a short hook early and twice more: after the DJ intro, on the instrumental peak into Clementine's line, and in the outro",
+  "v7 hook levels: the chop source is spoken softly, so the hooks sit at +8 dB (intro), +15 dB (peak, with the drums ducked under it like the rap), and +12 dB (outro) to reach the verses' presence",
+  "v7 tuning: the chop word glides from about C3 down to E2 as spoken, so it comes from kodak-thankful-hook, a copy of the acapella with that one word flattened onto B2; the chop shifts then land on B, D, E, F#, and A",
+  "v8 hook: the pitched one-word chop read as no words at all (Whisper heard 'Outro Music' in it), so the hook is now a whole phrase in Kodak's own voice, 'see my blessings', named after the beat: twice after the DJ intro, three times on the instrumental peak with Clementine's line answering, twice in the outro",
+  "v8 hook treatment: Kodak's own voice with only a 120 Hz high-pass, no chain or echo; Whisper reads the raw slice as 'see my blessing' and the hook in the mix as '...my blessing'"
+ ]
+}
