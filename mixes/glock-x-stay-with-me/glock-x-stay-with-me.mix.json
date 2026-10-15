@@ -665,17 +665,23 @@
       }
     },
     {
-      "id": "intro1",
+      "id": "tease1",
       "source": "vox",
       "stem": "vocals",
-      "from_bar": 5.25,
-      "bars": 4,
+      "from_bar": 9.25,
+      "bars": 2.25,
       "at_bar": 9.5,
+      "chain": "hook",
+      "gain_db": -2,
       "automation": {
         "highpass_hz": [
           [
             0,
-            110.0
+            800.0
+          ],
+          [
+            4.5,
+            300.0
           ]
         ]
       }
@@ -1002,7 +1008,9 @@
     "the beat's own 2-bar fade-out is cut; the DJ outro follows on",
     "DJ edges: 0-bar beat intro, 16-bar beat outro (looped from bar 17 of dabin-stay-with-me-feat-velvetears)",
     "auto fix: vocal buried or hard to make out: +2 dB on hook2; bed-other ducks 7 dB under the vocal",
-    "auto fix: vocal buried or hard to make out: +2 dB on verse1, hook2; bed-other ducks 9 dB under the vocal"
+    "auto fix: vocal buried or hard to make out: +2 dB on verse1, hook2; bed-other ducks 9 dB under the vocal",
+    "intro1 removed (source bars 5.25-9.25 of GLOCK: the Whitney Houston 'Exhale' sample, 'For every win ... when we exhale, say shoop'); tease1 at bar 9.5 is now the first vocal, and the full hook (hook1) comes in at bar 17.5, right after the bar-17 drop",
+    "tease1: the first two hook lines ('Hold my Glock when I'm in the club ... show me love', GLOCK bars 9.25-11.5) over the bar-9 build, high-passed 800 -> 300 Hz and 2 dB down, so the vocal comes in about 15 s in and the full hook lands on the bar-17 drop"
   ],
   "groove": {
     "pump_fx": {

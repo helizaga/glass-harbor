@@ -39,18 +39,27 @@
 - round 1: vocal buried or hard to make out: +2 dB on hook2; bed-other ducks 7 dB under the vocal (superseded by round 2's 9 dB)
 - round 2: vocal buried or hard to make out: +2 dB on verse1, hook2; bed-other ducks 9 dB under the vocal
 
+## Edits after the draft
+
+- Removed `intro1` (GLOCK bars 5.25-9.25, the sampled opening "For every win ... when we exhale, say shoop" that the
+  user identified as Whitney Houston's vocal). The published lyrics put the sample at 0:00-0:27 of GLOCK (`intro1`
+  used 0:14-0:26), and the vocal stem is silent from 26.3 s to 27.8 s, so `hook1` and `hook3` (from bar 9.25) start
+  after it. The "shoot, shoot" chant (`chant1`) is Don Toliver's own line in the published lyrics and stays.
+- Added `tease1`: the first two hook lines ("Hold my Glock when I'm in the club ... show me love", GLOCK bars
+  9.25-11.5) over the bar-9 build, high-passed 800 -> 300 Hz and 2 dB under the hook, so the vocal comes in about
+  15 s in and the full hook lands on the bar-17 drop.
+
 ## QA after the last render
 
-- verdict: review, -7.5 LUFS, -1.0 dBTP
-- warning: intro1: warped clip lands +29 ms off the output grid
+- verdict: review, -7.7 LUFS, -1.0 dBTP
 - warning: verse1: warped clip lands +16 ms off the output grid
 - warning: verse2: warped clip lands -25 ms off the output grid
-- warning: chant1: warped clip lands +32 ms off the output grid
 - warning: bars 29: held vocal notes rub against the beat's chord (a semitone off); check harmonize notes in render.json or shift the vocal
-- warning: verse1: Whisper made out only 33% of its 40 words in the finished mix (the track's average is 51%): the beat masks it
-- warning: hook2: Whisper made out only 33% of its 70 words in the finished mix (the track's average is 51%): the beat masks it
-- warning: bars 16, 95, 105: vocal is buried under the beat in the 1-4 kHz band; raise the vocal, add duck to the bed, or cut the bed's mids
+- warning: verse1: Whisper made out only 33% of its 40 words in the finished mix (the track's average is 50%): the beat masks it
+- warning: hook2: Whisper made out only 17% of its 70 words in the finished mix (the track's average is 50%): the beat masks it
+- warning: bars 95: vocal is buried under the beat in the 1-4 kHz band; raise the vocal, add duck to the bed, or cut the bed's mids
 
 ## Needs ears
 
 - Does the vocal ride the beat? Do the drops land? Anything off pitch or buried?
+- Does the filtered tease over the build read as a tease, or is 800 Hz too thin?
