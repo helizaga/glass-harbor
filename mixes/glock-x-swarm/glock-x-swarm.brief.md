@@ -25,8 +25,8 @@
 ## Decisions (the draft's rules; edit the plan to change them)
 
 - fit: parallel major/minor (same home note), E major (12B) over E minor (9A), -1.3% stretch on vocals, score 0.911
-- song order: verse 1 (vocal bar 2) lands on the beat's first full section (bar 17)
-- the beat ends before the song: the draft keeps 6 of 12 vocal pieces (extend the beat or pick a longer one to use the rest)
+- song order: GLOCK's first hook line (vocal bar 9) lands on the beat's first full section (bar 17, bar 33 in this plan)
+- the beat ends before the song: GLOCK plays to its bar 44.75 of 72
 - stem arrangement on bed: verses over drums + bass (melodic layer -60 dB), full beat under hooks, 0 drums-only bar before each hook, melodic layer pumps on the beat
 - drop at bar 17: 8-bar build on bed-drums, bed-bass, bed-other, riser, snare roll, impact, 1 beat(s) of silence
 - drop at bar 53: 8-bar build on bed-drums, bed-bass, bed-other, riser, snare roll, impact, 1 beat(s) of silence
@@ -35,25 +35,38 @@
 - fills: crash 1, crash 17, crash 53, crash 77, swell into 53
 - bar numbers in the notes above (and in fill ids like riser-92) are from before the DJ intro: add 16 to find them in this plan
 - DJ edges: 16-bar beat intro, 16-bar beat outro (looped from bar 17 of swarm)
-- bass follows the vocal's original chords under verse2 (their sung notes sat a half-step off the beat's bassline)
+- bass follows the vocal's original chords under hook4 (their sung notes sat a half-step off the beat's bassline)
 
 ## Fix rounds
 
 - round 1: vocal buried or hard to make out: +2 dB on verse1, verse2, verse4, verse6; bed-other ducks 7 dB under the vocal (superseded by round 2's 9 dB); drop at bar 93: bed-bass out for bar 92
 - round 2: vocal buried or hard to make out: +2 dB on verse1, verse2, verse4, verse6; bed-other ducks 9 dB under the vocal
 
+## Edits after the draft
+
+- Removed the Whitney Houston "Exhale" sample that opened `verse1` (GLOCK bars 1-9.2, "Everyone falls ... when we
+  exhale, say shoop"; the published lyrics put it at 0:00-0:27, and the vocal stem is silent from 26.3 s to 27.8 s).
+  Before, it played across the bar-33 drop and Don came in at bar 48.
+- Re-laid the vocal with the draft's own anchoring rule: GLOCK bar 9 (Don's first line, "Hold my Glock when I'm in the
+  club") lands on the bar-33 drop, and GLOCK plays in order to its bar 44.75 as `hook1`, `hook2`, `verse3`, `hook4`,
+  `verse5` (the hooks are the published chorus lines). Cuts sit on beats where the vocal stem is quiet, with
+  `word_safe` off: Whisper missed this chorus, so its word times there are wrong, and the word-safe edges overlapped
+  the next clip by half a second.
+- Every piece keeps the +4 dB rap treatment the earlier draft gave these lines. With the hook chain at 0 dB, Whisper
+  made out 13% of `hook2`.
+- `mix follow` puts the bass under `hook4` on the vocal's original chords (QA: 12% of its sung notes sat a half-step
+  or tritone off the beat's bass). The old follow under `verse2` went with that clip.
+- Whisper's readings swing run to run: `hook1` read 61% and then 38% on two renders whose audio there differs by
+  -40 dB.
+
 ## QA after the last render
 
-- verdict: review, -6.2 LUFS, -1.0 dBTP
-- warning: verse1: warped clip lands +18 ms off the output grid
-- warning: bar 93: the drop has only 3.4 dB of contrast with the 8 bars before it; strip or filter more in the build
+- verdict: review, -6.2 LUFS, -1.1 dBTP
+- warning: hook4: warped clip lands -17 ms off the output grid
 - warning: bed-shout-1: 1 word(s) still cut at the clip edges
-- warning: bars 32, 41, 51: held vocal notes rub against the beat's chord (a semitone off); check harmonize notes in render.json or shift the vocal
-- warning: verse1: Whisper made out only 46% of its 28 words in the finished mix (the track's average is 50%): the beat masks it
-- warning: verse2: Whisper made out only 43% of its 14 words in the finished mix (the track's average is 50%): the beat masks it
-- warning: verse4: Whisper made out only 46% of its 26 words in the finished mix (the track's average is 50%): the beat masks it
-- warning: bars 17-18, 22, 26, 28, 31-34, 39, 41, 43, 45-46, 68, 103: vocal is buried under the beat in the 1-4 kHz band; raise the vocal, add duck to the bed, or cut the bed's mids
-- warning: sources bed + vox (bed-bass, bed-other, hook3, hook5, verse1, verse2, verse4, verse6): plan: keys 9A vs 12B are 4 steps apart on the Camelot wheel; shift semitones or keep the overlap short/percussive
+- warning: bars 49: held vocal notes rub against the beat's chord (a semitone off); check harmonize notes in render.json or shift the vocal
+- warning: bars 92-93: vocal is buried under the beat in the 1-4 kHz band; raise the vocal, add duck to the bed, or cut the bed's mids
+- warning: sources bed + vox (bed-bass, bed-other, hook1, hook2, hook4, verse3, verse5): plan: keys 9A vs 12B are 4 steps apart on the Camelot wheel; shift semitones or keep the overlap short/percussive
 
 ## Needs ears
 
